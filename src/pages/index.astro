@@ -10,9 +10,6 @@ const results = await db.prepare('SELECT * from calendar_dates LIMIT 10;').all()
 
 const tables = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
 
-console.log({db})
-
-console.log(results);
 
 ---
 

@@ -1,0 +1,71 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { openDb } from 'gtfs';
+import { GTFSconfig } from '../integrations/import-gtfs';
+export const prerender = true;
+
+const db = openDb(GTFSconfig);
+
+const query = `SELECT 
+    stops.stop_name,
+    stops.stop_id,
+    stop_times.stop_sequence,
+    GROUP_CONCAT(stop_times.arrival_time ORDER BY stop_times.arrival_time) as arrival_times
+FROM routes
+JOIN trips ON routes.route_id = trips.route_id  
+JOIN stop_times ON trips.trip_id = stop_times.trip_id
+JOIN stops ON stop_times.stop_id = stops.stop_id
+WHERE routes.route_id = 801  
+  AND trips.direction_id = 0  -- optional: specific direction
+GROUP BY stops.stop_id, stops.stop_name, stop_times.stop_sequence
+ORDER BY stop_times.stop_sequence;`
+
+const results = await db.prepare(query).all();
+const schedule = results.map(row => ({
+  stop_name: row.stop_name,
+  stop_id: row.stop_id,
+  arrival_times: row.arrival_times.split(',')
+}));
+
+
+---
+
+<Layout>
+
+    <table>
+        <thead>
+            <tr>
+                <th scope="col">
+                    Stop
+                </th>
+                {
+                    schedule[0].arrival_times.map( time =>(
+                        <th scope="col">
+                            Time
+                        </th>
+                    ))
+                }
+            </tr>
+        </thead>
+        <tbody>
+            {
+                schedule.map( stop => (
+                    <tr>
+                        <td>
+                            {stop.stop_name}
+                        </td>
+                        {stop.arrival_times.map(time => (
+                        <td>
+                            {time}
+                        </td>
+                        ))}
+                    </tr>   
+                ))
+            }
+            
+        </tbody>
+    </table>
+    <code>
+		{JSON.stringify(results)}
+	</code>
+</Layout>
