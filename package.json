@@ -12,7 +12,8 @@
 	},
 	"dependencies": {
 		"@astrojs/cloudflare": "^12.6.12",
-		"astro": "^5.16.1"
+		"astro": "^5.16.1",
+		"gtfs": "^4.18.1"
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.1",
