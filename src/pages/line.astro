@@ -4,6 +4,20 @@ import { openDb } from 'gtfs';
 import { GTFSconfig } from '../integrations/import-gtfs';
 export const prerender = true;
 
+// Define types for database query results
+interface QueryResult {
+  stop_name: string;
+  stop_id: string;
+  stop_sequence: number;
+  arrival_times: string;
+}
+
+interface ScheduleItem {
+  stop_name: string;
+  stop_id: string;
+  arrival_times: string[];
+}
+
 const db = openDb(GTFSconfig);
 
 const query = `SELECT 
@@ -20,8 +34,8 @@ WHERE routes.route_id = 801
 GROUP BY stops.stop_id, stops.stop_name, stop_times.stop_sequence
 ORDER BY stop_times.stop_sequence;`
 
-const results = await db.prepare(query).all();
-const schedule = results.map(row => ({
+const results = await db.prepare(query).all() as QueryResult[];
+const schedule: ScheduleItem[] = results.map((row: QueryResult) => ({
   stop_name: row.stop_name,
   stop_id: row.stop_id,
   arrival_times: row.arrival_times.split(',')
@@ -39,7 +53,7 @@ const schedule = results.map(row => ({
                     Stop
                 </th>
                 {
-                    schedule[0].arrival_times.map( time =>(
+                    schedule.length > 0 && schedule[0].arrival_times.map(() => (
                         <th scope="col">
                             Time
                         </th>
@@ -54,7 +68,7 @@ const schedule = results.map(row => ({
                         <td>
                             {stop.stop_name}
                         </td>
-                        {stop.arrival_times.map(time => (
+                        {stop.arrival_times.map((time: string) => (
                         <td>
                             {time}
                         </td>
