@@ -4,20 +4,6 @@ import { openDb, getTrips, getStoptimes, getStops } from "gtfs";
 import { GTFSconfig } from "../integrations/import-gtfs";
 export const prerender = true;
 
-// Define types for database query results
-interface QueryResult {
-  stop_name: string;
-  stop_id: string;
-  stop_sequence: number;
-  arrival_times: string;
-}
-
-interface ScheduleItem {
-  stop_name: string;
-  stop_id: string;
-  arrival_times: string[];
-}
-
 // Alternative approach: query DB directly (keeping here for prototype exploration)
 // const db = openDb(GTFSconfig);
 // const query = `
@@ -48,6 +34,7 @@ interface ScheduleItem {
 //   arrival_times: row.arrival_time.split(","),
 // }));
 
+// TODO: this is a pretty inefficient way to do this, and I'm not sure if we want to rely on the GTFS library for querying if we don't need.
 const trips = getTrips({
   route_id: "801",
   service_id: "RJUN25-801-1_Weekday-94",
@@ -72,6 +59,14 @@ const schedule = trips.map((trip) => {
   return stopstimesWithNames;
 });
 
+// TODO: this is hard coded to sorting stops by using a stop that every tip hits
+// this needs to be generalized to any configuration of lines
+const sortedSchedule = schedule.sort((a, b) => {
+  const aTime = a.find((s) => s.stop_id === "80112")?.arrival_timestamp ?? 0;
+  const bTime = b.find((s) => s.stop_id === "80112")?.arrival_timestamp ?? 0;
+  return aTime - bTime;
+});
+
 // TODO: For now, we're assuming that the longest trip contains all of the stops in order
 // This does not necessarily hold in all cases and needs to be fixed.
 const longestRouteIndex = schedule.reduce(
@@ -92,12 +87,18 @@ const allStops = schedule[longestRouteIndex]
   <table>
     <thead>
       <tr>
-        {allStops.map((stop) => <th scope="col">{stop.stop_name}</th>)}
+        {
+          allStops.map((stop) => (
+            <th scope="col">
+              {stop.stop_name}, {stop.stop_id}
+            </th>
+          ))
+        }
       </tr>
     </thead>
     <tbody>
       {
-        schedule.map((trip) => (
+        sortedSchedule.map((trip) => (
           <tr>
             {allStops.map((mainStop) => {
               const stop = trip.find((s) => s.stop_id === mainStop.stop_id);
