@@ -1,0 +1,19 @@
+Agencies: Metro - Los Angeles
+Feed Version: Unknown
+GTFS-to-HTML Version: 2.12.1
+Date Generated: 2025-12-01T21:02:04.248Z
+Timetable Page Count: 0
+Timetable Count: 0
+Calendar Service ID Count: 0
+Route Count: 0
+Trip Count: 0
+Stop Count: 0
+Source: https://gitlab.com/LACMTA/gtfs_rail/-/raw/master/gtfs_rail.zip?ref_type=heads&inline=false
+
+Warnings:
+No route found for timetable_page_id=route_Metro A Line
+No route found for timetable_page_id=route_Metro B Line
+No route found for timetable_page_id=route_Metro C Line
+No route found for timetable_page_id=route_Metro E Line
+No route found for timetable_page_id=route_Metro K Line
+No route found for timetable_page_id=route_Metro D Line

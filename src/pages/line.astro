@@ -1,7 +1,7 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import { openDb } from 'gtfs';
-import { GTFSconfig } from '../integrations/import-gtfs';
+import Layout from "../layouts/Layout.astro";
+import { openDb, getTrips, getStoptimes, getStops } from "gtfs";
+import { GTFSconfig } from "../integrations/import-gtfs";
 export const prerender = true;
 
 // Define types for database query results
@@ -18,70 +18,94 @@ interface ScheduleItem {
   arrival_times: string[];
 }
 
-const db = openDb(GTFSconfig);
+// Alternative approach: query DB directly (keeping here for prototype exploration)
+// const db = openDb(GTFSconfig);
+// const query = `
+//     SELECT
+//         stop_times.arrival_time as arrival_time,
+//         stop_times.arrival_timestamp as arrival_timestamp,
+//         stop_times.trip_id as trip_id,
+//         stop_times.stop_id as stop_id,
+//         trips.route_id as route_id,
+//         stops.stop_name as stop_name,
+//         stop_times.stop_sequence as stop_sequence
+//     FROM stop_times
+//     LEFT JOIN trips ON stop_times.trip_id = trips.trip_id
+//     LEFT JOIN stops ON stops.stop_id = stop_times.stop_id
+//     WHERE
+//         trips.route_id = 801
+//         AND trips.service_id = 'RJUN25-801-1_Weekday-94'
+//         AND trips.direction_id = 0
+//     ORDER BY stop_times.stop_sequence, trips.route_id;
+//         `;
 
-const query = `SELECT 
-    stops.stop_name,
-    stops.stop_id,
-    stop_times.stop_sequence,
-    GROUP_CONCAT(DISTINCT stop_times.arrival_time ORDER BY stop_times.arrival_time) as arrival_times
-FROM routes
-JOIN trips ON routes.route_id = trips.route_id  
-JOIN stop_times ON trips.trip_id = stop_times.trip_id
-JOIN stops ON stop_times.stop_id = stops.stop_id
-WHERE routes.route_id = 801  
-  AND trips.direction_id = 0
-  AND stop_times.arrival_time IS NOT NULL
-  AND stop_times.arrival_time != ''
-GROUP BY stops.stop_id, stops.stop_name, stop_times.stop_sequence
-ORDER BY stop_times.stop_sequence;`
+// const results = (await db.prepare(query).all()) as QueryResult[];
+// console.log({ results });
+// const schedule: ScheduleItem[] = results.map((row: QueryResult) => ({
+//   stop_name: row.stop_name,
+//   stop_id: row.stop_id,
+//   stop_sequence: row.stop_sequence,
+//   arrival_times: row.arrival_time.split(","),
+// }));
 
-const results = await db.prepare(query).all() as QueryResult[];
-const schedule: ScheduleItem[] = results.map((row: QueryResult) => ({
-  stop_name: row.stop_name,
-  stop_id: row.stop_id,
-  arrival_times: row.arrival_times.split(',')
-}));
+const trips = getTrips({
+  route_id: "801",
+  service_id: "RJUN25-801-1_Weekday-94",
+  direction_id: 0,
+});
 
+const schedule = trips.map((trip) => {
+  const stoptimes = getStoptimes(
+    {
+      trip_id: trip.trip_id,
+    },
+    [],
+    [["stop_sequence", "ASC"]],
+  );
+  const stopstimesWithNames = stoptimes.map((stoptime) => {
+    const stop = getStops({ stop_id: stoptime.stop_id });
+    return {
+      ...stoptime,
+      stop: stop[0],
+    };
+  });
+  return stopstimesWithNames;
+});
 
+// TODO: For now, we're assuming that the longest trip contains all of the stops in order
+// This does not necessarily hold in all cases and needs to be fixed.
+const longestRouteIndex = schedule.reduce(
+  (p, c, i, a) => (a[p].length > c.length ? p : i),
+  0,
+);
+const allStops = schedule[longestRouteIndex]
+  .sort((a, b) => {
+    // Handle null arrival_timestamp values
+    const aTime = a.arrival_timestamp || 0;
+    const bTime = b.arrival_timestamp || 0;
+    return aTime - bTime;
+  })
+  .map((stoptime) => stoptime.stop);
 ---
 
 <Layout>
-
-    <table>
-        <thead>
-            <tr>
-                <th scope="col">
-                    Stop
-                </th>
-                {
-                    schedule.length > 0 && schedule[0].arrival_times.map(() => (
-                        <th scope="col">
-                            Time
-                        </th>
-                    ))
-                }
-            </tr>
-        </thead>
-        <tbody>
-            {
-                schedule.map( stop => (
-                    <tr>
-                        <td>
-                            {stop.stop_name}
-                        </td>
-                        {stop.arrival_times.map((time: string) => (
-                        <td>
-                            {time}
-                        </td>
-                        ))}
-                    </tr>   
-                ))
-            }
-            
-        </tbody>
-    </table>
-    <code>
-		{JSON.stringify(results)}
-	</code>
+  <table>
+    <thead>
+      <tr>
+        {allStops.map((stop) => <th scope="col">{stop.stop_name}</th>)}
+      </tr>
+    </thead>
+    <tbody>
+      {
+        schedule.map((trip) => (
+          <tr>
+            {allStops.map((mainStop) => {
+              const stop = trip.find((s) => s.stop_id === mainStop.stop_id);
+              return stop ? <td>{stop.arrival_time}</td> : <td> -- </td>;
+            })}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
 </Layout>

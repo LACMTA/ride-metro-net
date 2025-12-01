@@ -1,5 +1,13 @@
 {
-	"files.associations": {
-		"wrangler.json": "jsonc"
-	}
+  "files.associations": {
+    "wrangler.json": "jsonc"
+  },
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[astro]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  }
 }
