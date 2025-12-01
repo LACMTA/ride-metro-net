@@ -10,8 +10,7 @@
 		"nodejs_compat"
 	],
 	"assets": {
-    "directory": "./dist",
-    "binding": "ASSETS"
+    "directory": "./dist"
 	},
 	"observability": {
 		"enabled": true
