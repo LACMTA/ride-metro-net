@@ -1,8 +1,8 @@
 import { importGtfs } from "gtfs";
 
 export const GTFSconfig = {
-  // sqlitePath: ":memory:",
-  sqlitePath: "./data/test.db",
+  sqlitePath: ":memory:",
+  // sqlitePath: "./data/test.db",
   agencies: [
     {
       // train
