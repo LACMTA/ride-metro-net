@@ -4,6 +4,60 @@ import { openDb, getTrips, getStoptimes, getStops } from "gtfs";
 import { GTFSconfig } from "../integrations/import-gtfs";
 export const prerender = true;
 
+// For now we're using the `gtfs` library to query the SQLite database; see below for an example querying directly
+
+// TODO: this is a pretty inefficient way to do this, though it doesn't *really* matter since it runs at build time.
+
+// Get all a-line trips
+const trips = getTrips({
+  route_id: "801",
+  service_id: "RJUN25-801-1_Weekday-94",
+  direction_id: 0,
+});
+
+const schedule = trips.map((trip) => {
+  // get stop times for each trip
+  const stoptimes = getStoptimes(
+    {
+      trip_id: trip.trip_id,
+    },
+    [],
+    [["stop_sequence", "ASC"]],
+  );
+  const stopstimesWithNames = stoptimes.map((stoptime) => {
+    // get stop details for each stop
+    const stop = getStops({ stop_id: stoptime.stop_id });
+    return {
+      ...stoptime,
+      stop: stop[0],
+    };
+  });
+  return stopstimesWithNames;
+});
+
+// TODO: this is hard coded to sorting stops by using a stop that every tip hits
+// this needs to be generalized to any configuration of stops along a route
+const sortedSchedule = schedule.sort((a, b) => {
+  const aTime = a.find((s) => s.stop_id === "80112")?.arrival_timestamp ?? 0;
+  const bTime = b.find((s) => s.stop_id === "80112")?.arrival_timestamp ?? 0;
+  return aTime - bTime;
+});
+
+// TODO: For now, we're assuming that the longest trip contains all of the stops in order
+// This does not necessarily hold in all cases and needs to be fixed.
+const longestRouteIndex = schedule.reduce(
+  (p, c, i, a) => (a[p].length > c.length ? p : i),
+  0,
+);
+const allStops = schedule[longestRouteIndex]
+  .sort((a, b) => {
+    // Handle null arrival_timestamp values
+    const aTime = a.arrival_timestamp || 0;
+    const bTime = b.arrival_timestamp || 0;
+    return aTime - bTime;
+  })
+  .map((stoptime) => stoptime.stop);
+
 // Alternative approach: query DB directly (keeping here for prototype exploration)
 // const db = openDb(GTFSconfig);
 // const query = `
@@ -33,54 +87,6 @@ export const prerender = true;
 //   stop_sequence: row.stop_sequence,
 //   arrival_times: row.arrival_time.split(","),
 // }));
-
-// TODO: this is a pretty inefficient way to do this, and I'm not sure if we want to rely on the GTFS library for querying if we don't need.
-const trips = getTrips({
-  route_id: "801",
-  service_id: "RJUN25-801-1_Weekday-94",
-  direction_id: 0,
-});
-
-const schedule = trips.map((trip) => {
-  const stoptimes = getStoptimes(
-    {
-      trip_id: trip.trip_id,
-    },
-    [],
-    [["stop_sequence", "ASC"]],
-  );
-  const stopstimesWithNames = stoptimes.map((stoptime) => {
-    const stop = getStops({ stop_id: stoptime.stop_id });
-    return {
-      ...stoptime,
-      stop: stop[0],
-    };
-  });
-  return stopstimesWithNames;
-});
-
-// TODO: this is hard coded to sorting stops by using a stop that every tip hits
-// this needs to be generalized to any configuration of lines
-const sortedSchedule = schedule.sort((a, b) => {
-  const aTime = a.find((s) => s.stop_id === "80112")?.arrival_timestamp ?? 0;
-  const bTime = b.find((s) => s.stop_id === "80112")?.arrival_timestamp ?? 0;
-  return aTime - bTime;
-});
-
-// TODO: For now, we're assuming that the longest trip contains all of the stops in order
-// This does not necessarily hold in all cases and needs to be fixed.
-const longestRouteIndex = schedule.reduce(
-  (p, c, i, a) => (a[p].length > c.length ? p : i),
-  0,
-);
-const allStops = schedule[longestRouteIndex]
-  .sort((a, b) => {
-    // Handle null arrival_timestamp values
-    const aTime = a.arrival_timestamp || 0;
-    const bTime = b.arrival_timestamp || 0;
-    return aTime - bTime;
-  })
-  .map((stoptime) => stoptime.stop);
 ---
 
 <Layout>
