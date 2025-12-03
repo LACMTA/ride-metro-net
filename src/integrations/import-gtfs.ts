@@ -47,9 +47,13 @@ const getTripIndex = async function () {
   const results = (await db.prepare(query).all()) as [
     { route_id: string; trip_ids: string },
   ];
-  const trips = results.map((trip) => ({
-    [trip.route_id]: trip.trip_ids.split(SEPERATOR),
-  }));
+  const trips = results.reduce(
+    (res, trip) => {
+      res[trip.route_id] = trip.trip_ids.split(SEPERATOR);
+      return res;
+    },
+    {} as Record<string, string[]>,
+  );
 
   fs.mkdirSync(TRIPS_DIR, { recursive: true });
   fs.writeFileSync(path.join(TRIPS_DIR, TRIPS_FILE), JSON.stringify(trips));
