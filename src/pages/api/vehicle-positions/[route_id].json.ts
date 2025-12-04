@@ -43,7 +43,7 @@ export async function GET(context: import("astro").APIContext) {
     },
   });
   if (!response.ok) {
-    return new Response(`Swifty request failed!\n${response.body}`, {
+    return new Response(`Swifty request failed!\n${await response.text()}`, {
       status: 500,
     });
   }
