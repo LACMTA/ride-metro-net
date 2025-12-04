@@ -42,6 +42,11 @@ export async function GET(context: import("astro").APIContext) {
       Authorization: env.API_KEY as string,
     },
   });
+  if (!response.ok) {
+    return new Response(`Swifty request failed!\n${response.body}`, {
+      status: 404,
+    });
+  }
   const responseData = (await response.json()) as GTFSRTResponse;
   const data = responseData.entity;
 
