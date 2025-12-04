@@ -101,8 +101,10 @@ const allStops = schedule[longestRouteIndex]
     const res = await fetch(
       `/api/vehicle-positions/${route_id}.json?direction_id=0`,
     );
+    if (!res.ok) {
+      return console.error(res.body);
+    }
     const data = (await res.json()) as LiveVehicleType[];
-    console.log(data);
     liveVehicles.set(data);
   };
   // TODO: hard coded rn
