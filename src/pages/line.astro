@@ -2,7 +2,12 @@
 import Layout from "../layouts/Layout.astro";
 import { openDb, getTrips, getStoptimes, getStops } from "gtfs";
 import { GTFSconfig } from "../integrations/import-gtfs";
+import LiveVehicleIndicator from "../components/LiveVehicleIndicator";
+
 export const prerender = true;
+
+// TODO: get this from the URL once this is generalized
+const route_id = "801";
 
 // For now we're using the `gtfs` library to query the SQLite database; see below for an example querying directly
 
@@ -10,8 +15,8 @@ export const prerender = true;
 
 // Get all a-line trips
 const trips = getTrips({
-  route_id: "801",
-  service_id: "RJUN25-801-1_Weekday-94",
+  route_id: route_id,
+  service_id: "RJUN25-801-1_Weekday-68",
   direction_id: 0,
 });
 
@@ -89,6 +94,21 @@ const allStops = schedule[longestRouteIndex]
 // }));
 ---
 
+<script>
+  import { liveVehicles, type LiveVehicleType } from "../lib/liveVehicleStore";
+  const getLiveVehicles = async function (route_id: string) {
+    const res = await fetch(
+      `/api/vehicle-positions/${route_id}.json?direction_id=0`,
+    );
+    const data = (await res.json()) as LiveVehicleType[];
+    console.log(data);
+    liveVehicles.set(data);
+  };
+  // TODO: hard coded rn
+  getLiveVehicles("801");
+  setInterval(getLiveVehicles.bind(this, "801"), 10000);
+</script>
+
 <Layout>
   <table>
     <thead>
@@ -108,7 +128,18 @@ const allStops = schedule[longestRouteIndex]
           <tr>
             {allStops.map((mainStop) => {
               const stop = trip.find((s) => s.stop_id === mainStop.stop_id);
-              return stop ? <td>{stop.arrival_time}</td> : <td> -- </td>;
+              return stop && stop.stop_id && stop.trip_id ? (
+                <td>
+                  {stop.arrival_time}{" "}
+                  <LiveVehicleIndicator
+                    stop_id={stop.stop_id}
+                    trip_id={stop.trip_id}
+                    client:only="preact"
+                  />{" "}
+                </td>
+              ) : (
+                <td> -- </td>
+              );
             })}
           </tr>
         ))

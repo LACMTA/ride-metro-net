@@ -13,8 +13,14 @@
   "dependencies": {
     "@astrojs/check": "^0.9.6",
     "@astrojs/cloudflare": "^12.6.12",
+    "@astrojs/preact": "^4.1.3",
+    "@nanostores/preact": "^1.0.0",
     "astro": "^5.16.1",
     "gtfs": "^4.18.1",
+    "install": "^0.13.0",
+    "nanostores": "^1.1.0",
+    "npm": "^11.6.4",
+    "preact": "^10.28.0",
     "typescript": "^5.9.3"
   },
   "devDependencies": {

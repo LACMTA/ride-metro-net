@@ -1,22 +1,23 @@
 // @ts-check
 import { defineConfig } from "astro/config";
-
 import cloudflare from "@astrojs/cloudflare";
 import importGTFS from "./src/integrations/import-gtfs";
+
+import preact from "@astrojs/preact";
 
 // https://astro.build/config
 export default defineConfig({
   adapter: cloudflare({
     platformProxy: {
-      enabled: true,
+      enabled: true
     },
-    imageService: "cloudflare",
+    imageService: "cloudflare"
   }),
   vite: {
     // force GTFS/SQLite integration to run only at buildtime
     ssr: {
-      external: ["gtfs", "better-sqlite3", "sqlite3"],
-    },
+      external: ["gtfs", "better-sqlite3", "sqlite3"]
+    }
   },
-  integrations: [importGTFS()],
+  integrations: [importGTFS(), preact()]
 });
