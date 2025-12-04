@@ -7,7 +7,7 @@
   "name": "gtfs-experiments",
   "compatibility_date": "2025-11-26",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-  // "main": "./dist/_worker.js",
+  "main": "./dist/_worker.js",
   "assets": {
     "directory": "./dist",
   },
