@@ -1,0 +1,47 @@
+---
+import { openDb } from "gtfs";
+import Layout from "../../layouts/Layout.astro";
+import { GTFSconfig } from "../../integrations/import-gtfs";
+
+const { stop_id } = Astro.params;
+export const prerender = false;
+
+const db = openDb(GTFSconfig);
+const query = `
+    SELECT 
+      stop_name, stop_id, stop_lat, stop_lon
+    FROM stops
+    WHERE stop_id = ${stop_id}
+    LIMIT 1
+        `;
+
+const stop = await db.prepare(query).all()[0];
+---
+
+<script>
+  import type { Predictions } from "../api/stop-predictions/[stop_id]";
+
+  const getPredictions = async function (stop_id: string) {
+    const res = await fetch(`/api/stop-predictions/${stop_id}`);
+    if (!res.ok) {
+      return console.error(await res.text());
+    }
+    const data = (await res.json()) as Predictions;
+    console.log(data);
+    const el = document.getElementById("predictions");
+    console.log(el);
+    el?.setHTMLUnsafe(JSON.stringify(data));
+  };
+  // TODO: hard coded rn
+  getPredictions("193");
+  setInterval(getPredictions.bind(this, "193"), 10000);
+</script>
+
+<Layout>
+  <h1>{stop.stop_name}</h1>
+  <code>
+    {JSON.stringify(stop)}
+  </code>
+  <h2>Predictions</h2>
+  <code id="predictions"></code>
+</Layout>
