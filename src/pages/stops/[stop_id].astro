@@ -3,19 +3,32 @@ import { openDb } from "gtfs";
 import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
 
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const db = openDb(GTFSconfig);
+  // TODO: this will currently build all pages. Consider building only pages for pilot.
+  const allStops = (await db
+    .prepare("SELECT DISTINCT stop_id FROM stops")
+    .all()) as { stop_id: string }[];
+
+  return allStops.map((stop: { stop_id: string }) => ({
+    params: { stop_id: stop.stop_id },
+  }));
+}
+
 const { stop_id } = Astro.params;
-export const prerender = false;
 
 const db = openDb(GTFSconfig);
 const query = `
     SELECT 
       stop_name, stop_id, stop_lat, stop_lon
     FROM stops
-    WHERE stop_id = ${stop_id}
+    WHERE stop_id = ?
     LIMIT 1
         `;
 
-const stop = await db.prepare(query).all()[0];
+const stop = await db.prepare(query).get(stop_id);
 ---
 
 <script>
