@@ -1,7 +1,8 @@
 ---
-import { openDb } from "gtfs";
+import { openDb, type Stop } from "gtfs";
 import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
+import { objectToCamel } from "ts-case-convert";
 
 export const prerender = true;
 
@@ -28,7 +29,7 @@ const query = `
     LIMIT 1
         `;
 
-const stop = await db.prepare(query).get(stopId);
+const stop = objectToCamel((await db.prepare(query).get(stopId)) as Stop);
 ---
 
 <script>
@@ -51,7 +52,7 @@ const stop = await db.prepare(query).get(stopId);
 </script>
 
 <Layout>
-  <h1>{stop.stop_name}</h1>
+  <h1>{stop.stopName}</h1>
   <code>
     {JSON.stringify(stop)}
   </code>

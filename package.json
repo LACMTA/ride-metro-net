@@ -17,10 +17,12 @@
     "@nanostores/preact": "^1.0.0",
     "astro": "^5.16.1",
     "gtfs": "^4.18.1",
+    "gtfs-types": "^5.1.0",
     "install": "^0.13.0",
     "nanostores": "^1.1.0",
     "npm": "^11.6.4",
     "preact": "^10.28.0",
+    "ts-case-convert": "^2.1.0",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
