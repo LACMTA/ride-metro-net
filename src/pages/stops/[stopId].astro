@@ -13,11 +13,11 @@ export async function getStaticPaths() {
     .all()) as { stop_id: string }[];
 
   return allStops.map((stop: { stop_id: string }) => ({
-    params: { stop_id: stop.stop_id },
+    params: { stopId: stop.stop_id },
   }));
 }
 
-const { stop_id } = Astro.params;
+const { stopId } = Astro.params;
 
 const db = openDb(GTFSconfig);
 const query = `
@@ -28,14 +28,14 @@ const query = `
     LIMIT 1
         `;
 
-const stop = await db.prepare(query).get(stop_id);
+const stop = await db.prepare(query).get(stopId);
 ---
 
 <script>
-  import type { Predictions } from "../api/stop-predictions/[stop_id]";
+  import type { Predictions } from "../api/stop-predictions/[stopId]";
 
-  const getPredictions = async function (stop_id: string) {
-    const res = await fetch(`/api/stop-predictions/${stop_id}`);
+  const getPredictions = async function (stopId: string) {
+    const res = await fetch(`/api/stop-predictions/${stopId}`);
     if (!res.ok) {
       return console.error(await res.text());
     }
