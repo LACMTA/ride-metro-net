@@ -3,6 +3,7 @@ import { openDb, type Stop } from "gtfs";
 import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
 import { objectToCamel } from "ts-case-convert";
+import DataInjector from "../../components/DataInjector.astro";
 
 export const prerender = true;
 
@@ -32,8 +33,14 @@ const query = `
 const stop = objectToCamel((await db.prepare(query).get(stopId)) as Stop);
 ---
 
+<DataInjector data={stop} id="data-stop" />
 <script>
   import type { Predictions } from "../api/stop-predictions/[stopId]";
+  import type { Stop } from "gtfs";
+  import { getData } from "../../lib/getData";
+  import { objectToCamel } from "ts-case-convert";
+
+  const stop = objectToCamel(getData("data-stop") as Stop);
 
   const getPredictions = async function (stopId: string) {
     const res = await fetch(`/api/stop-predictions/${stopId}`);
@@ -46,9 +53,9 @@ const stop = objectToCamel((await db.prepare(query).get(stopId)) as Stop);
     console.log(el);
     el?.setHTMLUnsafe(JSON.stringify(data));
   };
-  // TODO: hard coded rn
-  getPredictions("193");
-  setInterval(getPredictions.bind(this, "193"), 10000);
+
+  getPredictions(stop.stopId);
+  setInterval(getPredictions.bind(this, stop.stopId), 10000);
 </script>
 
 <Layout>
