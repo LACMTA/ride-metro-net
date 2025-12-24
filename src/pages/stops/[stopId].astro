@@ -2,8 +2,9 @@
 import { openDb, type Stop } from "gtfs";
 import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
-import { objectToCamel } from "ts-case-convert";
 import DataInjector from "../../components/DataInjector.astro";
+import getStopWithRoutes from "../../lib/getStopWithRoutes";
+import type { StopWithRoutes } from "../../lib/getStopWithRoutes";
 
 export const prerender = true;
 
@@ -21,26 +22,16 @@ export async function getStaticPaths() {
 
 const { stopId } = Astro.params;
 
-const db = openDb(GTFSconfig);
-const query = `
-    SELECT 
-      stop_name, stop_id, stop_lat, stop_lon
-    FROM stops
-    WHERE stop_id = ?
-    LIMIT 1
-        `;
-
-const stop = objectToCamel((await db.prepare(query).get(stopId)) as Stop);
+const stop = await getStopWithRoutes(stopId);
 ---
 
 <DataInjector data={stop} id="data-stop" />
 <script>
   import type { Predictions } from "../api/stop-predictions/[stopId]";
-  import type { Stop } from "gtfs";
+  import type { StopWithRoutes } from "../../lib/getStopWithRoutes";
   import { getData } from "../../lib/getData";
-  import { objectToCamel } from "ts-case-convert";
 
-  const stop = objectToCamel(getData("data-stop") as Stop);
+  const stop = getData("data-stop") as StopWithRoutes;
 
   const getPredictions = async function (stopId: string) {
     const res = await fetch(`/api/stop-predictions/${stopId}`);
@@ -63,6 +54,10 @@ const stop = objectToCamel((await db.prepare(query).get(stopId)) as Stop);
   <code>
     {JSON.stringify(stop)}
   </code>
+  <h2>Routes</h2>
+  <ul>
+    {stop.routeShortNames.map((route) => <li>{route}</li>)}
+  </ul>
   <h2>Predictions</h2>
   <code id="predictions"></code>
 </Layout>
