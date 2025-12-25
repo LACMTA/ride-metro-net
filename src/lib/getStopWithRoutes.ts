@@ -5,14 +5,24 @@ import { objectToCamel } from "ts-case-convert";
 export interface StopWithRoutes {
   stopName: string;
   stopId: string;
-  routeShortNames: string[];
+  routes: {
+    routeId: string;
+    routeShortName: string;
+  }[];
 }
 
 export default async function (stopId: string) {
   const db = openDb(GTFSconfig);
   const query = `
 SELECT
-    stops.stop_name as stop_name, stops.stop_id as stop_id, group_concat( DISTINCT routes.route_short_name) as route_short_names
+      stops.stop_name as stop_name, 
+      stops.stop_id as stop_id, 
+      JSON_GROUP_ARRAY(
+        DISTINCT JSON_OBJECT(
+          'route_id', routes.route_id,
+          'route_shortname', routes.route_short_name
+        )
+      ) AS routes
     FROM stops
     LEFT JOIN stop_times ON stop_times.stop_id = stops.stop_id
     LEFT JOIN trips ON trips.trip_id = stop_times.trip_id
@@ -22,11 +32,11 @@ SELECT
 
   const res = objectToCamel(await db.prepare(query).get(stopId));
 
-  const stop: StopWithRoutes = {
-    routeShortNames: res.routeShortNames.split(","),
+  const stop = {
     stopName: res.stopName,
     stopId: res.stopId,
-  };
+    routes: JSON.parse(res.routes),
+  } as StopWithRoutes;
 
   return stop;
 }

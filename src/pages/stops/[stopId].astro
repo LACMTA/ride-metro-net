@@ -55,7 +55,7 @@ const stop = await getStopWithRoutes(stopId);
   </code>
   <h2>Routes</h2>
   <ul>
-    {stop.routeShortNames.map((route) => <li>{route}</li>)}
+    {stop.routes.map((route) => <li>{JSON.stringify(route)}</li>)}
   </ul>
   <h2>Predictions</h2>
   <code id="predictions"></code>
