@@ -20,7 +20,7 @@ SELECT
       JSON_GROUP_ARRAY(
         DISTINCT JSON_OBJECT(
           'route_id', routes.route_id,
-          'route_shortname', routes.route_short_name
+          'route_short_name', routes.route_short_name
         )
       ) AS routes
     FROM stops
@@ -30,13 +30,13 @@ SELECT
     WHERE stops.stop_id = ?
         `;
 
-  const res = objectToCamel(await db.prepare(query).get(stopId));
+  const res = await db.prepare(query).get(stopId);
 
-  const stop = {
-    stopName: res.stopName,
-    stopId: res.stopId,
+  const stop = objectToCamel({
+    stopName: res.stop_name,
+    stopId: res.stop_id,
     routes: JSON.parse(res.routes),
-  } as StopWithRoutes;
+  }) as StopWithRoutes;
 
   return stop;
 }
