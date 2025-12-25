@@ -8,6 +8,7 @@ export interface StopWithRoutes {
   routes: {
     routeId: string;
     routeShortName: string;
+    arrivalTimes: string[];
   }[];
 }
 
@@ -20,7 +21,14 @@ SELECT
       JSON_GROUP_ARRAY(
         DISTINCT JSON_OBJECT(
           'route_id', routes.route_id,
-          'route_short_name', routes.route_short_name
+          'route_short_name', routes.route_short_name,
+          'arrival_times', (
+            SELECT JSON_GROUP_ARRAY(stop_times.arrival_time) 
+            FROM stop_times
+            JOIN trips ON trips.trip_id = stop_times.trip_id 
+            WHERE stop_times.stop_id = stops.stop_id 
+              AND trips.route_id = routes.route_id
+          )
         )
       ) AS routes
     FROM stops
