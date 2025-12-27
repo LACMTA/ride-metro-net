@@ -38,9 +38,7 @@ const stop = await getStopWithRoutes(stopId);
       return console.error(await res.text());
     }
     const data = (await res.json()) as Predictions;
-    console.log(data);
     const el = document.getElementById("predictions");
-    console.log(el);
     el?.setHTMLUnsafe(JSON.stringify(data));
   };
 
