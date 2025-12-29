@@ -14,7 +14,7 @@ export async function getStaticPaths() {
     .prepare("SELECT DISTINCT stop_id FROM stops")
     .all()) as { stop_id: string }[];
 
-  return allStops.map((stop: { stop_id: string }) => ({
+  return allStops.map((stop) => ({
     params: { stopId: stop.stop_id },
   }));
 }
