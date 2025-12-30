@@ -1,5 +1,5 @@
-import type { Alert, Incrementality } from "gtfs-types";
-import type { CamelCasedPropertiesDeep, OverrideProperties } from "type-fest";
+import type { Alert } from "gtfs-types";
+import type { CamelCasedPropertiesDeep } from "type-fest";
 
 export const prerender = false;
 
@@ -83,7 +83,7 @@ export async function GET(context: import("astro").APIContext) {
   );
   predictionsUrl.searchParams.append("stop", stopId);
 
-  const predictionsResponse = await fetch(predictionsUrl.toString(), {
+  const predictionsResponsePromise = fetch(predictionsUrl.toString(), {
     method: "GET",
     headers: {
       Accept:
@@ -91,8 +91,35 @@ export async function GET(context: import("astro").APIContext) {
       Authorization: env.API_KEY as string,
     },
   });
+
+  const alertsUrl = new URL(
+    `https://api.goswift.ly/real-time/${AGENCY_KEY}/gtfs-rt-alerts/v2`,
+  );
+  // TODO: consider using protocol buffer for network performance
+  // it's possible the response will actually match the GTFS spec in this case
+  alertsUrl.searchParams.append("format", "json");
+
+  // TODO: consider caching alerts with KV (if we stay on cloudflare)
+  const alertsResponsePromise = fetch(alertsUrl.toString(), {
+    method: "GET",
+    headers: {
+      Accept:
+        "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
+      Authorization: env.API_KEY as string,
+    },
+  });
+
+  const predictionsResponse = await predictionsResponsePromise;
   if (!predictionsResponse.ok) {
     console.error(await predictionsResponse.text());
+    return new Response(`Swifty request failed!`, {
+      status: 500,
+    });
+  }
+
+  const alertsResponse = await alertsResponsePromise;
+  if (!alertsResponse.ok) {
+    console.error(await alertsResponse.text());
     return new Response(`Swifty request failed!`, {
       status: 500,
     });
@@ -104,28 +131,6 @@ export async function GET(context: import("astro").APIContext) {
 
   const routeIds = filteredPredictions.map((route) => route.routeId);
 
-  const alertsUrl = new URL(
-    `https://api.goswift.ly/real-time/${AGENCY_KEY}/gtfs-rt-alerts/v2`,
-  );
-  // TODO: consider using protocol buffer for network performance
-  alertsUrl.searchParams.append("format", "json");
-
-  // TODO: run fetches concurrently
-  // TODO: consider caching alerts with KV (if we stay on cloudflare)
-  const alertsResponse = await fetch(alertsUrl.toString(), {
-    method: "GET",
-    headers: {
-      Accept:
-        "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
-      Authorization: env.API_KEY as string,
-    },
-  });
-  if (!alertsResponse.ok) {
-    console.error(await alertsResponse.text());
-    return new Response(`Swifty request failed!`, {
-      status: 500,
-    });
-  }
   const alertsData: AlertsApiResponse = await alertsResponse.json();
 
   const makeConciseAlert = (fullAlert: SwiftlyAlert) => {
