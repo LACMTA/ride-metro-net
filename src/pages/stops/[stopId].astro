@@ -26,7 +26,7 @@ const stop = await getStopWithRoutes(stopId);
 
 <DataInjector data={stop} id="data-stop" />
 <script>
-  import type { Predictions } from "../api/stop-predictions/[stopId]";
+  import type { StopPredictionsWithAlerts } from "../api/stop-predictions/[stopId]";
   import type { StopWithRoutes } from "../../lib/getStopWithRoutes";
   import { getData } from "../../lib/getData";
 
@@ -37,9 +37,9 @@ const stop = await getStopWithRoutes(stopId);
     if (!res.ok) {
       return console.error(await res.text());
     }
-    const data = (await res.json()) as Predictions;
+    const data = (await res.json()) as StopPredictionsWithAlerts;
     const el = document.getElementById("predictions");
-    el?.setHTMLUnsafe(JSON.stringify(data));
+    el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
   };
 
   getPredictions(stop.stopId);
@@ -49,12 +49,14 @@ const stop = await getStopWithRoutes(stopId);
 <Layout>
   <h1>{stop.stopName}</h1>
   <code>
-    {JSON.stringify(stop)}
+    {JSON.stringify(stop, null, 2)}
   </code>
   <h2>Routes</h2>
   <ul>
-    {stop.routes.map((route) => <li>{JSON.stringify(route)}</li>)}
+    {stop.routes.map((route) => <li>{JSON.stringify(route, null, 2)}</li>)}
   </ul>
   <h2>Predictions</h2>
-  <code id="predictions"></code>
+  <pre>
+    <code id="predictions" />
+  </pre>
 </Layout>
