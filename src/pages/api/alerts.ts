@@ -30,8 +30,9 @@ export type ConciseAlert = Pick<
 
 /**
  * GET /api/alerts
- * @param {string} stopId - Comma-separated list of stop IDs to filter by
- * @param {string} routeId - Comma-separated list of route IDs to filter by
+ * @param {string} [stopId] - Comma-separated list of stop IDs to filter by
+ * @param {string} [routeId] - Comma-separated list of route IDs to filter by
+ * @returns {ConciseAlert[]} Array of alerts
  */
 export async function GET(context: import("astro").APIContext) {
   const { env } = context.locals.runtime;

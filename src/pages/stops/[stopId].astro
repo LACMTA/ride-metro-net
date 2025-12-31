@@ -26,9 +26,10 @@ const stop = await getStopWithRoutes(stopId);
 
 <DataInjector data={stop} id="data-stop" />
 <script>
-  import type { StopPredictionsWithAlerts } from "../api/predictions";
   import type { StopWithRoutes } from "../../lib/getStopWithRoutes";
   import { getData } from "../../lib/getData";
+  import type { Prediction } from "../api/predictions";
+  import type { ConciseAlert } from "../api/alerts";
 
   const stop = getData("data-stop") as StopWithRoutes;
 
@@ -37,7 +38,7 @@ const stop = await getStopWithRoutes(stopId);
     if (!res.ok) {
       return console.error(await res.text());
     }
-    const data = (await res.json()) as StopPredictionsWithAlerts;
+    const data = (await res.json()) as Prediction[];
     const el = document.getElementById("predictions");
     el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
   };
@@ -49,7 +50,7 @@ const stop = await getStopWithRoutes(stopId);
     if (!res.ok) {
       return console.error(await res.text());
     }
-    const data = (await res.json()) as StopPredictionsWithAlerts;
+    const data = (await res.json()) as ConciseAlert[];
     const el = document.getElementById("alerts");
     el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
   };
