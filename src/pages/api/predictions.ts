@@ -71,9 +71,10 @@ export type StopPredictionsWithAlerts = {
 
 export async function GET(context: import("astro").APIContext) {
   const { env } = context.locals.runtime;
-  const { stopId } = context.params;
+  const stopId = context.url.searchParams.get("stopId");
 
-  if (!stopId) return new Response("Stop ID is required", { status: 400 });
+  if (!stopId)
+    return new Response("stopId query parameter is required", { status: 400 });
 
   // TODO: generalize for trains
   const AGENCY_KEY = "lametro";
