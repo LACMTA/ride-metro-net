@@ -42,7 +42,23 @@ const stop = await getStopWithRoutes(stopId);
     el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
   };
 
+  const getAlerts = async function (stopId: string, routeIds: string[]) {
+    const res = await fetch(
+      `/api/alerts?stopId=${stopId}&routeId=${routeIds.join(",")}`,
+    );
+    if (!res.ok) {
+      return console.error(await res.text());
+    }
+    const data = (await res.json()) as StopPredictionsWithAlerts;
+    const el = document.getElementById("alerts");
+    el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
+  };
+
   getPredictions(stop.stopId);
+  getAlerts(
+    stop.stopId,
+    stop.routes.map((route) => route.routeId),
+  );
   setInterval(getPredictions.bind(this, stop.stopId), 10000);
 </script>
 
@@ -58,5 +74,9 @@ const stop = await getStopWithRoutes(stopId);
   <h2>Predictions</h2>
   <pre>
     <code id="predictions" />
+  </pre>
+  <h2>Alerts</h2>
+  <pre>
+    <code id="alerts" />
   </pre>
 </Layout>
