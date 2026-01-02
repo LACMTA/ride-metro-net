@@ -1,6 +1,7 @@
 import { openDb } from "gtfs";
 import { GTFSconfig } from "../integrations/import-gtfs";
 import { objectToCamel } from "ts-case-convert";
+import type Database from "better-sqlite3";
 
 export interface StopWithRoutes {
   stopName: string;
@@ -8,13 +9,35 @@ export interface StopWithRoutes {
   routes: {
     routeId: string;
     routeShortName: string;
-    arrivalTimes: string[];
+    departures: {
+      departureTimestamp: number;
+      stopHeadsign: string;
+    };
   }[];
 }
 
-export default async function (stopId: string) {
-  const db = openDb(GTFSconfig);
-  const query = `
+interface DatabaseQueryResult {
+  stop_name: string;
+  stop_id: string;
+  routes: string; // JSON string
+}
+
+let dbInstance: Database.Database | null = null;
+let preparedQuery: Database.Statement | null = null;
+
+function getDb() {
+  if (!dbInstance) {
+    dbInstance = openDb(GTFSconfig);
+
+    dbInstance.pragma("synchronous = OFF");
+    dbInstance.pragma("cache_size = 10000");
+    dbInstance.pragma("temp_store = MEMORY");
+    dbInstance.pragma("journal_mode = OFF"); // Safe for in-memory
+  }
+  return dbInstance;
+}
+
+const query = `
 SELECT
       stops.stop_name as stop_name, 
       stops.stop_id as stop_id, 
@@ -22,12 +45,23 @@ SELECT
         DISTINCT JSON_OBJECT(
           'route_id', routes.route_id,
           'route_short_name', routes.route_short_name,
-          'arrival_times', (
-            SELECT JSON_GROUP_ARRAY(stop_times.arrival_time) 
-            FROM stop_times
-            JOIN trips ON trips.trip_id = stop_times.trip_id 
-            WHERE stop_times.stop_id = stops.stop_id 
-              AND trips.route_id = routes.route_id
+          'departures', (
+            SELECT JSON_GROUP_ARRAY(
+              JSON_OBJECT(
+                'departure_timestamp', ordered_times.departure_timestamp,
+                'stop_headsign', ordered_times.clean_headsign
+              ) 
+            )
+            FROM (
+              SELECT 
+                stop_times.departure_timestamp,
+                SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3) as clean_headsign
+              FROM stop_times
+              JOIN trips ON trips.trip_id = stop_times.trip_id 
+              WHERE stop_times.stop_id = stops.stop_id 
+                AND trips.route_id = routes.route_id
+              ORDER BY stop_times.departure_timestamp ASC
+            ) ordered_times
           )
         )
       ) AS routes
@@ -38,7 +72,17 @@ SELECT
     WHERE stops.stop_id = ?
         `;
 
-  const res = await db.prepare(query).get(stopId);
+function getPreparedQuery() {
+  if (!preparedQuery) {
+    const db = getDb();
+    preparedQuery = db.prepare(query);
+  }
+  return preparedQuery;
+}
+
+export default async function (stopId: string) {
+  const query = getPreparedQuery();
+  const res = query.get(stopId) as DatabaseQueryResult;
 
   const stop = objectToCamel({
     stopName: res.stop_name,

@@ -9,15 +9,20 @@ import preact from "@astrojs/preact";
 export default defineConfig({
   adapter: cloudflare({
     platformProxy: {
-      enabled: true
+      enabled: true,
     },
-    imageService: "cloudflare"
+    imageService: "cloudflare",
   }),
+  build: {
+    // Our latency is mostly from SQLite,
+    // which in-memory is only really hurt by higher concurrency.
+    concurrency: 1,
+  },
   vite: {
     // force GTFS/SQLite integration to run only at buildtime
     ssr: {
-      external: ["gtfs", "better-sqlite3", "sqlite3"]
-    }
+      external: ["gtfs", "better-sqlite3", "sqlite3"],
+    },
   },
-  integrations: [importGTFS(), preact()]
+  integrations: [importGTFS(), preact()],
 });
