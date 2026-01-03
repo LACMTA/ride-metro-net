@@ -47,12 +47,13 @@ SELECT
           'route_short_name', routes.route_short_name,
           'departures', (
             SELECT JSON_GROUP_ARRAY(
-              JSON_OBJECT(
+              DISTINCT JSON_OBJECT(
                 'departure_timestamp', ordered_times.departure_timestamp,
                 'stop_headsign', ordered_times.clean_headsign
               ) 
             )
             FROM (
+            -- TODO: we aren't checking the calendar or calendar_dates tables to ensure we're using the right schedule
               SELECT 
                 stop_times.departure_timestamp,
                 SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3) as clean_headsign
