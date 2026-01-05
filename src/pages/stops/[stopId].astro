@@ -71,11 +71,11 @@ const stop = await getStopWithRoutes(stopId);
     el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
   };
 
-  getPredictions(stop.stopId);
   getAlerts(
     stop.stopId,
     stop.routes.map((route) => route.routeId),
   );
+  getPredictions(stop.stopId);
   setInterval(getPredictions.bind(this, stop.stopId), 10000);
 </script>
 
@@ -103,6 +103,8 @@ const stop = await getStopWithRoutes(stopId);
   </pre>
   <h2>Pre-built data from static GTFS</h2>
   <code>
-    {JSON.stringify(stop, null, 2)}
+    <pre>
+      {JSON.stringify(stop, null, 2)}
+    </pre>
   </code>
 </Layout>
