@@ -45,25 +45,7 @@ SELECT
         DISTINCT JSON_OBJECT(
           'route_id', routes.route_id,
           'route_short_name', routes.route_short_name,
-          'departures', (
-            SELECT JSON_GROUP_ARRAY(
-              DISTINCT JSON_OBJECT(
-                'departure_timestamp', ordered_times.departure_timestamp,
-                'stop_headsign', ordered_times.clean_headsign
-              ) 
-            )
-            FROM (
-            -- TODO: we aren't checking the calendar or calendar_dates tables to ensure we're using the right schedule
-              SELECT 
-                stop_times.departure_timestamp,
-                SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3) as clean_headsign
-              FROM stop_times
-              JOIN trips ON trips.trip_id = stop_times.trip_id 
-              WHERE stop_times.stop_id = stops.stop_id 
-                AND trips.route_id = routes.route_id
-              ORDER BY stop_times.departure_timestamp ASC
-            ) ordered_times
-          )
+          'headsign', SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
         )
       ) AS routes
     FROM stops
