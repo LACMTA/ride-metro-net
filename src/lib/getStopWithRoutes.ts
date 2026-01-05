@@ -12,7 +12,7 @@ export interface StopWithRoutes {
 export interface StopRoute {
   routeId: string;
   routeShortName: string;
-  headsign: string;
+  headsigns: string[];
   directionId: 0 | 1;
 }
 
@@ -38,22 +38,37 @@ function getDb() {
 }
 
 const query = `
-SELECT
+    WITH route_headsigns AS (
+      SELECT 
+        stops.stop_id,
+        routes.route_id,
+        routes.route_short_name,
+        trips.direction_id,
+        JSON_GROUP_ARRAY(
+          DISTINCT SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
+        ) as headsigns
+      FROM stops
+      LEFT JOIN stop_times ON stop_times.stop_id = stops.stop_id
+      LEFT JOIN trips ON trips.trip_id = stop_times.trip_id
+      LEFT JOIN routes ON routes.route_id = trips.route_id
+      WHERE stops.stop_id = @stopId
+      GROUP BY stops.stop_id, routes.route_id, routes.route_short_name, trips.direction_id
+    )
+    SELECT
       stops.stop_name as stop_name, 
       stops.stop_id as stop_id, 
       JSON_GROUP_ARRAY(
-        DISTINCT JSON_OBJECT(
-          'route_id', routes.route_id,
-          'route_short_name', routes.route_short_name,
-          'headsign', SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3),
-          'direction_id', trips.direction_id
+        JSON_OBJECT(
+          'route_id', route_headsigns.route_id,
+          'route_short_name', route_headsigns.route_short_name,
+          'direction_id', route_headsigns.direction_id,
+          'headsigns', JSON(route_headsigns.headsigns)
         )
       ) AS routes
     FROM stops
-    LEFT JOIN stop_times ON stop_times.stop_id = stops.stop_id
-    LEFT JOIN trips ON trips.trip_id = stop_times.trip_id
-    LEFT JOIN routes ON routes.route_id = trips.route_id
-    WHERE stops.stop_id = ?
+    JOIN route_headsigns ON route_headsigns.stop_id = stops.stop_id
+    WHERE stops.stop_id = @stopId
+    GROUP BY stops.stop_id, stops.stop_name;
         `;
 
 function getPreparedQuery() {
@@ -66,7 +81,7 @@ function getPreparedQuery() {
 
 export default async function (stopId: string) {
   const query = getPreparedQuery();
-  const res = query.get(stopId) as DatabaseQueryResult;
+  const res = query.get({ stopId }) as DatabaseQueryResult;
 
   const stop = objectToCamel({
     stopName: res.stop_name,

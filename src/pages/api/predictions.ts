@@ -11,7 +11,7 @@ type PredictionsApiResponse = {
 
 export type RoutePredictions = {
   destinations: {
-    directionId: "0" | "1"; //swiftly returns a string
+    directionId: string; //swiftly returns a string
     headsign: string;
     predictions: Prediction[];
   }[];

@@ -38,7 +38,11 @@ const stop = await getStopWithRoutes(stopId);
   // Initialize the store based on the static data
   routePredictions.set(
     stop.routes.map((route) => ({
-      destinations: [],
+      destinations: route.headsigns.map((headsign) => ({
+        headsign,
+        directionId: route.directionId.toString(),
+        predictions: [],
+      })),
       routeId: route.routeId,
       routeShortName: route.routeShortName,
       stopId: stop.stopId,
