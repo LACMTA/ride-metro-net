@@ -14,7 +14,6 @@ export default function StopRoutePrediction({ routeId, directionId }: Props) {
     // TODO: implement zod so we don't have these problems.
     (destination) => Number(destination.directionId) === Number(directionId),
   );
-  console.log({ route, routeId, directionId });
   return (
     <li>
       <h4>{route?.routeShortName}</h4>
