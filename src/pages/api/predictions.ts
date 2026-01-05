@@ -3,23 +3,17 @@ export const prerender = false;
 type PredictionsApiResponse = {
   data: {
     agencyKey: string;
-    predictionsData: Prediction[];
+    predictionsData: RoutePredictions[];
   };
   route: string;
   success: boolean;
 };
 
-export type Prediction = {
+export type RoutePredictions = {
   destinations: {
-    directionId: string;
+    directionId: "0" | "1"; //swiftly returns a string
     headsign: string;
-    predictions: {
-      min: number;
-      sec: number;
-      time: number;
-      tripId: string;
-      vehicleId: string;
-    }[];
+    predictions: Prediction[];
   }[];
   routeId: string;
   routeName: string;
@@ -29,10 +23,18 @@ export type Prediction = {
   stopName: string;
 };
 
+export type Prediction = {
+  min: number;
+  sec: number;
+  time: number;
+  tripId: string;
+  vehicleId: string;
+};
+
 /**
  * GET /api/predictions
  * @param {string} stopId - The stop ID to provide predictions for
- * @returns {Prediction[]} Array of predictions
+ * @returns {PredictionSet[]} Array of predictions
  */
 export async function GET(context: import("astro").APIContext) {
   const { env } = context.locals.runtime;
@@ -70,8 +72,6 @@ export async function GET(context: import("astro").APIContext) {
   const predictionsData: PredictionsApiResponse =
     await predictionsResponse.json();
   const filteredPredictions = predictionsData.data.predictionsData;
-
-  const routeIds = filteredPredictions.map((route) => route.routeId);
 
   return new Response(JSON.stringify(filteredPredictions));
 }

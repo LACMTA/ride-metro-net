@@ -6,14 +6,14 @@ import type Database from "better-sqlite3";
 export interface StopWithRoutes {
   stopName: string;
   stopId: string;
-  routes: {
-    routeId: string;
-    routeShortName: string;
-    departures: {
-      departureTimestamp: number;
-      stopHeadsign: string;
-    };
-  }[];
+  routes: StopRoute[];
+}
+
+export interface StopRoute {
+  routeId: string;
+  routeShortName: string;
+  headsign: string;
+  directionId: 0 | 1;
 }
 
 interface DatabaseQueryResult {
@@ -45,7 +45,8 @@ SELECT
         DISTINCT JSON_OBJECT(
           'route_id', routes.route_id,
           'route_short_name', routes.route_short_name,
-          'headsign', SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
+          'headsign', SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3),
+          'direction_id', trips.direction_id
         )
       ) AS routes
     FROM stops

@@ -4,6 +4,7 @@ import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
 import DataInjector from "../../components/DataInjector.astro";
 import getStopWithRoutes from "../../lib/getStopWithRoutes";
+import StopRoutePrediction from "../../components/StopRoutePrediction";
 
 export const prerender = true;
 
@@ -26,19 +27,34 @@ const stop = await getStopWithRoutes(stopId);
 
 <DataInjector data={stop} id="data-stop" />
 <script>
-  import type { StopWithRoutes } from "../../lib/getStopWithRoutes";
   import { getData } from "../../lib/getData";
-  import type { Prediction } from "../api/predictions";
+  import { routePredictions } from "../../lib/routePredictionsStore";
+  import type { StopWithRoutes } from "../../lib/getStopWithRoutes";
+  import type { RoutePredictions } from "../api/predictions";
   import type { ConciseAlert } from "../api/alerts";
 
   const stop = getData("data-stop") as StopWithRoutes;
+
+  // Initialize the store based on the static data
+  routePredictions.set(
+    stop.routes.map((route) => ({
+      destinations: [],
+      routeId: route.routeId,
+      routeShortName: route.routeShortName,
+      stopId: stop.stopId,
+      stopName: stop.stopName,
+      routeName: route.routeShortName,
+      stopCode: Number(stop.stopId),
+    })),
+  );
 
   const getPredictions = async function (stopId: string) {
     const res = await fetch(`/api/predictions?stopId=${stopId}`);
     if (!res.ok) {
       return console.error(await res.text());
     }
-    const data = (await res.json()) as Prediction[];
+    const data = (await res.json()) as RoutePredictions[];
+    routePredictions.set(data);
     const el = document.getElementById("predictions");
     el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
   };
@@ -65,12 +81,17 @@ const stop = await getStopWithRoutes(stopId);
 
 <Layout>
   <h1>{stop.stopName}</h1>
-  <code>
-    {JSON.stringify(stop, null, 2)}
-  </code>
   <h2>Routes</h2>
   <ul>
-    {stop.routes.map((route) => <li>{JSON.stringify(route, null, 2)}</li>)}
+    {
+      stop.routes.map((route) => (
+        <StopRoutePrediction
+          client:load
+          routeId={route.routeId}
+          directionId={route.directionId}
+        />
+      ))
+    }
   </ul>
   <h2>Predictions</h2>
   <pre>
@@ -80,4 +101,8 @@ const stop = await getStopWithRoutes(stopId);
   <pre>
     <code id="alerts" />
   </pre>
+  <h2>Pre-built data from static GTFS</h2>
+  <code>
+    {JSON.stringify(stop, null, 2)}
+  </code>
 </Layout>
