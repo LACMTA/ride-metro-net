@@ -1,36 +1,36 @@
 import { useStore } from "@nanostores/preact";
 import { routePredictions } from "../lib/routePredictionsStore";
+import type { StopRoute } from "../lib/getStopWithRoutes";
 
 interface Props {
-  routeId: string;
-  directionId: 0 | 1;
+  route: StopRoute;
 }
 
-export default function StopRoutePrediction({ routeId, directionId }: Props) {
+export default function StopRoutePrediction({ route }: Props) {
   const $routePredictions = useStore(routePredictions);
-  const route = $routePredictions.find((route) => route.routeId === routeId);
-  const destinations = route?.destinations.filter(
-    // Swiftly returns strings, static GTFS returns numbers
-    // TODO: implement zod so we don't have these problems.
-    (destination) => Number(destination.directionId) === Number(directionId),
+
+  const predictionsRoute = $routePredictions.find(
+    (r) => r.routeId === route.routeId,
   );
+
+  // TODO: this is leading to showing headsigns we aren't getting predictions for (ex: 5133)
+  // Should we remove headsigns that don't have predictions once we get live data?
+  // It seems like there may be a number of cases to handle.
+  const destinations = predictionsRoute?.destinations;
+
   return (
     <li>
-      <h4>{route?.routeShortName}</h4>
-      {destinations?.map((destination) => {
-        const predictions = destination.predictions;
-        return (
-          <p>
-            <b>{destination.headsign}</b>
-            {": "}
-            {predictions && predictions.length > 0
-              ? predictions.map((prediction) => (
-                  <span>{prediction.min} mins, </span>
-                ))
-              : "No predictions available"}
-          </p>
-        );
-      })}
+      <h4>{route.routeShortName}</h4>
+      {route.headsigns.map((headsign, index) => (
+        <p key={index}>
+          <b>{headsign}</b>:{" "}
+          {destinations
+            ?.find((d) => d.headsign === headsign)
+            ?.predictions.map((prediction, predIndex) => (
+              <span key={predIndex}>{prediction.min} mins, </span>
+            )) || "Loading predictions..."}
+        </p>
+      ))}
     </li>
   );
 }

@@ -89,11 +89,7 @@ const stop = await getStopWithRoutes(stopId);
   <ul>
     {
       stop.routes.map((route) => (
-        <StopRoutePrediction
-          client:load
-          routeId={route.routeId}
-          directionId={route.directionId}
-        />
+        <StopRoutePrediction route={route} client:load />
       ))
     }
   </ul>
