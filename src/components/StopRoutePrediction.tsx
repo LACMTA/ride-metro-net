@@ -23,7 +23,7 @@ export default function StopRoutePrediction({ routeId, directionId }: Props) {
       </h4>
       <p>
         {"Predictions: "}
-        {predictions
+        {predictions && predictions.length > 0
           ? predictions.map((prediction) => (
               <span>{prediction.min} mins, </span>
             ))
