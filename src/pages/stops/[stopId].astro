@@ -35,23 +35,6 @@ const stop = await getStopWithRoutes(stopId);
 
   const stop = getData("data-stop") as StopWithRoutes;
 
-  // Initialize the store based on the static data
-  routePredictions.set(
-    stop.routes.map((route) => ({
-      destinations: route.headsigns.map((headsign) => ({
-        headsign,
-        directionId: route.directionId.toString(),
-        predictions: [],
-      })),
-      routeId: route.routeId,
-      routeShortName: route.routeShortName,
-      stopId: stop.stopId,
-      stopName: stop.stopName,
-      routeName: route.routeShortName,
-      stopCode: Number(stop.stopId),
-    })),
-  );
-
   const getPredictions = async function (stopId: string) {
     const res = await fetch(`/api/predictions?stopId=${stopId}`);
     if (!res.ok) {

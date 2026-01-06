@@ -1,9 +1,14 @@
 import { useStore } from "@nanostores/preact";
 import { routePredictions } from "../lib/routePredictionsStore";
 import type { StopRoute } from "../lib/getStopWithRoutes";
+import type { Prediction } from "../pages/api/predictions";
 
 interface Props {
   route: StopRoute;
+}
+
+interface DestinationPrediction extends Prediction {
+  headsign: string;
 }
 
 export default function StopRoutePrediction({ route }: Props) {
@@ -13,24 +18,34 @@ export default function StopRoutePrediction({ route }: Props) {
     (r) => r.routeId === route.routeId,
   );
 
-  // TODO: this is leading to showing headsigns we aren't getting predictions for (ex: 5133)
-  // Should we remove headsigns that don't have predictions once we get live data?
-  // It seems like there may be a number of cases to handle.
   const destinations = predictionsRoute?.destinations;
+
+  // Combine predictions across headsigns
+  const allPredictions = destinations
+    ?.reduce<DestinationPrediction[]>((result, destination, index) => {
+      const destinationPredictions = destination.predictions.map(
+        (prediction) => ({
+          headsign: destination.headsign,
+          ...prediction,
+        }),
+      );
+      return result.concat(destinationPredictions);
+    }, [])
+    .sort((a, b) => a.sec - b.sec);
 
   return (
     <li>
       <h4>{route.routeShortName}</h4>
-      {route.headsigns.map((headsign, index) => (
+      {allPredictions?.map((prediction, index) => (
         <p key={index}>
-          <b>{headsign}</b>:{" "}
-          {destinations
-            ?.find((d) => d.headsign === headsign)
-            ?.predictions.map((prediction, predIndex) => (
-              <span key={predIndex}>{prediction.min} mins, </span>
-            )) || "Loading predictions..."}
+          <b>{prediction.headsign}</b>: {prediction.min} mins
         </p>
-      ))}
+      )) ||
+        route.headsigns.map((headsign, index) => (
+          <p key={index}>
+            <b>{headsign}</b>: Loading predictions...
+          </p>
+        ))}
     </li>
   );
 }
