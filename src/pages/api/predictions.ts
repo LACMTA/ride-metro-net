@@ -37,7 +37,7 @@ export type Prediction = {
  * @returns {PredictionSet[]} Array of predictions
  */
 export async function GET(context: import("astro").APIContext) {
-  const { env } = context.locals.runtime;
+  const API_KEY = Netlify.env.get("API_KEY");
   const stopId = context.url.searchParams.get("stopId");
 
   if (!stopId)
@@ -56,7 +56,7 @@ export async function GET(context: import("astro").APIContext) {
     headers: {
       Accept:
         "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
-      Authorization: env.API_KEY as string,
+      Authorization: API_KEY as string,
     },
   });
 

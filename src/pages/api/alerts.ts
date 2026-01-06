@@ -35,7 +35,7 @@ export type ConciseAlert = Pick<
  * @returns {ConciseAlert[]} Array of alerts
  */
 export async function GET(context: import("astro").APIContext) {
-  const { env } = context.locals.runtime;
+  const API_KEY = Netlify.env.get("API_KEY");
   const stopIds = context.url.searchParams.get("stopId")?.split(",") || [];
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
 
@@ -49,13 +49,13 @@ export async function GET(context: import("astro").APIContext) {
   // it's possible the response will actually match the GTFS spec in this case
   alertsUrl.searchParams.append("format", "json");
 
-  // TODO: consider caching alerts with KV (if we stay on cloudflare)
+  // TODO: consider caching alerts
   const alertsResponsePromise = fetch(alertsUrl.toString(), {
     method: "GET",
     headers: {
       Accept:
         "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
-      Authorization: env.API_KEY as string,
+      Authorization: API_KEY as string,
     },
   });
 
