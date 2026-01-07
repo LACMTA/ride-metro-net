@@ -35,7 +35,7 @@ export type ConciseAlert = Pick<
  * @returns {ConciseAlert[]} Array of alerts
  */
 export async function GET(context: import("astro").APIContext) {
-  const API_KEY = Netlify.env.get("API_KEY");
+  const API_KEY = import.meta.env.API_KEY;
   const stopIds = context.url.searchParams.get("stopId")?.split(",") || [];
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
 

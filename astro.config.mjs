@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig } from "astro/config";
+import { defineConfig, envField } from "astro/config";
 import importGTFS from "./src/integrations/import-gtfs";
 
 import preact from "@astrojs/preact";
@@ -12,6 +12,12 @@ export default defineConfig({
     // Our latency is mostly from SQLite,
     // which in-memory is only really hurt by higher concurrency.
     concurrency: 1,
+  },
+
+  env: {
+    schema: {
+      API_KEY: envField.string({ context: "server", access: "secret" }),
+    },
   },
 
   vite: {
