@@ -28,42 +28,16 @@ const stop = await getStopWithRoutes(stopId);
 <DataInjector data={stop} id="data-stop" />
 <script>
   import { getData } from "../../lib/getData";
-  import { routePredictions } from "../../lib/routePredictionsStore";
   import type { StopWithRoutes } from "../../lib/getStopWithRoutes";
-  import type { RoutePredictions } from "../api/predictions";
-  import type { ConciseAlert } from "../api/alerts";
+  import watchAlerts from "../../lib/watchAlerts";
+  import watchPredictions from "../../lib/watchPredictions";
 
   const stop = getData("data-stop") as StopWithRoutes;
-
-  const getPredictions = async function (stopId: string) {
-    const res = await fetch(`/api/predictions?stopId=${stopId}`);
-    if (!res.ok) {
-      return console.error(await res.text());
-    }
-    const data = (await res.json()) as RoutePredictions[];
-    routePredictions.set(data);
-    const el = document.getElementById("predictions");
-    el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
-  };
-
-  const getAlerts = async function (stopId: string, routeIds: string[]) {
-    const res = await fetch(
-      `/api/alerts?stopId=${stopId}&routeId=${routeIds.join(",")}`,
-    );
-    if (!res.ok) {
-      return console.error(await res.text());
-    }
-    const data = (await res.json()) as ConciseAlert[];
-    const el = document.getElementById("alerts");
-    el?.setHTMLUnsafe(JSON.stringify(data, null, 2));
-  };
-
-  getAlerts(
-    stop.stopId,
+  watchAlerts(
+    [stop.stopId],
     stop.routes.map((route) => route.routeId),
   );
-  getPredictions(stop.stopId);
-  setInterval(getPredictions.bind(this, stop.stopId), 10000);
+  watchPredictions(stop.stopId);
 </script>
 
 <Layout>
@@ -76,14 +50,6 @@ const stop = await getStopWithRoutes(stopId);
       ))
     }
   </ul>
-  <h2>Predictions</h2>
-  <pre>
-    <code id="predictions" />
-  </pre>
-  <h2>Alerts</h2>
-  <pre>
-    <code id="alerts" />
-  </pre>
   <h2>Pre-built data from static GTFS</h2>
   <code>
     <pre>
