@@ -36,8 +36,14 @@ export type ConciseAlert = Pick<
  */
 export async function GET(context: import("astro").APIContext) {
   const API_KEY = import.meta.env.API_KEY;
-  const stopIds = context.url.searchParams.get("stopId")?.split(",") || [];
-  const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
+  // dedupe stopIds and routeIds
+  // otherwise we'll provide duplicate alerts if we get duplicates
+  const stopIds = [
+    ...new Set(context.url.searchParams.get("stopId")?.split(",") || []),
+  ];
+  const routeIds = [
+    ...new Set(context.url.searchParams.get("routeId")?.split(",") || []),
+  ];
 
   // TODO: generalize for trains
   const AGENCY_KEY = "lametro";
