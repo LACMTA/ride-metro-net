@@ -83,13 +83,15 @@ export async function GET(context: import("astro").APIContext) {
 
   const filteredAlerts = alertsData.reduce<ConciseAlert[]>(
     (result, alert, index) => {
+      let alertAdded = false;
       stopIds.forEach((stopId) => {
         if (alert.informedEntities.find((entity) => entity.stopId === stopId)) {
           result.push(makeConciseAlert(alert));
-          // return so we don't duplicate if both the stop and route are found
-          return result;
+          alertAdded = true;
         }
       });
+      // return here so we don't duplicate if both the stop and route are found
+      if (alertAdded) return result;
       routeIds.forEach((routeId) => {
         if (
           alert.informedEntities.find((entity) => entity.routeId === routeId)
