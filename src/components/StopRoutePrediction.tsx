@@ -2,6 +2,7 @@ import { useStore } from "@nanostores/preact";
 import { routePredictions } from "../lib/routePredictionsStore";
 import type { StopRoute } from "../lib/getStopWithRoutes";
 import type { Prediction } from "../pages/api/predictions";
+import AlertList from "./AlertList";
 
 interface Props {
   route: StopRoute;
@@ -46,6 +47,7 @@ export default function StopRoutePrediction({ route }: Props) {
             <b>{headsign}</b>: Loading predictions...
           </p>
         ))}
+      <AlertList routeIds={[route.routeId]} />
     </li>
   );
 }

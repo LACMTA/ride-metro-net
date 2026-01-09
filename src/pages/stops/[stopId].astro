@@ -5,6 +5,7 @@ import { GTFSconfig } from "../../integrations/import-gtfs";
 import DataInjector from "../../components/DataInjector.astro";
 import getStopWithRoutes from "../../lib/getStopWithRoutes";
 import StopRoutePrediction from "../../components/StopRoutePrediction";
+import AlertList from "../../components/AlertList";
 
 export const prerender = true;
 
@@ -44,6 +45,7 @@ const stop = await getStopWithRoutes(stopId);
 
 <Layout>
   <h1>{stop.stopName}</h1>
+  <AlertList stopIds={[stop.stopId]} client:load />
   <h2>Routes</h2>
   <ul>
     {
