@@ -1,0 +1,24 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  # Increase timeout to handle external API calls
+  timeout = 30
+
+[[redirects]]
+  # Ensure API routes are properly handled by Netlify Functions
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[dev]
+  framework = "astro"
+  command = "npm run dev"
+
+# Headers for API responses
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    X-Content-Type-Options = "nosniff"

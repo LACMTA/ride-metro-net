@@ -51,22 +51,36 @@ export async function GET(context: import("astro").APIContext) {
   );
   predictionsUrl.searchParams.append("stop", stopId);
 
-  const predictionsResponsePromise = fetch(predictionsUrl.toString(), {
+  console.log(`Fetching predictions from: ${predictionsUrl.toString()}`);
+
+  const predictionsResponse = await fetch(predictionsUrl.toString(), {
     method: "GET",
     headers: {
       Accept:
         "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
       Authorization: API_KEY as string,
     },
+    // Add timeout for better cold start handling
+    signal: AbortSignal.timeout(25000), // 25 second timeout
   });
 
-  const predictionsResponse = await predictionsResponsePromise;
-
   if (!predictionsResponse.ok) {
-    console.error(await predictionsResponse.text());
-    return new Response(`Swifty request failed!`, {
-      status: 500,
-    });
+    const errorText = await predictionsResponse.text();
+    console.error(
+      `Swiftly predictions API error (${predictionsResponse.status}):`,
+      errorText,
+    );
+    return new Response(
+      JSON.stringify({
+        error: "External API request failed",
+        status: predictionsResponse.status,
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: 502, // Bad Gateway - external service issue
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   const predictionsData: PredictionsApiResponse =

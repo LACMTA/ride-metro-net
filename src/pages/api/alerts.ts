@@ -56,21 +56,36 @@ export async function GET(context: import("astro").APIContext) {
   alertsUrl.searchParams.append("format", "json");
 
   // TODO: consider caching alerts
-  const alertsResponsePromise = fetch(alertsUrl.toString(), {
+  console.log(`Fetching alerts from: ${alertsUrl.toString()}`);
+
+  const alertsResponse = await fetch(alertsUrl.toString(), {
     method: "GET",
     headers: {
       Accept:
         "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
       Authorization: API_KEY as string,
     },
+    // Add timeout for better cold start handling
+    signal: AbortSignal.timeout(25000), // 25 second timeout
   });
 
-  const alertsResponse = await alertsResponsePromise;
   if (!alertsResponse.ok) {
-    console.error(await alertsResponse.text());
-    return new Response(`Swifty request failed!`, {
-      status: 500,
-    });
+    const errorText = await alertsResponse.text();
+    console.error(
+      `Swiftly alerts API error (${alertsResponse.status}):`,
+      errorText,
+    );
+    return new Response(
+      JSON.stringify({
+        error: "External API request failed",
+        status: alertsResponse.status,
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: 502, // Bad Gateway - external service issue
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   const alertsData: AlertsApiResponse = await alertsResponse.json();
