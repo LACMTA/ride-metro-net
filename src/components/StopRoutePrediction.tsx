@@ -19,7 +19,9 @@ export default function StopRoutePrediction({ route }: Props) {
     (r) => r.routeId === route.routeId,
   );
 
-  const destinations = predictionsRoute?.destinations;
+  const destinations = predictionsRoute?.destinations.filter(
+    (d) => Number(d.directionId) === Number(route.directionId),
+  );
 
   // Combine predictions across headsigns
   const allPredictions = destinations
