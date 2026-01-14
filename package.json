@@ -19,7 +19,6 @@
     "install": "^0.13.0",
     "nanostores": "^1.1.0",
     "npm": "^11.6.4",
-    "pluralize": "^8.0.0",
     "preact": "^10.28.0",
     "tailwindcss": "^4.1.18",
     "ts-case-convert": "^2.1.0",
