@@ -43,19 +43,18 @@ const stop = await getStopWithRoutes(stopId);
   watchPredictions(stop.stopId);
 </script>
 
-<Layout>
-  <h1>{stop.stopName}</h1>
-  <AlertList stopIds={[stop.stopId]} alertEntityType="stop" client:load />
-  <h2>Routes</h2>
-  <ul>
-    {
-      stop.routes.map((route) => (
-        <StopRoutePrediction
-          route={route}
-          alertEntityType="route"
-          client:load
-        />
-      ))
-    }
-  </ul>
+<Layout title={stop.stopName}>
+  <ul>{stop.routes.map((route) => <li>{route.routeShortName}</li>)}</ul>
+  <main>
+    <h1>{stop.stopName}</h1>
+    <small>STOP ID: <b>{stop.stopId}</b></small>
+    <AlertList stopIds={[stop.stopId]} alertEntityType="stop" client:load />
+    <ul>
+      {
+        stop.routes.map((route) => (
+          <StopRoutePrediction route={route} client:load />
+        ))
+      }
+    </ul>
+  </main>
 </Layout>
