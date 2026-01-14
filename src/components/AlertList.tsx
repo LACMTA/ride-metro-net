@@ -5,9 +5,14 @@ import Alert from "./Alert";
 interface Props {
   stopIds?: string[];
   routeIds?: string[];
+  alertEntityType?: string;
 }
 
-export default function AlertList({ stopIds, routeIds }: Props) {
+export default function AlertList({
+  stopIds,
+  routeIds,
+  alertEntityType,
+}: Props) {
   const $alerts = useStore(alerts);
 
   const filteredAlerts = $alerts.filter((alert) =>
@@ -19,8 +24,15 @@ export default function AlertList({ stopIds, routeIds }: Props) {
     }),
   );
 
-  return (
+  const alertsCount = filteredAlerts.length;
+  const pluralAlerts = alertsCount === 1 ? "alert" : "alerts";
+
+  const list = (
     <ul>
+      <h3>
+        {alertsCount} active {pluralAlerts}{" "}
+        {alertEntityType ? `for this ${alertEntityType}` : ""}
+      </h3>
       {filteredAlerts.map((alert) => (
         <li>
           <Alert alert={alert} />
@@ -28,4 +40,6 @@ export default function AlertList({ stopIds, routeIds }: Props) {
       ))}
     </ul>
   );
+
+  return alertsCount > 0 ? list : null;
 }

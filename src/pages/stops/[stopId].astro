@@ -45,12 +45,16 @@ const stop = await getStopWithRoutes(stopId);
 
 <Layout>
   <h1>{stop.stopName}</h1>
-  <AlertList stopIds={[stop.stopId]} client:load />
+  <AlertList stopIds={[stop.stopId]} alertEntityType="stop" client:load />
   <h2>Routes</h2>
   <ul>
     {
       stop.routes.map((route) => (
-        <StopRoutePrediction route={route} client:load />
+        <StopRoutePrediction
+          route={route}
+          alertEntityType="route"
+          client:load
+        />
       ))
     }
   </ul>

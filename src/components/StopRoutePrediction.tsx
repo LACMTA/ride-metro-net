@@ -49,7 +49,7 @@ export default function StopRoutePrediction({ route }: Props) {
             <b>{headsign}</b>: Loading predictions...
           </p>
         ))}
-      <AlertList routeIds={[route.routeId]} />
+      <AlertList routeIds={[route.routeId]} alertEntityType="route" />
     </li>
   );
 }
