@@ -1,5 +1,6 @@
 import { useStore } from "@nanostores/preact";
 import { alerts } from "../lib/alertsStore";
+import Alert from "./Alert";
 
 interface Props {
   stopIds?: string[];
@@ -22,7 +23,7 @@ export default function AlertList({ stopIds, routeIds }: Props) {
     <ul>
       {filteredAlerts.map((alert) => (
         <li>
-          <pre>{JSON.stringify(alert, null, 2)}</pre>
+          <Alert alert={alert} />
         </li>
       ))}
     </ul>
