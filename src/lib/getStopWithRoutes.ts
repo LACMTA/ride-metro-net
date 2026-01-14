@@ -44,6 +44,7 @@ const query = `
         routes.route_id,
         routes.route_short_name,
         trips.direction_id,
+        MIN(stop_times.stop_sequence) as min_stop_sequence,
         JSON_GROUP_ARRAY(
           DISTINCT SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
         ) as headsigns
@@ -53,21 +54,33 @@ const query = `
       LEFT JOIN routes ON routes.route_id = trips.route_id
       WHERE stops.stop_id = @stopId
       GROUP BY stops.stop_id, routes.route_id, routes.route_short_name, trips.direction_id
+    ),
+    filtered_routes AS (
+      -- For each route_id, keep only the direction with the minimum stop_sequence
+      -- This eliminates duplicates at termini, but may cause problems elsewhere
+      SELECT 
+        *,
+        ROW_NUMBER() OVER (
+          PARTITION BY stop_id, route_id 
+          ORDER BY min_stop_sequence ASC
+        ) as sequence_rank
+      FROM route_headsigns
     )
     SELECT
       stops.stop_name as stop_name, 
       stops.stop_id as stop_id, 
       JSON_GROUP_ARRAY(
         JSON_OBJECT(
-          'route_id', route_headsigns.route_id,
-          'route_short_name', route_headsigns.route_short_name,
-          'direction_id', route_headsigns.direction_id,
-          'headsigns', JSON(route_headsigns.headsigns)
+          'route_id', filtered_routes.route_id,
+          'route_short_name', filtered_routes.route_short_name,
+          'direction_id', filtered_routes.direction_id,
+          'headsigns', JSON(filtered_routes.headsigns)
         )
       ) AS routes
     FROM stops
-    JOIN route_headsigns ON route_headsigns.stop_id = stops.stop_id
-    WHERE stops.stop_id = @stopId
+    JOIN filtered_routes ON filtered_routes.stop_id = stops.stop_id
+    WHERE stops.stop_id = @stopId 
+      AND filtered_routes.sequence_rank = 1  -- Only keep the direction with minimum stop_sequence
     GROUP BY stops.stop_id, stops.stop_name;
         `;
 
