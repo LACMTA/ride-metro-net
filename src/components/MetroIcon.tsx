@@ -8,6 +8,7 @@ export default function MetroIcon({ className = "text-metro-text" }: Props) {
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 45.04 45.04"
       className={className}
+      preserveAspectRatio="xMinYMin"
     >
       <path
         fill="currentColor"
