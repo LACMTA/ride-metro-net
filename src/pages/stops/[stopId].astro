@@ -7,6 +7,7 @@ import getStopWithRoutes from "../../lib/getStopWithRoutes";
 import StopRoutePrediction from "../../components/StopRoutePrediction";
 import AlertList from "../../components/AlertList";
 import BusIcon from "../../components/BusIcon";
+import Column from "../../components/Column";
 
 export const prerender = true;
 
@@ -45,18 +46,22 @@ const stop = await getStopWithRoutes(stopId);
 </script>
 
 <Layout title={stop.stopName}>
-  <BusIcon />
-  <ul>{stop.routes.map((route) => <li>{route.routeShortName}</li>)}</ul>
+  <Column>
+    <BusIcon />
+    <ul>{stop.routes.map((route) => <li>{route.routeShortName}</li>)}</ul>
+  </Column>
   <main>
-    <h1>{stop.stopName}</h1>
-    <small>STOP ID: <b>{stop.stopId}</b></small>
-    <AlertList stopIds={[stop.stopId]} alertEntityType="stop" client:load />
-    <ul>
-      {
-        stop.routes.map((route) => (
-          <StopRoutePrediction route={route} client:load />
-        ))
-      }
-    </ul>
+    <Column>
+      <h1>{stop.stopName}</h1>
+      <small>STOP ID: <b>{stop.stopId}</b></small>
+      <AlertList stopIds={[stop.stopId]} alertEntityType="stop" client:load />
+      <ul>
+        {
+          stop.routes.map((route) => (
+            <StopRoutePrediction route={route} client:load />
+          ))
+        }
+      </ul>
+    </Column>
   </main>
 </Layout>
