@@ -3,6 +3,7 @@ import { routePredictions } from "../lib/routePredictionsStore";
 import type { StopRoute } from "../lib/getStopWithRoutes";
 import type { Prediction } from "../pages/api/predictions";
 import AlertList from "./AlertList";
+import BusIcon from "./BusIcon";
 
 interface Props {
   route: StopRoute;
@@ -37,8 +38,11 @@ export default function StopRoutePrediction({ route }: Props) {
     .sort((a, b) => a.sec - b.sec);
 
   return (
-    <li>
-      <h4>{route.routeShortName}</h4>
+    <li className="overflow-hidden rounded-xl">
+      <h2 className="text-background-white bg-black px-4 py-4 text-5xl font-bold">
+        <BusIcon className="mr-3 inline h-10 align-baseline" />
+        {route.routeShortName}
+      </h2>
       {allPredictions?.map((prediction, index) => (
         <p key={index}>
           <b>{prediction.headsign}</b>: {prediction.min} mins
