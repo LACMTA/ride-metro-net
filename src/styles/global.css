@@ -5,42 +5,49 @@
   --color-black: #121212;
   --color-gray-900: #27272a;
   --color-gray-800: #3f3f46;
-  --color-gray-700: #52525b;
+  --color-gray-700: #58585f;
   --color-gray-600: #71717a;
   --color-gray-500: #a1a1aa;
   --color-gray-400: #c4c4ca;
   --color-gray-300: #d6d6db;
   --color-gray-200: #e7e7ea;
-  --color-gray-100: #f1f1f6;
+  --color-gray-100: #f5f5f6;
   --color-white: #ffffff;
+  --color-silver: #adb8bf;
   --color-dark-red: #aa2a16;
-  --color-red: #ef4444;
-  --color-light-red: #fca5a5;
+  --color-red: #eb131b;
+  --color-light-red: #fc8d87;
   --color-xlight-red: #ffe7e5;
-  --color-orange: #f97316;
-  --color-light-orange: #fdba74;
-  --color-xlight-orange: #ffedd5;
+  --color-coral-red: #ef3841;
+  --color-ruby-red: #d11242;
+  --color-pink: #e470ab;
+  --color-orange: #fc4c02;
+  --color-light-orange: #ffa47d;
+  --color-xlight-orange: #ffddc0;
+  --color-burnt-orange: #e16710;
+  --color-mustard-orange: #f99c24;
+  --color-gold: #fdb913;
   --color-dark-yellow: #aa6408;
-  --color-yellow: #f59e0b;
-  --color-light-yellow: #fde68a;
-  --color-xlight-yellow: #fef3c7;
-  --color-dark-green: #15803d;
-  --color-green: #22c55e;
-  --color-light-green: #86efac;
-  --color-xlight-green: #dcfce7;
-  --color-dark-blue: #1e3a8a;
-  --color-blue: #3b82f6;
-  --color-sky-blue: #0ea5e9;
-  --color-light-blue: #93c5fd;
-  --color-xlight-blue: #eff6ff;
-  --color-dark-purple: #581c87;
-  --color-purple: #8b5cf6;
-  --color-light-purple: #d8b4fe;
-  --color-xlight-purple: #f3e8ff;
+  --color-yellow: #ffd453;
+  --color-light-yellow: #feecbe;
+  --color-xlight-yellow: #fff8e6;
+  --color-dark-green: #0a8217;
+  --color-green: #58a738;
+  --color-light-green: #a8dc9a;
+  --color-xlight-green: #dff1e0;
+  --color-dark-blue: #003078;
+  --color-blue: #0072bc;
+  --color-sky-blue: #9bd3f8;
+  --color-light-blue: #ccebff;
+  --color-xlight-blue: #e2eff8;
+  --color-dark-purple: #4c2c92;
+  --color-purple: #7c4ee3;
+  --color-light-purple: #c6acff;
+  --color-xlight-purple: #e6dbff;
 
   /* Text colors */
   --metro-text-color: var(--color-black);
-  --secondary-text-color: var(--color-gray-600);
+  --secondary-text-color: var(--color-gray-700);
 
   /* Link colors */
   --link-color: var(--color-blue);
@@ -61,16 +68,16 @@
 
   /* Active/Info colors */
   --highlight-color: var(--color-light-blue);
-  --highlight-light-color: var(--color-xlight-blue);
+  --highlight-light-color: var(--color-sky-blue);
 
   /* Text highlights */
-  --text-highlight-yellow: var(--color-xlight-yellow);
-  --text-highlight-blue: var(--color-light-blue);
+  --text-highlight-yellow: var(--color-light-yellow);
+  --text-highlight-blue: var(--color-xlight-blue);
 
   /* Border colors */
-  --border-dark-color: var(--color-gray-600);
-  --border-light-color: var(--color-gray-300);
-  --border-xlight-color: var(--color-gray-200);
+  --border-dark-color: var(--color-gray-300);
+  --border-light-color: var(--color-gray-200);
+  --border-xlight-color: var(--color-gray-100);
   --border-black-color: var(--color-black);
 
   /* Background colors */
@@ -79,4 +86,17 @@
 
   /* Focus colors */
   --focus-color: var(--color-light-blue);
+
+  /* Metro Line Colors */
+  --a-line-color: var(--color-blue);
+  --b-line-color: var(--color-red);
+  --c-line-color: var(--color-green);
+  --d-line-color: #a05da5;
+  --e-line-color: var(--color-gold);
+  --k-line-color: var(--color-pink);
+  --g-line-color: var(--color-orange);
+  --j-line-color: var(--color-silver);
+
+  --bus-local-color: var(--color-burnt-orange);
+  --bus-rapid-color: var(--color-ruby-red);
 }
