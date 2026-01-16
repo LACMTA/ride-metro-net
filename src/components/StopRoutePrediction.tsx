@@ -4,6 +4,8 @@ import type { StopRoute } from "../lib/getStopWithRoutes";
 import type { Prediction } from "../pages/api/predictions";
 import AlertList from "./AlertList";
 import BusIcon from "./BusIcon";
+import type { ComponentChildren } from "preact";
+import ArrowIcon from "./ArrowIcon";
 
 interface Props {
   route: StopRoute;
@@ -37,34 +39,43 @@ export default function StopRoutePrediction({ route }: Props) {
     }, [])
     .sort((a, b) => a.sec - b.sec);
 
+  function HeadsignTd({ children }: { children: ComponentChildren }) {
+    return (
+      <td className="py-3 font-bold">
+        <ArrowIcon className="text-bus-local mr-2 inline h-4 align-middle" />
+        {children}
+      </td>
+    );
+  }
+
   const predictionsTable = allPredictions?.map((prediction, index) => (
     <tr key={index}>
-      <td>{prediction.headsign}</td>
+      <HeadsignTd>{prediction.headsign}</HeadsignTd>
       <td>{prediction.min} mins</td>
     </tr>
   ));
 
   const exceptionTable = route.headsigns.map((headsign, index) => (
     <tr key={index}>
-      <td>{headsign}</td>
+      <HeadsignTd>{headsign}</HeadsignTd>
       <td>
         {allPredictions?.length === 0
           ? "No predictions available"
-          : "Loading predictions..."}{" "}
+          : "Loading predictions..."}
       </td>
     </tr>
   ));
 
   const table = (
-    <table className="w-full">
+    <table className="m-4 mb-0 w-full">
       <thead className="text-left text-sm text-gray-600 uppercase">
-        <th>Terminus</th>
-        <th className="max-w-sm">Arrives in</th>
+        <tr>
+          <th>Terminus</th>
+          <th className="max-w-sm">Arrives in</th>
+        </tr>
       </thead>
       <tbody>
-        {allPredictions && allPredictions.length > 0
-          ? predictionsTable
-          : exceptionTable}
+        {allPredictions?.length !== 0 ? predictionsTable : exceptionTable}
       </tbody>
     </table>
   );
@@ -75,7 +86,7 @@ export default function StopRoutePrediction({ route }: Props) {
         <BusIcon className="mr-3 inline h-9 align-baseline" />
         {route.routeShortName}
       </h2>
-      <div className="p-4">{table}</div>
+      {table}
       <AlertList routeIds={[route.routeId]} alertEntityType="route" />
     </li>
   );
