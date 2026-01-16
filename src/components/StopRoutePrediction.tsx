@@ -37,22 +37,45 @@ export default function StopRoutePrediction({ route }: Props) {
     }, [])
     .sort((a, b) => a.sec - b.sec);
 
+  const predictionsTable = allPredictions?.map((prediction, index) => (
+    <tr key={index}>
+      <td>{prediction.headsign}</td>
+      <td>{prediction.min} mins</td>
+    </tr>
+  ));
+
+  const exceptionTable = route.headsigns.map((headsign, index) => (
+    <tr key={index}>
+      <td>{headsign}</td>
+      <td>
+        {allPredictions?.length === 0
+          ? "No predictions available"
+          : "Loading predictions..."}{" "}
+      </td>
+    </tr>
+  ));
+
+  const table = (
+    <table className="w-full">
+      <thead className="text-left text-sm text-gray-600 uppercase">
+        <th>Terminus</th>
+        <th className="max-w-sm">Arrives in</th>
+      </thead>
+      <tbody>
+        {allPredictions && allPredictions.length > 0
+          ? predictionsTable
+          : exceptionTable}
+      </tbody>
+    </table>
+  );
+
   return (
-    <li className="overflow-hidden rounded-xl">
+    <li className="bg-background-white mb-5 overflow-hidden rounded-xl">
       <h2 className="text-background-white bg-black px-4 py-4 text-5xl font-bold">
-        <BusIcon className="mr-3 inline h-10 align-baseline" />
+        <BusIcon className="mr-3 inline h-9 align-baseline" />
         {route.routeShortName}
       </h2>
-      {allPredictions?.map((prediction, index) => (
-        <p key={index}>
-          <b>{prediction.headsign}</b>: {prediction.min} mins
-        </p>
-      )) ||
-        route.headsigns.map((headsign, index) => (
-          <p key={index}>
-            <b>{headsign}</b>: Loading predictions...
-          </p>
-        ))}
+      <div className="p-4">{table}</div>
       <AlertList routeIds={[route.routeId]} alertEntityType="route" />
     </li>
   );

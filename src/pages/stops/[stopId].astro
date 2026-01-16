@@ -48,7 +48,7 @@ const stop = await getStopWithRoutes(stopId);
 
 <Layout title={stop.stopName}>
   <Column>
-    <div class="my-5 flex items-center">
+    <div class="mt-6 mb-4 flex items-center">
       <BusIcon className="text-metro-text mr-4 h-8 shrink-0" />
       <ul>
         {
@@ -67,7 +67,7 @@ const stop = await getStopWithRoutes(stopId);
       <small>STOP ID: <b>{stop.stopId}</b></small>
       <AlertList stopIds={[stop.stopId]} alertEntityType="stop" client:load />
     </Column>
-    <div class="bg-background-gray">
+    <div class="mt-6 bg-gray-200 pt-6">
       <Column>
         <ul>
           {
