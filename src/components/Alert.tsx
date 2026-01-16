@@ -7,7 +7,9 @@ interface Props {
 export default function Alert({ alert }: Props) {
   return (
     <div>
-      <h4>{alert.effect}</h4>
+      <h4 className="font-bold capitalize">
+        {String(alert.effect).toLowerCase()}
+      </h4>
       <p>{alert.descriptionText}</p>
     </div>
   );

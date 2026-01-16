@@ -67,15 +67,13 @@ const stop = await getStopWithRoutes(stopId);
       <small>STOP ID: <b>{stop.stopId}</b></small>
       <AlertList stopIds={[stop.stopId]} alertEntityType="stop" client:load />
     </Column>
-    <div class="mt-6 bg-gray-200 pt-6">
+    <div class="mt-6 bg-gray-200 py-6">
       <Column>
-        <ul>
-          {
-            stop.routes.map((route) => (
-              <StopRoutePrediction route={route} client:load />
-            ))
-          }
-        </ul>
+        {
+          stop.routes.map((route) => (
+            <StopRoutePrediction route={route} client:load />
+          ))
+        }
       </Column>
     </div>
   </main>

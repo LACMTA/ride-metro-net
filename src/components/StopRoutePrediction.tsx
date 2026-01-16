@@ -83,13 +83,13 @@ export default function StopRoutePrediction({ route }: Props) {
   );
 
   return (
-    <li className="bg-background-white mb-5 overflow-hidden rounded-xl">
-      <h2 className="text-background-white bg-black px-4 py-4 text-5xl font-bold">
+    <div className="bg-background-white mb-5 overflow-hidden rounded-xl">
+      <h2 className="text-background-white bg-black p-4 text-5xl font-bold">
         <BusIcon className="mr-3 inline h-9 align-baseline" />
         {route.routeShortName}
       </h2>
       {table}
       <AlertList routeIds={[route.routeId]} alertEntityType="route" />
-    </li>
+    </div>
   );
 }

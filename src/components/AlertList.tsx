@@ -28,17 +28,17 @@ export default function AlertList({
   const pluralAlerts = alertsCount === 1 ? "alert" : "alerts";
 
   const list = (
-    <ul>
-      <h3>
+    <div>
+      <h3 className="bg-yellow p-4 font-bold">
         {alertsCount} active {pluralAlerts}{" "}
         {alertEntityType ? `for this ${alertEntityType}` : ""}
       </h3>
-      {filteredAlerts.map((alert) => (
-        <li>
+      <div className="bg-light-yellow p-4">
+        {filteredAlerts.map((alert) => (
           <Alert alert={alert} />
-        </li>
-      ))}
-    </ul>
+        ))}
+      </div>
+    </div>
   );
 
   return alertsCount > 0 ? list : null;
