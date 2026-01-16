@@ -41,8 +41,10 @@ export default function StopRoutePrediction({ route }: Props) {
 
   function HeadsignTd({ children }: { children: ComponentChildren }) {
     return (
-      <td className="py-3 font-bold">
-        <ArrowIcon className="text-bus-local mr-2 inline h-4 align-middle" />
+      <td className="mr-auto flex w-full py-3 pr-2 font-bold">
+        <span>
+          <ArrowIcon className="text-bus-local mr-2 inline h-4 align-middle" />
+        </span>
         {children}
       </td>
     );
@@ -51,14 +53,14 @@ export default function StopRoutePrediction({ route }: Props) {
   const predictionsTable = allPredictions?.map((prediction, index) => (
     <tr key={index}>
       <HeadsignTd>{prediction.headsign}</HeadsignTd>
-      <td>{prediction.min} mins</td>
+      <td className="text-right">{prediction.min} mins</td>
     </tr>
   ));
 
   const exceptionTable = route.headsigns.map((headsign, index) => (
     <tr key={index}>
       <HeadsignTd>{headsign}</HeadsignTd>
-      <td>
+      <td className="text-right">
         {allPredictions?.length === 0
           ? "No predictions available"
           : "Loading predictions..."}
@@ -67,11 +69,11 @@ export default function StopRoutePrediction({ route }: Props) {
   ));
 
   const table = (
-    <table className="m-4 w-full">
+    <table className="w-full">
       <thead className="text-left text-sm text-gray-600 uppercase">
         <tr>
           <th>Terminus</th>
-          <th className="max-w-sm">Arrives in</th>
+          <th className="max-w-sm text-right text-nowrap">Arrives in</th>
         </tr>
       </thead>
       <tbody>
@@ -88,7 +90,7 @@ export default function StopRoutePrediction({ route }: Props) {
         <BusIcon className="mr-3 inline h-9 align-baseline" />
         {route.routeShortName}
       </h2>
-      {table}
+      <div className="m-4">{table}</div>
       <AlertList routeIds={[route.routeId]} alertEntityType="Route" />
     </div>
   );
