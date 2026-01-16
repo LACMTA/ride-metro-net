@@ -77,6 +77,7 @@ const query = `
           AND rh2.stop_id = route_headsigns.stop_id
           AND rh2.direction_id != route_headsigns.direction_id
           AND rh2.min_stop_sequence = 1
+          AND route_headsigns.min_stop_sequence != 1
       )
     GROUP BY stops.stop_id, stops.stop_name;
         `;
