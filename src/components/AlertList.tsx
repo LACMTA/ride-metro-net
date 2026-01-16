@@ -1,6 +1,7 @@
 import { useStore } from "@nanostores/preact";
 import { alerts } from "../lib/alertsStore";
 import Alert from "./Alert";
+import AlertIconColumn from "./AlertIconColumn";
 
 interface Props {
   stopIds?: string[];
@@ -29,11 +30,12 @@ export default function AlertList({
 
   const list = (
     <div className="overflow-hidden rounded-b-xl">
-      <h3 className="bg-yellow p-4 font-bold">
+      <h3 className="bg-yellow flex px-4 py-5 font-bold">
+        <AlertIconColumn />
         {alertsCount} Active {pluralAlerts}{" "}
         {alertEntityType ? `for this ${alertEntityType}` : ""}
       </h3>
-      <div className="bg-light-yellow p-4">
+      <div className="bg-light-yellow">
         {filteredAlerts.map((alert) => (
           <Alert alert={alert} />
         ))}
