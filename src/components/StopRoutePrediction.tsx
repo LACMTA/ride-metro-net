@@ -89,7 +89,7 @@ export default function StopRoutePrediction({ route }: Props) {
         {route.routeShortName}
       </h2>
       {table}
-      <AlertList routeIds={[route.routeId]} alertEntityType="route" />
+      <AlertList routeIds={[route.routeId]} alertEntityType="Route" />
     </div>
   );
 }

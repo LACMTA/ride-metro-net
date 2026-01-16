@@ -25,12 +25,12 @@ export default function AlertList({
   );
 
   const alertsCount = filteredAlerts.length;
-  const pluralAlerts = alertsCount === 1 ? "alert" : "alerts";
+  const pluralAlerts = alertsCount === 1 ? "Alert" : "Alerts";
 
   const list = (
-    <div>
+    <div className="overflow-hidden rounded-b-xl">
       <h3 className="bg-yellow p-4 font-bold">
-        {alertsCount} active {pluralAlerts}{" "}
+        {alertsCount} Active {pluralAlerts}{" "}
         {alertEntityType ? `for this ${alertEntityType}` : ""}
       </h3>
       <div className="bg-light-yellow p-4">

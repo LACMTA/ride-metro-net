@@ -8,7 +8,7 @@ export default function Alert({ alert }: Props) {
   return (
     <div>
       <h4 className="font-bold capitalize">
-        {String(alert.effect).toLowerCase()}
+        {String(alert.cause).toLowerCase().replace("_", " ")}
       </h4>
       <p>{alert.descriptionText}</p>
     </div>
