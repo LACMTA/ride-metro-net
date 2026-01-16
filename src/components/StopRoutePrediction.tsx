@@ -67,7 +67,7 @@ export default function StopRoutePrediction({ route }: Props) {
   ));
 
   const table = (
-    <table className="m-4 mb-0 w-full">
+    <table className="m-4 w-full">
       <thead className="text-left text-sm text-gray-600 uppercase">
         <tr>
           <th>Terminus</th>
