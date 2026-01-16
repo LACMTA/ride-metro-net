@@ -75,7 +75,9 @@ export default function StopRoutePrediction({ route }: Props) {
         </tr>
       </thead>
       <tbody>
-        {allPredictions?.length !== 0 ? predictionsTable : exceptionTable}
+        {allPredictions && allPredictions?.length > 0
+          ? predictionsTable
+          : exceptionTable}
       </tbody>
     </table>
   );
