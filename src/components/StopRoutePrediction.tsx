@@ -53,7 +53,9 @@ export default function StopRoutePrediction({ route }: Props) {
   const predictionsTable = allPredictions?.map((prediction, index) => (
     <tr key={index}>
       <HeadsignTd>{prediction.headsign}</HeadsignTd>
-      <td className="text-right">{prediction.min} mins</td>
+      <td className="text-right">
+        <b className="text-2xl">{prediction.min}</b> mins
+      </td>
     </tr>
   ));
 
