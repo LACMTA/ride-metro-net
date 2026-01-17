@@ -1,0 +1,44 @@
+---
+import { openDb } from "gtfs";
+import { GTFSconfig } from "../../integrations/import-gtfs";
+import Column from "../../components/Column";
+import Layout from "../../layouts/Layout.astro";
+
+const db = openDb(GTFSconfig);
+const allStops = (await db
+  .prepare(
+    `
+    SELECT DISTINCT
+      stops.stop_id as stopId,
+      stops.stop_name as stopName
+    FROM stops
+    JOIN stop_times ON stop_times.stop_id = stops.stop_id
+    JOIN trips ON trips.trip_id = stop_times.trip_id
+    JOIN routes ON routes.route_id = trips.route_id
+    ORDER BY stops.stop_id;
+    `,
+  )
+  .all()) as { stopId: string; stopName: string }[];
+---
+
+<Layout>
+  <main>
+    <Column>
+      <h1 class="mt-10 text-3xl font-bold">All Stops</h1>
+      <p class="mb-10">
+        This page is just here for experimenting; we'll delete it before
+        production.
+      </p>
+      {
+        allStops.map((stop) => (
+          <a
+            class="text-link mb-2 block underline"
+            href={`/stops/${stop.stopId}`}
+          >
+            {stop.stopName}
+          </a>
+        ))
+      }
+    </Column>
+  </main>
+</Layout>

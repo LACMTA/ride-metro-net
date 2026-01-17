@@ -59,11 +59,15 @@ export default function StopRoutePrediction({ route }: Props) {
     </tr>
   ));
 
+  const predictionsNotAvailable =
+    allPredictions?.length === 0 ||
+    ($routePredictions.length > 0 && !predictionsRoute);
+
   const exceptionTable = route.headsigns.map((headsign, index) => (
     <tr key={index}>
       <HeadsignTd>{headsign}</HeadsignTd>
       <td className="text-right">
-        {allPredictions?.length === 0
+        {predictionsNotAvailable
           ? "No predictions available"
           : "Loading predictions..."}
       </td>

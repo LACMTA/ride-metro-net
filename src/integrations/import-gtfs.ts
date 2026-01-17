@@ -5,10 +5,10 @@ export const GTFSconfig = {
   // TODO: optionally import to file and re-use to improve dev server startup
   // sqlitePath: "./data/data.db",
   agencies: [
-    {
-      // train
-      url: "https://gitlab.com/LACMTA/gtfs_rail/-/raw/master/gtfs_rail.zip?ref_type=heads&inline=false",
-    },
+    // {
+    //   // train
+    //   url: "https://gitlab.com/LACMTA/gtfs_rail/-/raw/master/gtfs_rail.zip?ref_type=heads&inline=false",
+    // },
     {
       // bus
       url: "https://gitlab.com/LACMTA/gtfs_bus/-/raw/master/gtfs_bus.zip?ref_type=heads&inline=false",

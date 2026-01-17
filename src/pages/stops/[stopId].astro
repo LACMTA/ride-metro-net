@@ -16,7 +16,18 @@ export async function getStaticPaths() {
   const db = openDb(GTFSconfig);
   // TODO: this will currently build all pages. Consider building only pages for pilot.
   const allStops = (await db
-    .prepare("SELECT DISTINCT stop_id FROM stops")
+    .prepare(
+      `
+      SELECT DISTINCT
+        stops.stop_id as stopId,
+        stops.stop_name as stopName
+      FROM stops
+      JOIN stop_times ON stop_times.stop_id = stops.stop_id
+      JOIN trips ON trips.trip_id = stop_times.trip_id
+      JOIN routes ON routes.route_id = trips.route_id
+      ORDER BY stops.stop_id;
+    `,
+    )
     .all()) as { stop_id: string }[];
 
   return allStops.map((stop) => ({
