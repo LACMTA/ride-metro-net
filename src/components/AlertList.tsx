@@ -1,7 +1,12 @@
-import { useStore } from "@nanostores/preact";
+import { useStore } from "@nanostores/react";
 import { alerts } from "../lib/alertsStore";
 import Alert from "./Alert";
 import AlertIconColumn from "./AlertIconColumn";
+import {
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+} from "@headlessui/react";
 
 interface Props {
   stopIds?: string[];
@@ -29,18 +34,20 @@ export default function AlertList({
   const pluralAlerts = alertsCount === 1 ? "Alert" : "Alerts";
 
   const list = (
-    <div className="overflow-hidden rounded-b-xl">
-      <h3 className="bg-yellow flex px-4 py-5 font-bold">
-        <AlertIconColumn />
-        {alertsCount} Active {pluralAlerts}{" "}
-        {alertEntityType ? `for this ${alertEntityType}` : ""}
-      </h3>
-      <div className="bg-light-yellow">
-        {filteredAlerts.map((alert) => (
-          <Alert alert={alert} />
+    <Disclosure as="div" className="block overflow-hidden rounded-b-xl">
+      <DisclosureButton>
+        <h3 className="bg-yellow flex px-4 py-5 font-bold">
+          <AlertIconColumn />
+          {alertsCount} Active {pluralAlerts}{" "}
+          {alertEntityType ? `for this ${alertEntityType}` : ""}
+        </h3>
+      </DisclosureButton>
+      <DisclosurePanel className="bg-light-yellow">
+        {filteredAlerts.map((alert, index) => (
+          <Alert alert={alert} key={index} />
         ))}
-      </div>
-    </div>
+      </DisclosurePanel>
+    </Disclosure>
   );
 
   return alertsCount > 0 ? list : null;

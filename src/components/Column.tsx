@@ -1,7 +1,7 @@
-import type { ComponentChildren } from "preact";
+import type { ReactNode } from "react";
 
 interface Props {
-  children: ComponentChildren;
+  children: ReactNode;
 }
 
 export default function Column({ children }: Props) {

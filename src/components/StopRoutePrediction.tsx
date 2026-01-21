@@ -1,10 +1,10 @@
-import { useStore } from "@nanostores/preact";
+import { useStore } from "@nanostores/react";
 import { routePredictions } from "../lib/routePredictionsStore";
 import type { StopRoute } from "../lib/getStopWithRoutes";
 import type { Prediction } from "../pages/api/predictions";
 import AlertList from "./AlertList";
 import BusIcon from "./BusIcon";
-import type { ComponentChildren } from "preact";
+import type { ReactNode } from "react";
 import ArrowIcon from "./ArrowIcon";
 
 interface Props {
@@ -39,7 +39,7 @@ export default function StopRoutePrediction({ route }: Props) {
     }, [])
     .sort((a, b) => a.sec - b.sec);
 
-  function HeadsignTd({ children }: { children: ComponentChildren }) {
+  function HeadsignTd({ children }: { children: ReactNode }) {
     return (
       <td className="mr-auto flex w-full py-3 pr-2 font-bold">
         <span>

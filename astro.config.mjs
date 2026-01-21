@@ -1,7 +1,7 @@
 // @ts-check
 import { defineConfig, envField } from "astro/config";
 import importGTFS from "./src/integrations/import-gtfs";
-import preact from "@astrojs/preact";
+import react from "@astrojs/react";
 import netlify from "@astrojs/netlify";
 
 import tailwindcss from "@tailwindcss/vite";
@@ -29,6 +29,6 @@ export default defineConfig({
 
     plugins: [tailwindcss()],
   },
-  integrations: [importGTFS(), preact()],
+  integrations: [importGTFS(), react()],
   adapter: netlify(),
 });
