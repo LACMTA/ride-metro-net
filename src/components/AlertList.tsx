@@ -34,19 +34,23 @@ export default function AlertList({
   const pluralAlerts = alertsCount === 1 ? "Alert" : "Alerts";
 
   const list = (
-    <Disclosure as="div" className="block overflow-hidden rounded-b-xl">
-      <DisclosureButton>
-        <h3 className="bg-yellow flex px-4 py-5 font-bold">
-          <AlertIconColumn />
-          {alertsCount} Active {pluralAlerts}{" "}
-          {alertEntityType ? `for this ${alertEntityType}` : ""}
-        </h3>
-      </DisclosureButton>
-      <DisclosurePanel className="bg-light-yellow">
-        {filteredAlerts.map((alert, index) => (
-          <Alert alert={alert} key={index} />
-        ))}
-      </DisclosurePanel>
+    <Disclosure as="div" className="overflow-hidden rounded-b-xl">
+      {({ open }) => (
+        <>
+          <DisclosureButton className="w-full cursor-pointer">
+            <h3 className="bg-yellow flex px-4 py-5 font-bold">
+              <AlertIconColumn />
+              {alertsCount} Active {pluralAlerts}{" "}
+              {alertEntityType ? `for this ${alertEntityType}` : ""}
+            </h3>
+          </DisclosureButton>
+          <DisclosurePanel className="bg-light-yellow">
+            {filteredAlerts.map((alert, index) => (
+              <Alert alert={alert} key={index} />
+            ))}
+          </DisclosurePanel>
+        </>
+      )}
     </Disclosure>
   );
 
