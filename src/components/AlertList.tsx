@@ -7,6 +7,8 @@ import {
   DisclosureButton,
   DisclosurePanel,
 } from "@headlessui/react";
+import ChevronIcon from "./ChevronIcon";
+import clsx from "clsx";
 
 interface Props {
   stopIds?: string[];
@@ -37,12 +39,13 @@ export default function AlertList({
     <Disclosure as="div" className="overflow-hidden rounded-b-xl">
       {({ open }) => (
         <>
-          <DisclosureButton className="w-full cursor-pointer">
-            <h3 className="bg-yellow flex px-4 py-5 font-bold">
+          <DisclosureButton className="bg-yellow flex w-full cursor-pointer items-center justify-between px-4 py-5 font-bold">
+            <h3 className="flex">
               <AlertIconColumn />
               {alertsCount} Active {pluralAlerts}{" "}
               {alertEntityType ? `for this ${alertEntityType}` : ""}
             </h3>
+            <ChevronIcon className={clsx("h-3.5", { "rotate-180": open })} />
           </DisclosureButton>
           <DisclosurePanel className="bg-light-yellow">
             {filteredAlerts.map((alert, index) => (
