@@ -37,23 +37,19 @@ export default function AlertList({
 
   const list = (
     <Disclosure as="div" className="overflow-hidden rounded-b-xl">
-      {({ open }) => (
-        <>
-          <DisclosureButton className="bg-yellow flex w-full cursor-pointer items-center justify-between px-4 py-5 font-bold">
-            <h3 className="flex">
-              <AlertIconColumn />
-              {alertsCount} Active {pluralAlerts}{" "}
-              {alertEntityType ? `for this ${alertEntityType}` : ""}
-            </h3>
-            <ChevronIcon className={clsx("h-3.5", { "rotate-180": open })} />
-          </DisclosureButton>
-          <DisclosurePanel className="bg-light-yellow">
-            {filteredAlerts.map((alert, index) => (
-              <Alert alert={alert} key={index} />
-            ))}
-          </DisclosurePanel>
-        </>
-      )}
+      <DisclosureButton className="bg-yellow group flex w-full cursor-pointer items-center justify-between px-4 py-5 font-bold">
+        <h3 className="flex">
+          <AlertIconColumn />
+          {alertsCount} Active {pluralAlerts}{" "}
+          {alertEntityType ? `for this ${alertEntityType}` : ""}
+        </h3>
+        <ChevronIcon className="h-3.5 group-data-open:rotate-180" />
+      </DisclosureButton>
+      <DisclosurePanel className="bg-light-yellow">
+        {filteredAlerts.map((alert, index) => (
+          <Alert alert={alert} key={index} />
+        ))}
+      </DisclosurePanel>
     </Disclosure>
   );
 
