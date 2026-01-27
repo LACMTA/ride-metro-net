@@ -9,6 +9,7 @@ import AlertList from "../../components/AlertList";
 import BusIcon from "../../components/BusIcon";
 import Column from "../../components/Column";
 import BusPill from "../../components/BusPill";
+import ContactBlock from "../../components/ContactBlock";
 
 export const prerender = true;
 
@@ -62,19 +63,30 @@ const stop = await getStopWithRoutes(stopId);
     </div>
   </Column>
   <main>
-    <Column>
-      <h1 class="text-4xl font-bold">{stop.stopName}</h1>
-      <small>STOP ID: <b>{stop.stopId}</b></small>
-      <AlertList stopIds={[stop.stopId]} alertEntityType="Stop" client:load />
-    </Column>
-    <div class="mt-6 bg-gray-200 py-6">
+    <section>
       <Column>
-        {
-          stop.routes.map((route) => (
-            <StopRoutePrediction route={route} client:load />
-          ))
-        }
+        <h1 class="text-4xl font-bold">{stop.stopName}</h1>
+        <small>STOP ID: <b>{stop.stopId}</b></small>
+        <AlertList stopIds={[stop.stopId]} alertEntityType="Stop" client:load />
       </Column>
-    </div>
+      <div class="mt-6 bg-gray-200 py-6">
+        <Column>
+          {
+            stop.routes.map((route) => (
+              <StopRoutePrediction route={route} client:load />
+            ))
+          }
+        </Column>
+      </div>
+    </section>
+    <section>
+      <ContactBlock
+        headline="Need to plan an alternate bus route?"
+        body="Get help with fares, schedules, and arrival times, service alerts, and transit connections by calling <b>NUMBER</b>"
+        buttonCopy="Call for Trip Help"
+        buttonHref="tel:555555555555"
+      />
+    </section>
   </main>
+  <footer></footer>
 </Layout>
