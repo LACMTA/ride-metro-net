@@ -33,7 +33,7 @@ export default function ContactBlock({
 
   return (
     <div className="border-b-gray-200 not-last:border-b">
-      <Column classNames="text-center my-7">
+      <Column classNames="text-center my-10 max-w-150">
         <h2 className="mb-2 text-2xl font-bold">{headline}</h2>
         <p dangerouslySetInnerHTML={{ __html: body }}></p>
         <a
