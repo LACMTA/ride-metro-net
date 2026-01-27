@@ -40,7 +40,7 @@ export default function ContactBlock({
 
   return (
     <div className={containerClasses}>
-      <Column classNames="text-center max-w-150">
+      <Column narrow className="text-center">
         <h2 className="mb-2 text-2xl font-bold">{headline}</h2>
         <p dangerouslySetInnerHTML={{ __html: body }}></p>
         <a href={buttonHref} className={buttonClasses}>
