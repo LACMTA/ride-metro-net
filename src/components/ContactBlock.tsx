@@ -9,6 +9,8 @@ interface Props {
   buttonCopy: string;
   buttonHref: string;
   buttonIcon?: "phone" | "arrow" | "email";
+  bgClassName?: string;
+  buttonClassName?: string;
 }
 
 export default function ContactBlock({
@@ -17,6 +19,8 @@ export default function ContactBlock({
   buttonCopy,
   buttonHref,
   buttonIcon,
+  bgClassName,
+  buttonClassName,
 }: Props) {
   const iconClasses = "fill-background-white h-4 ml-2 ";
 
@@ -31,15 +35,15 @@ export default function ContactBlock({
     return null;
   };
 
+  const containerClasses = `py-10 not-last:border-b ${bgClassName || "border-b-gray-200"}`;
+  const buttonClasses = `mx-auto mt-5 flex max-w-100 items-center justify-center rounded-lg p-3 font-bold ${buttonClassName || "text-background-white bg-link"}`;
+
   return (
-    <div className="border-b-gray-200 not-last:border-b">
-      <Column classNames="text-center my-10 max-w-150">
+    <div className={containerClasses}>
+      <Column classNames="text-center max-w-150">
         <h2 className="mb-2 text-2xl font-bold">{headline}</h2>
         <p dangerouslySetInnerHTML={{ __html: body }}></p>
-        <a
-          href={buttonHref}
-          className="text-background-white bg-link mx-auto mt-5 flex max-w-100 items-center justify-center rounded-lg p-3 font-bold"
-        >
+        <a href={buttonHref} className={buttonClasses}>
           {buttonCopy}
           {renderIcon()}
         </a>
