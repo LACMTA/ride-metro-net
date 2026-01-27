@@ -36,14 +36,9 @@ export type ConciseAlert = Pick<
  */
 export async function GET(context: import("astro").APIContext) {
   const API_KEY = import.meta.env.API_KEY;
-  // dedupe stopIds and routeIds
-  // otherwise we'll provide duplicate alerts if we get duplicates
-  const stopIds = [
-    ...new Set(context.url.searchParams.get("stopId")?.split(",") || []),
-  ];
-  const routeIds = [
-    ...new Set(context.url.searchParams.get("routeId")?.split(",") || []),
-  ];
+
+  const stopIds = context.url.searchParams.get("stopId")?.split(",") || [];
+  const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
 
   // TODO: generalize for trains
   const AGENCY_KEY = "lametro";
@@ -104,22 +99,23 @@ export async function GET(context: import("astro").APIContext) {
 
   const filteredAlerts = alertsData.reduce<ConciseAlert[]>(
     (result, alert, index) => {
-      let alertAdded = false;
-      stopIds.forEach((stopId) => {
-        if (alert.informedEntities.find((entity) => entity.stopId === stopId)) {
-          result.push(makeConciseAlert(alert));
-          alertAdded = true;
-        }
-      });
-      // return here so we don't duplicate if both the stop and route are found
-      if (alertAdded) return result;
-      routeIds.forEach((routeId) => {
-        if (
-          alert.informedEntities.find((entity) => entity.routeId === routeId)
-        ) {
-          result.push(makeConciseAlert(alert));
-        }
-      });
+      const matchesStop = stopIds.some((stopId) =>
+        alert.informedEntities.some((entity) => entity.stopId === stopId),
+      );
+
+      if (matchesStop) {
+        result.push(makeConciseAlert(alert));
+        return result;
+      }
+
+      // Same pattern for routes
+      const matchesRoute = routeIds.some((routeId) =>
+        alert.informedEntities.some((entity) => entity.routeId === routeId),
+      );
+
+      if (matchesRoute) {
+        result.push(makeConciseAlert(alert));
+      }
       return result;
     },
     [],
