@@ -78,7 +78,7 @@ export default function StopRoutePrediction({ route }: Props) {
     <table className="w-full">
       <thead className="text-left text-sm text-gray-600 uppercase">
         <tr>
-          <th>Terminus</th>
+          <th>Destination</th>
           <th className="max-w-sm text-right text-nowrap">Arrives in</th>
         </tr>
       </thead>
