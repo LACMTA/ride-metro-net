@@ -91,7 +91,7 @@ const stop = await getStopWithRoutes(stopId);
         headline="Does something need attention at the stop?"
         body="Report issues with bus stop maintenance, service problems, hazards, unsafe conditions and other concerns."
         buttonCopy="Report an Issue"
-        buttonHref="#"
+        buttonHref={`https://tw.metro.net/?app=metro-stop-page&type=stoplocation&id=${stopId}`}
         buttonIcon="arrow"
       />
       <ContactBlock
