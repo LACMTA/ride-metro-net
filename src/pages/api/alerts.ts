@@ -13,6 +13,8 @@ type SwiftlyAlert = CamelCaseAlert & {
   createdAt: string;
   userEmail: string;
   userFullname: string;
+  // In the spec, this is an object with translations. Swiftly just provides text.
+  descriptionText: string;
   deletedAt?: string;
   deletedBy?: string;
 };
