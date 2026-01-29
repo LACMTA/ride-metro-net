@@ -16,9 +16,9 @@ async function getAlerts(stopIds: string[], routeIds: string[]) {
 export default async function watchAlerts(
   stopIds: string[],
   routeIds: string[],
+  // 5 minutes
   pollInterval: number = 300000,
 ) {
-  const curriedGetAlerts = getAlerts.bind(null, stopIds, routeIds);
-  curriedGetAlerts();
-  return setInterval(curriedGetAlerts, pollInterval);
+  getAlerts(stopIds, routeIds);
+  return setInterval(getAlerts, pollInterval, stopIds, routeIds);
 }
