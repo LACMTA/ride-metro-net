@@ -1,5 +1,6 @@
 import { useStore } from "@nanostores/react";
 import { alerts } from "../lib/alertsStore";
+import { analyticsEvent } from "../lib/analytics";
 import Alert from "./Alert";
 import AlertIconColumn from "./AlertIconColumn";
 import {
@@ -37,7 +38,10 @@ export default function AlertList({
 
   const list = (
     <Disclosure as="div" className="overflow-hidden rounded-b-xl">
-      <DisclosureButton className="bg-yellow group flex w-full cursor-pointer items-center justify-between px-4 py-5 font-bold">
+      <DisclosureButton
+        className="bg-yellow group flex w-full cursor-pointer items-center justify-between px-4 py-5 font-bold"
+        onClick={() => analyticsEvent("alert_accordion_click")}
+      >
         <h3 className="flex">
           <AlertIconColumn />
           {alertsCount} Active {pluralAlerts}{" "}
