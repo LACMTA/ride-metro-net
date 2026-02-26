@@ -1,4 +1,6 @@
 ---
+import AnalyticsBody from "../components/AnalyticsBody.astro";
+import AnalyticsHead from "../components/AnalyticsHead.astro";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
 import "../styles/fonts.css";
@@ -12,18 +14,7 @@ const { title } = Astro.props;
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    {import.meta.env.PROD && (
-      <>
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-DRHSKDM2QJ"></script>
-        <script is:inline>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-DRHSKDM2QJ');
-        </script>
-      </>
-    )}
+    {import.meta.env.PROD && <AnalyticsHead />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
       rel="preload"
@@ -36,6 +27,7 @@ const { title } = Astro.props;
     <title>{title}</title>
   </head>
   <body class="font-sans">
+    {import.meta.env.PROD && <AnalyticsBody />}
     <Header />
     <slot />
     <Footer />
