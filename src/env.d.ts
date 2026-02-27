@@ -1,5 +1,5 @@
 /// <reference path="../.astro/types.d.ts" />
 
 interface Window {
-  gtag?: (...args: unknown[]) => void;
+  dataLayer?: { push: (...args: unknown[]) => void };
 }

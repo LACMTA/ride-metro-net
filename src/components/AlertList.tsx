@@ -39,8 +39,10 @@ export default function AlertList({
   const list = (
     <Disclosure as="div" className="overflow-hidden rounded-b-xl">
       <DisclosureButton
-        className="bg-yellow group flex w-full cursor-pointer items-center justify-between px-4 py-5 font-bold"
-        onClick={() => analyticsEvent("alert_accordion_click")}
+        className="bg-yellow group analytics-alert-accordion flex w-full cursor-pointer items-center justify-between px-4 py-5 font-bold"
+        onClick={() =>
+          analyticsEvent({ event: "click", target: "alert_accordion" })
+        }
       >
         <h3 className="flex">
           <AlertIconColumn />
