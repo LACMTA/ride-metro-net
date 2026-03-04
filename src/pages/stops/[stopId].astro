@@ -79,30 +79,5 @@ const stop = await getStopWithRoutes(stopId);
         </Column>
       </div>
     </section>
-    <section>
-      <ContactBlock
-        headline="Need to plan an alternate bus route?"
-        body="Get help with fares, schedules, and arrival times, service alerts, and transit connections by calling 1-800-464-2111"
-        buttonCopy="Call for Trip Help"
-        buttonHref="tel:8004642111"
-        buttonIcon="phone"
-      />
-      <ContactBlock
-        headline="Does something need attention at the stop?"
-        body="Report issues with bus stop maintenance, service problems, hazards, unsafe conditions and other concerns."
-        buttonCopy="Report an Issue"
-        buttonHref={`https://tw.metro.net/?app=metro-stop-page&type=stoplocation&id=${stopId}`}
-        buttonIcon="arrow"
-      />
-      <ContactBlock
-        headline="Need to get in touch?"
-        body="You can email Metro with any feedback or general questions at CustomerRelations@metro.net."
-        buttonCopy="Email Customer Relations"
-        buttonHref="mailto:CustomerRelations@metro.net"
-        buttonIcon="email"
-        bgClassName="bg-background-gray"
-        buttonClassName="border border-metro-text text-metro-text bg-background-gray"
-      />
-    </section>
   </main>
 </Layout>
