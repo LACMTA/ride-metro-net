@@ -34,3 +34,5 @@ pnpm-debug.log*
 data
 # Local Netlify folder
 .netlify
+
+BOT.md
