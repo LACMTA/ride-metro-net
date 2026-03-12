@@ -3,11 +3,15 @@ import { routePredictions } from "./routePredictionsStore";
 
 let adjustmentIntervalId: NodeJS.Timeout | null;
 
-async function getPredictions(stopId: string, adjustmentInterval: number) {
+async function getPredictions(
+  stopId: string,
+  agency: string,
+  adjustmentInterval: number,
+) {
   if (adjustmentIntervalId) {
     clearInterval(adjustmentIntervalId);
   }
-  const res = await fetch(`/api/predictions?stopId=${stopId}`);
+  const res = await fetch(`/api/predictions?stopId=${stopId}&agency=${agency}`);
   if (!res.ok) {
     return console.error(await res.text());
   }
@@ -49,9 +53,16 @@ function adjustPredictions(secondsDelta: number) {
 
 export default async function watchPredictions(
   stopId: string,
+  agency: string,
   pollInterval: number = 60000,
   adjustmentInterval: number = 30000,
 ) {
-  getPredictions(stopId, adjustmentInterval);
-  return setInterval(getPredictions, pollInterval, stopId, adjustmentInterval);
+  getPredictions(stopId, agency, adjustmentInterval);
+  return setInterval(
+    getPredictions,
+    pollInterval,
+    stopId,
+    agency,
+    adjustmentInterval,
+  );
 }

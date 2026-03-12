@@ -43,8 +43,9 @@ const stop = await getStopWithRoutes(stopId);
   watchAlerts(
     [stop.stopId],
     stop.routes.map((route) => route.routeId),
+    stop.swiftlyAgencyId,
   );
-  watchPredictions(stop.stopId);
+  watchPredictions(stop.stopId, stop.swiftlyAgencyId);
 </script>
 
 <Layout title={stop.stopName}>

@@ -41,12 +41,13 @@ export async function GET(context: import("astro").APIContext) {
 
   const stopIds = context.url.searchParams.get("stopId")?.split(",") || [];
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
+  const agency = context.url.searchParams.get("agency");
 
-  // TODO: generalize for trains
-  const AGENCY_KEY = "lametro";
+  if (!agency)
+    return new Response("agency query parameter is required", { status: 400 });
 
   const alertsUrl = new URL(
-    `https://api.goswift.ly/real-time/${AGENCY_KEY}/gtfs-rt-alerts/v2`,
+    `https://api.goswift.ly/real-time/${agency}/gtfs-rt-alerts/v2`,
   );
   // TODO: consider using protocol buffer for network performance
   // it's possible the response will actually match the GTFS spec in this case

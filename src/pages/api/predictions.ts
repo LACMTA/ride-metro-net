@@ -39,15 +39,15 @@ export type Prediction = {
 export async function GET(context: import("astro").APIContext) {
   const API_KEY = import.meta.env.API_KEY;
   const stopId = context.url.searchParams.get("stopId");
+  const agency = context.url.searchParams.get("agency");
 
   if (!stopId)
     return new Response("stopId query parameter is required", { status: 400 });
-
-  // TODO: generalize for trains
-  const AGENCY_KEY = "lametro";
+  if (!agency)
+    return new Response("agency query parameter is required", { status: 400 });
 
   const predictionsUrl = new URL(
-    `https://api.goswift.ly/real-time/${AGENCY_KEY}/predictions`,
+    `https://api.goswift.ly/real-time/${agency}/predictions`,
   );
   predictionsUrl.searchParams.append("stop", stopId);
 

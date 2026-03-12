@@ -6,12 +6,17 @@ import type Database from "better-sqlite3";
 export interface StopWithRoutes {
   stopName: string;
   stopId: string;
+  /** Swiftly real-time API agency key, derived from route_type at build time. */
+  swiftlyAgencyId: string;
   routes: StopRoute[];
 }
 
 export interface StopRoute {
   routeId: string;
   routeShortName: string;
+  routeType: number;
+  routeColor: string;
+  routeTextColor: string;
   headsigns: string[];
   directionId: 0 | 1;
 }
@@ -19,6 +24,7 @@ export interface StopRoute {
 interface DatabaseQueryResult {
   stop_name: string;
   stop_id: string;
+  swiftly_agency_id: string;
   routes: string; // JSON string
 }
 
@@ -43,6 +49,10 @@ const query = `
         stops.stop_id,
         routes.route_id,
         routes.route_short_name,
+        routes.route_type,
+        routes.route_color,
+        routes.route_text_color,
+        CASE WHEN routes.route_type = 3 THEN 'lametro' ELSE 'lametro-rail' END AS swiftly_agency_id,
         trips.direction_id,
         MIN(stop_times.stop_sequence) as min_stop_sequence,
         JSON_GROUP_ARRAY(
@@ -57,11 +67,15 @@ const query = `
     )
     SELECT
       stops.stop_name as stop_name, 
-      stops.stop_id as stop_id, 
+      stops.stop_id as stop_id,
+      MIN(route_headsigns.swiftly_agency_id) as swiftly_agency_id,
       JSON_GROUP_ARRAY(
         JSON_OBJECT(
           'route_id', route_headsigns.route_id,
           'route_short_name', route_headsigns.route_short_name,
+          'route_type', route_headsigns.route_type,
+          'route_color', COALESCE(route_headsigns.route_color, ''),
+          'route_text_color', COALESCE(route_headsigns.route_text_color, ''),
           'direction_id', route_headsigns.direction_id,
           'headsigns', JSON(route_headsigns.headsigns)
         )
@@ -94,11 +108,12 @@ export default async function (stopId: string) {
   const query = getPreparedQuery();
   const res = query.get({ stopId }) as DatabaseQueryResult;
 
-  const stop = objectToCamel({
+  const stop: StopWithRoutes = {
     stopName: res.stop_name,
     stopId: res.stop_id,
-    routes: JSON.parse(res.routes),
-  }) as StopWithRoutes;
+    swiftlyAgencyId: res.swiftly_agency_id,
+    routes: objectToCamel(JSON.parse(res.routes)) as StopRoute[],
+  };
 
   return stop;
 }

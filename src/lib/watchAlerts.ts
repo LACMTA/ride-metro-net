@@ -1,9 +1,13 @@
 import type { ConciseAlert } from "../pages/api/alerts";
 import { alerts } from "./alertsStore";
 
-async function getAlerts(stopIds: string[], routeIds: string[]) {
+async function getAlerts(
+  stopIds: string[],
+  routeIds: string[],
+  agency: string,
+) {
   const res = await fetch(
-    `/api/alerts?stopId=${stopIds.join(",")}&routeId=${routeIds.join(",")}`,
+    `/api/alerts?stopId=${stopIds.join(",")}&routeId=${routeIds.join(",")}&agency=${agency}`,
   );
   if (!res.ok) {
     return console.error(await res.text());
@@ -16,9 +20,10 @@ async function getAlerts(stopIds: string[], routeIds: string[]) {
 export default async function watchAlerts(
   stopIds: string[],
   routeIds: string[],
+  agency: string,
   // 5 minutes
   pollInterval: number = 300000,
 ) {
-  getAlerts(stopIds, routeIds);
-  return setInterval(getAlerts, pollInterval, stopIds, routeIds);
+  getAlerts(stopIds, routeIds, agency);
+  return setInterval(getAlerts, pollInterval, stopIds, routeIds, agency);
 }
