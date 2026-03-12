@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "import-gtfs": "npx tsx scripts/import-gtfs.ts",
     "astro": "astro"
   },
   "dependencies": {
