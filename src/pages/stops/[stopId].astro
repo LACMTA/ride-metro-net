@@ -15,9 +15,9 @@ export const prerender = true;
 
 export async function getStaticPaths() {
   const db = openDb(GTFSconfig);
-  // TODO: this will currently build all pages. Consider building only pages for pilot.
+  // Only build pages for stops that have actual scheduled arrivals in stop_times.
   const allStops = (await db
-    .prepare("SELECT DISTINCT stop_id FROM stops")
+    .prepare("SELECT DISTINCT stop_id FROM stop_times")
     .all()) as { stop_id: string }[];
 
   return allStops.map((stop) => ({
