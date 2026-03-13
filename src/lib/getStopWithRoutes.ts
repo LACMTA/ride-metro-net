@@ -58,6 +58,23 @@ function getDb() {
   return dbInstance;
 }
 
+/**
+ * Stable route ID prefix → display letter for routes without a route_short_name in GTFS.
+ * (This is currently 1:1 with lettered routes, we may need to revisit if that changes)
+ * Rail IDs are fully stable. Rapid bus IDs carry a release-specific suffix
+ * (e.g. "901-13196"), so we match only on the numeric prefix before the dash.
+ */
+const ROUTE_SHORT_NAME_OVERRIDES: Record<string, string> = {
+  "801": "A",
+  "802": "B",
+  "803": "C",
+  "804": "E",
+  "805": "D",
+  "807": "K",
+  "901": "G",
+  "910": "J",
+};
+
 const query = `
     WITH
     -- Collect the stop itself plus any child stops (when @stopId is a parent station).
@@ -148,12 +165,23 @@ export default async function (stopId: string) {
     stopId,
   }) as ChildStopRow[];
 
+  const routes = (objectToCamel(JSON.parse(res.routes)) as StopRoute[]).map(
+    (route) => {
+      if (!route.routeShortName) {
+        const prefix = route.routeId.split("-")[0];
+        route.routeShortName =
+          ROUTE_SHORT_NAME_OVERRIDES[prefix] ?? route.routeShortName;
+      }
+      return route;
+    },
+  );
+
   const stop: StopWithRoutes = {
     stopName: res.stop_name,
     stopId: res.stop_id,
     childStopIds: childRows.map((r) => r.stop_id),
     swiftlyAgencyId: res.swiftly_agency_id,
-    routes: objectToCamel(JSON.parse(res.routes)) as StopRoute[],
+    routes,
   };
 
   return stop;
