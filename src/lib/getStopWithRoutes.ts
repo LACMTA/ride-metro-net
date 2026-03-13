@@ -24,7 +24,11 @@ export interface StopRoute {
   routeColor: string;
   routeTextColor: string;
   headsigns: string[];
-  directionId: 0 | 1;
+  /**
+   * 0 or 1 for bus routes (one card per direction).
+   * null for rail/tram/subway routes (both directions collapsed into one card).
+   */
+  directionId: 0 | 1 | null;
 }
 
 interface DatabaseQueryResult {
@@ -62,6 +66,10 @@ const query = `
       UNION ALL
       SELECT stop_id FROM stops WHERE parent_station = @stopId
     ),
+    -- For bus routes (route_type=3), group by direction so each direction becomes
+    -- a separate StopRoute (one card per direction in the UI).
+    -- For rail/tram/subway (route_type 0 or 1), collapse both directions into a
+    -- single row (direction_id=NULL) so all headsigns appear under one route card.
     route_headsigns AS (
       SELECT
         @stopId AS stop_id,
@@ -71,7 +79,7 @@ const query = `
         routes.route_color,
         routes.route_text_color,
         CASE WHEN routes.route_type = 3 THEN 'lametro' ELSE 'lametro-rail' END AS swiftly_agency_id,
-        trips.direction_id,
+        CASE WHEN routes.route_type = 3 THEN trips.direction_id ELSE NULL END AS direction_id,
         MIN(stop_times.stop_sequence) AS min_stop_sequence,
         JSON_GROUP_ARRAY(
           DISTINCT SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
@@ -80,7 +88,8 @@ const query = `
       JOIN relevant_stops rs ON rs.stop_id = stop_times.stop_id
       LEFT JOIN trips ON trips.trip_id = stop_times.trip_id
       LEFT JOIN routes ON routes.route_id = trips.route_id
-      GROUP BY routes.route_id, routes.route_short_name, trips.direction_id
+      GROUP BY routes.route_id, routes.route_short_name,
+        CASE WHEN routes.route_type = 3 THEN trips.direction_id ELSE NULL END
     )
     SELECT
       stops.stop_name AS stop_name,
