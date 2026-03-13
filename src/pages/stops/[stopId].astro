@@ -15,9 +15,25 @@ export const prerender = true;
 
 export async function getStaticPaths() {
   const db = openDb(GTFSconfig);
-  // Only build pages for stops that have actual scheduled arrivals in stop_times.
+  // Build pages for:
+  //   1. Stops that have scheduled arrivals (stop_times) and are NOT a child stop (no parent_station).
+  //   2. Stops that ARE a parent_station for other stops (even if they have no direct stop_times).
+  // Do NOT build pages for child stops (those that have a parent_station value).
   const allStops = (await db
-    .prepare("SELECT DISTINCT stop_id FROM stop_times")
+    .prepare(
+      `
+      SELECT DISTINCT st.stop_id
+      FROM stop_times st
+      JOIN stops s ON s.stop_id = st.stop_id
+      WHERE (s.parent_station IS NULL OR s.parent_station = '')
+
+      UNION
+
+      SELECT DISTINCT s.parent_station AS stop_id
+      FROM stops s
+      WHERE s.parent_station IS NOT NULL AND s.parent_station != ''
+      `,
+    )
     .all()) as { stop_id: string }[];
 
   return allStops.map((stop) => ({
@@ -40,12 +56,19 @@ const stop = await getStopWithRoutes(stopId);
   const stop = getData("data-stop") as StopWithRoutes;
 
   console.log("Pre-build GTFS data:", stop);
+
+  // For parent stations, predictions are associated with child stop IDs in Swiftly.
+  // Fall back to the stop's own ID for regular (non-parent) stops.
+  const effectiveStopIds =
+    stop.childStopIds.length > 0 ? stop.childStopIds : [stop.stopId];
+
   watchAlerts(
-    [stop.stopId],
+    // Include both the parent station ID and child IDs — alerts may be tagged to either.
+    [stop.stopId, ...stop.childStopIds],
     stop.routes.map((route) => route.routeId),
     stop.swiftlyAgencyId,
   );
-  watchPredictions(stop.stopId, stop.swiftlyAgencyId);
+  watchPredictions(effectiveStopIds, stop.swiftlyAgencyId);
 </script>
 
 <Layout title={stop.stopName}>

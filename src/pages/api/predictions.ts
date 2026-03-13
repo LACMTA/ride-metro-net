@@ -33,59 +33,60 @@ export type Prediction = {
 
 /**
  * GET /api/predictions
- * @param {string} stopId - The stop ID to provide predictions for
- * @returns {PredictionSet[]} Array of predictions
+ * @param {string} stopId - Comma-separated list of stop IDs to fetch predictions for.
+ *   For parent stations, pass the child stop IDs. Results are aggregated into a single array.
+ * @param {string} agency - The Swiftly agency key.
+ * @returns {RoutePredictions[]} Aggregated array of predictions across all requested stops.
  */
 export async function GET(context: import("astro").APIContext) {
   const API_KEY = import.meta.env.API_KEY;
-  const stopId = context.url.searchParams.get("stopId");
+  const stopIdParam = context.url.searchParams.get("stopId");
   const agency = context.url.searchParams.get("agency");
 
-  if (!stopId)
+  if (!stopIdParam)
     return new Response("stopId query parameter is required", { status: 400 });
   if (!agency)
     return new Response("agency query parameter is required", { status: 400 });
 
-  const predictionsUrl = new URL(
-    `https://api.goswift.ly/real-time/${agency}/predictions`,
-  );
-  predictionsUrl.searchParams.append("stop", stopId);
+  const stopIds = stopIdParam
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
 
-  console.log(`Fetching predictions from: ${predictionsUrl.toString()}`);
-
-  const predictionsResponse = await fetch(predictionsUrl.toString(), {
-    method: "GET",
-    headers: {
-      Accept:
-        "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
-      Authorization: API_KEY as string,
-    },
-    // Add timeout for better cold start handling
-    signal: AbortSignal.timeout(25000), // 25 second timeout
-  });
-
-  if (!predictionsResponse.ok) {
-    const errorText = await predictionsResponse.text();
-    console.error(
-      `Swiftly predictions API error (${predictionsResponse.status}):`,
-      errorText,
+  const fetchForStop = async (stopId: string): Promise<RoutePredictions[]> => {
+    const predictionsUrl = new URL(
+      `https://api.goswift.ly/real-time/${agency}/predictions`,
     );
-    return new Response(
-      JSON.stringify({
-        error: "External API request failed",
-        status: predictionsResponse.status,
-        timestamp: new Date().toISOString(),
-      }),
-      {
-        status: 502, // Bad Gateway - external service issue
-        headers: { "Content-Type": "application/json" },
+    predictionsUrl.searchParams.append("stop", stopId);
+
+    console.log(`Fetching predictions from: ${predictionsUrl.toString()}`);
+
+    const predictionsResponse = await fetch(predictionsUrl.toString(), {
+      method: "GET",
+      headers: {
+        Accept:
+          "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
+        Authorization: API_KEY as string,
       },
-    );
-  }
+      signal: AbortSignal.timeout(25000), // 25 second timeout
+    });
 
-  const predictionsData: PredictionsApiResponse =
-    await predictionsResponse.json();
-  const filteredPredictions = predictionsData.data.predictionsData;
+    if (!predictionsResponse.ok) {
+      const errorText = await predictionsResponse.text();
+      console.error(
+        `Swiftly predictions API error for stop ${stopId} (${predictionsResponse.status}):`,
+        errorText,
+      );
+      // Return empty rather than failing the whole request when one stop fails
+      return [];
+    }
 
-  return new Response(JSON.stringify(filteredPredictions));
+    const data: PredictionsApiResponse = await predictionsResponse.json();
+    return data.data.predictionsData;
+  };
+
+  const results = await Promise.all(stopIds.map(fetchForStop));
+  const allPredictions = results.flat();
+
+  return new Response(JSON.stringify(allPredictions));
 }

@@ -6,6 +6,12 @@ import type Database from "better-sqlite3";
 export interface StopWithRoutes {
   stopName: string;
   stopId: string;
+  /**
+   * For parent stations: the IDs of child stops that actually have scheduled arrivals.
+   * Empty array for regular (non-parent) stops.
+   * Use these IDs when requesting real-time predictions from Swiftly.
+   */
+  childStopIds: string[];
   /** Swiftly real-time API agency key, derived from route_type at build time. */
   swiftlyAgencyId: string;
   routes: StopRoute[];
@@ -28,8 +34,13 @@ interface DatabaseQueryResult {
   routes: string; // JSON string
 }
 
+interface ChildStopRow {
+  stop_id: string;
+}
+
 let dbInstance: Database.Database | null = null;
 let preparedQuery: Database.Statement | null = null;
+let preparedChildStopsQuery: Database.Statement | null = null;
 
 function getDb() {
   if (!dbInstance) {
@@ -44,9 +55,16 @@ function getDb() {
 }
 
 const query = `
-    WITH route_headsigns AS (
-      SELECT 
-        stops.stop_id,
+    WITH
+    -- Collect the stop itself plus any child stops (when @stopId is a parent station).
+    relevant_stops AS (
+      SELECT stop_id FROM stops WHERE stop_id = @stopId
+      UNION ALL
+      SELECT stop_id FROM stops WHERE parent_station = @stopId
+    ),
+    route_headsigns AS (
+      SELECT
+        @stopId AS stop_id,
         routes.route_id,
         routes.route_short_name,
         routes.route_type,
@@ -54,21 +72,20 @@ const query = `
         routes.route_text_color,
         CASE WHEN routes.route_type = 3 THEN 'lametro' ELSE 'lametro-rail' END AS swiftly_agency_id,
         trips.direction_id,
-        MIN(stop_times.stop_sequence) as min_stop_sequence,
+        MIN(stop_times.stop_sequence) AS min_stop_sequence,
         JSON_GROUP_ARRAY(
           DISTINCT SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
-        ) as headsigns
-      FROM stops
-      LEFT JOIN stop_times ON stop_times.stop_id = stops.stop_id
+        ) AS headsigns
+      FROM stop_times
+      JOIN relevant_stops rs ON rs.stop_id = stop_times.stop_id
       LEFT JOIN trips ON trips.trip_id = stop_times.trip_id
       LEFT JOIN routes ON routes.route_id = trips.route_id
-      WHERE stops.stop_id = @stopId
-      GROUP BY stops.stop_id, routes.route_id, routes.route_short_name, trips.direction_id
+      GROUP BY routes.route_id, routes.route_short_name, trips.direction_id
     )
     SELECT
-      stops.stop_name as stop_name, 
-      stops.stop_id as stop_id,
-      MIN(route_headsigns.swiftly_agency_id) as swiftly_agency_id,
+      stops.stop_name AS stop_name,
+      stops.stop_id AS stop_id,
+      MIN(route_headsigns.swiftly_agency_id) AS swiftly_agency_id,
       JSON_GROUP_ARRAY(
         JSON_OBJECT(
           'route_id', route_headsigns.route_id,
@@ -82,12 +99,12 @@ const query = `
       ) AS routes
     FROM stops
     JOIN route_headsigns ON route_headsigns.stop_id = stops.stop_id
-    WHERE stops.stop_id = @stopId 
+    WHERE stops.stop_id = @stopId
       AND NOT EXISTS (
         -- Exclude this direction if another direction for the same route has stop_sequence=1
-        SELECT 1 
-        FROM route_headsigns rh2 
-        WHERE rh2.route_id = route_headsigns.route_id 
+        SELECT 1
+        FROM route_headsigns rh2
+        WHERE rh2.route_id = route_headsigns.route_id
           AND rh2.stop_id = route_headsigns.stop_id
           AND rh2.direction_id != route_headsigns.direction_id
           AND rh2.min_stop_sequence = 1
@@ -104,13 +121,28 @@ function getPreparedQuery() {
   return preparedQuery;
 }
 
+function getPreparedChildStopsQuery() {
+  if (!preparedChildStopsQuery) {
+    const db = getDb();
+    preparedChildStopsQuery = db.prepare(
+      `SELECT stop_id FROM stops WHERE parent_station = @stopId`,
+    );
+  }
+  return preparedChildStopsQuery;
+}
+
 export default async function (stopId: string) {
-  const query = getPreparedQuery();
-  const res = query.get({ stopId }) as DatabaseQueryResult;
+  const mainQuery = getPreparedQuery();
+  const res = mainQuery.get({ stopId }) as DatabaseQueryResult;
+
+  const childRows = getPreparedChildStopsQuery().all({
+    stopId,
+  }) as ChildStopRow[];
 
   const stop: StopWithRoutes = {
     stopName: res.stop_name,
     stopId: res.stop_id,
+    childStopIds: childRows.map((r) => r.stop_id),
     swiftlyAgencyId: res.swiftly_agency_id,
     routes: objectToCamel(JSON.parse(res.routes)) as StopRoute[],
   };
