@@ -97,7 +97,9 @@ export default function StopRoutePrediction({ route }: Props) {
   return (
     <div className="bg-background-white mb-5 overflow-hidden rounded-xl">
       <h2 className="text-background-white bg-black p-4 text-5xl font-bold">
-        <BusIcon className="mr-3 inline h-9 align-baseline" />
+        {route.routeType === 3 && (
+          <BusIcon className="mr-3 inline h-9 align-baseline" />
+        )}
         {route.routeShortName}
       </h2>
       <div className="m-4">{table}</div>
