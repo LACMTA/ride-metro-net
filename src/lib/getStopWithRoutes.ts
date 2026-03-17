@@ -151,7 +151,7 @@ function getPreparedChildStopsQuery() {
   if (!preparedChildStopsQuery) {
     const db = getDb();
     preparedChildStopsQuery = db.prepare(
-      `SELECT stop_id FROM stops WHERE parent_station = @stopId`,
+      `SELECT DISTINCT stops.stop_id FROM stops INNER JOIN stop_times ON stop_times.stop_id = stops.stop_id WHERE stops.parent_station = @stopId`,
     );
   }
   return preparedChildStopsQuery;
