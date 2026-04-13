@@ -2,10 +2,7 @@ import { openDb } from "gtfs";
 import { GTFSconfig } from "../integrations/import-gtfs";
 import { objectToCamel } from "ts-case-convert";
 import type Database from "better-sqlite3";
-import {
-  ROUTE_SHORT_NAME_OVERRIDES,
-  resolveRouteShortName,
-} from "./routeShortNameOverrides";
+import { ROUTE_SHORT_NAME_OVERRIDES } from "./routeShortNameOverrides";
 
 export interface StopWithRoutes {
   stopName: string;
@@ -155,10 +152,11 @@ export default async function (stopId: string) {
 
   const routes = (objectToCamel(JSON.parse(res.routes)) as StopRoute[]).map(
     (route) => {
+      // Normalize routeId to the stable prefix (e.g. "901-13196" → "901")
+      route.routeId = route.routeId.split("-")[0];
       if (!route.routeShortName) {
-        const prefix = route.routeId.split("-")[0];
         route.routeShortName =
-          ROUTE_SHORT_NAME_OVERRIDES[prefix] ?? route.routeShortName;
+          ROUTE_SHORT_NAME_OVERRIDES[route.routeId] ?? route.routeShortName;
       }
       return route;
     },

@@ -47,6 +47,7 @@ const query = `
       COALESCE(route_text_color, '') AS route_text_color
     FROM routes
     WHERE route_id = @routeId
+       OR route_id LIKE @routeId || '-%'
     LIMIT 1
     `;
 
@@ -66,8 +67,10 @@ export default async function (routeId: string) {
     throw new Error(`Route not found: ${routeId}`);
   }
 
+  const routeIdPrefix = res.route_id.split("-")[0];
+
   const route: RouteWithInfo = {
-    routeId: res.route_id,
+    routeId: routeIdPrefix,
     routeShortName: resolveRouteShortName(
       res.route_id,
       res.route_short_name || "",

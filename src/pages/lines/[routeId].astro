@@ -13,6 +13,8 @@ export const prerender = true;
 export async function getStaticPaths() {
   const db = openDb(GTFSconfig);
   // Build pages for all routes that have trips (are active in the schedule).
+  // Strip the version suffix from route_id (e.g. "901-13196" → "901") so that
+  // page URLs are stable across GTFS releases, then deduplicate.
   const allRoutes = (await db
     .prepare(
       `
@@ -24,8 +26,12 @@ export async function getStaticPaths() {
     )
     .all()) as { route_id: string }[];
 
-  return allRoutes.map((route) => ({
-    params: { routeId: route.route_id },
+  const uniquePrefixes = [
+    ...new Set(allRoutes.map((route) => route.route_id.split("-")[0])),
+  ];
+
+  return uniquePrefixes.map((routeIdPrefix) => ({
+    params: { routeId: routeIdPrefix },
   }));
 }
 
