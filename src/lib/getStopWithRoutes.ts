@@ -2,6 +2,10 @@ import { openDb } from "gtfs";
 import { GTFSconfig } from "../integrations/import-gtfs";
 import { objectToCamel } from "ts-case-convert";
 import type Database from "better-sqlite3";
+import {
+  ROUTE_SHORT_NAME_OVERRIDES,
+  resolveRouteShortName,
+} from "./routeShortNameOverrides";
 
 export interface StopWithRoutes {
   stopName: string;
@@ -58,22 +62,6 @@ function getDb() {
   return dbInstance;
 }
 
-/**
- * Stable route ID prefix → display letter for routes without a route_short_name in GTFS.
- * (This is currently 1:1 with lettered routes, we may need to revisit if that changes)
- * Rail IDs are fully stable. Rapid bus IDs carry a release-specific suffix
- * (e.g. "901-13196"), so we match only on the numeric prefix before the dash.
- */
-const ROUTE_SHORT_NAME_OVERRIDES: Record<string, string> = {
-  "801": "A",
-  "802": "B",
-  "803": "C",
-  "804": "E",
-  "805": "D",
-  "807": "K",
-  "901": "G",
-  "910": "J",
-};
 
 const query = `
     WITH

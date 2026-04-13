@@ -1,0 +1,75 @@
+---
+import { openDb } from "gtfs";
+import Layout from "../../layouts/Layout.astro";
+import { GTFSconfig } from "../../integrations/import-gtfs";
+import getRouteById from "../../lib/getRouteById";
+import Column from "../../components/Column";
+import BusPill from "../../components/BusPill";
+import RailIcon from "../../components/RailIcon";
+import BusIcon from "../../components/BusIcon";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const db = openDb(GTFSconfig);
+  // Build pages for all routes that have trips (are active in the schedule).
+  const allRoutes = (await db
+    .prepare(
+      `
+      SELECT DISTINCT r.route_id
+      FROM routes r
+      JOIN trips t ON t.route_id = r.route_id
+      ORDER BY r.route_id
+      `,
+    )
+    .all()) as { route_id: string }[];
+
+  return allRoutes.map((route) => ({
+    params: { routeId: route.route_id },
+  }));
+}
+
+const { routeId } = Astro.params;
+
+const route = await getRouteById(routeId);
+---
+
+<Layout title={`Line ${route.routeShortName}`}>
+  <Column>
+    <div class="mt-6 mb-4 flex items-center">
+      {
+        route.routeType === 3 && (
+          <BusIcon className="text-metro-text mr-4 h-8 shrink-0" />
+        )
+      }
+      <ul>
+        {
+          route.routeType !== 3 ? (
+            <li class="my-1 mr-1.5 inline-block">
+              <RailIcon
+                name={route.routeShortName}
+                color={route.routeColor}
+                textColor={route.routeTextColor}
+              />
+            </li>
+          ) : (
+            <li class="my-1 mr-1.5 inline-block">
+              <BusPill name={route.routeShortName} />
+            </li>
+          )
+        }
+      </ul>
+    </div>
+  </Column>
+  <main>
+    <section>
+      <Column>
+        <h1 class="text-4xl font-bold">Line {route.routeShortName}</h1>
+        <p class="mt-0.5 mb-4 text-sm text-gray-500">
+          <small>ROUTE ID: <b>{route.routeId}</b></small>
+        </p>
+        <p class="text-gray-700">{route.routeLongName}</p>
+      </Column>
+    </section>
+  </main>
+</Layout>
