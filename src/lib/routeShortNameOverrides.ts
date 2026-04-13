@@ -15,6 +15,18 @@ export const ROUTE_SHORT_NAME_OVERRIDES: Record<string, string> = {
 };
 
 /**
+ * Lowercase display letter → numeric route ID prefix.
+ * Inverse of ROUTE_SHORT_NAME_OVERRIDES, used to resolve a lettered URL slug
+ * (e.g. "a") back to the stable numeric prefix (e.g. "801") for DB lookups.
+ */
+export const ROUTE_ID_BY_SHORT_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(ROUTE_SHORT_NAME_OVERRIDES).map(([id, letter]) => [
+    letter.toLowerCase(),
+    id,
+  ]),
+);
+
+/**
  * Resolves a display short name from a route_id and raw route_short_name.
  * If the raw name is empty, uses the ROUTE_SHORT_NAME_OVERRIDES map.
  */

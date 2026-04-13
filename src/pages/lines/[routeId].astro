@@ -7,6 +7,7 @@ import Column from "../../components/Column";
 import BusPill from "../../components/BusPill";
 import RailIcon from "../../components/RailIcon";
 import BusIcon from "../../components/BusIcon";
+import { ROUTE_SHORT_NAME_OVERRIDES } from "../../lib/routeShortNameOverrides";
 
 export const prerender = true;
 
@@ -30,14 +31,23 @@ export async function getStaticPaths() {
     ...new Set(allRoutes.map((route) => route.route_id.split("-")[0])),
   ];
 
-  return uniquePrefixes.map((routeIdPrefix) => ({
-    params: { routeId: routeIdPrefix },
-  }));
+  return uniquePrefixes.map((numericPrefix) => {
+    const letter = ROUTE_SHORT_NAME_OVERRIDES[numericPrefix];
+    // Routes with a letter override are served at e.g. /lines/a instead of /lines/801
+    const slug = letter ? letter.toLowerCase() : numericPrefix;
+    return {
+      params: { routeId: slug },
+      props: { numericId: numericPrefix },
+    };
+  });
 }
 
 const { routeId } = Astro.params;
+const { numericId } = Astro.props as { numericId: string };
 
-const route = await getRouteById(routeId);
+// Use the numeric prefix for the DB lookup regardless of whether the URL slug
+// is a letter (e.g. "a" → "801") or a plain numeric id (e.g. "720").
+const route = await getRouteById(numericId ?? routeId);
 ---
 
 <Layout title={`Line ${route.routeShortName}`}>
