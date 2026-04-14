@@ -19,7 +19,7 @@ export default function StopRoutePrediction({ route }: Props) {
   const $routePredictions = useStore(routePredictions);
 
   const predictionsRoute = $routePredictions.find(
-    (r) => r.routeId === route.routeId,
+    (r) => r.routeId.split("-")[0] === route.routeId,
   );
 
   // For rail/tram/subway routes directionId is null — show all destinations.
