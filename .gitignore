@@ -36,3 +36,7 @@ data
 .netlify
 
 BOT.md
+
+# Playwright
+test-results/
+playwright-report/
