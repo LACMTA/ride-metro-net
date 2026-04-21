@@ -1,5 +1,4 @@
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
-import Button from "./Button";
 import Column from "./Column";
 import AlertIcon from "./AlertIcon";
 
@@ -8,13 +7,27 @@ export default function LineTabs() {
     <Column>
       <TabGroup>
         <TabList className="flex gap-2">
-          <Tab>
-            {({ selected }) => (
-              <Button selected={selected}>Maps &amp; Schedules</Button>
-            )}
+          <Tab
+            className={({ selected }) =>
+              `cursor-pointer rounded-sm border-2 border-black px-5 py-2 font-bold transition-colors ${
+                selected
+                  ? "bg-black text-white"
+                  : "bg-white text-black hover:bg-gray-100"
+              }`
+            }
+          >
+            Maps &amp; Schedules
           </Tab>
-          <Tab>
-            {({ selected }) => <Button selected={selected}>Alerts</Button>}
+          <Tab
+            className={({ selected }) =>
+              `cursor-pointer rounded-sm border-2 border-black px-5 py-2 font-bold transition-colors ${
+                selected
+                  ? "bg-black text-white"
+                  : "bg-white text-black hover:bg-gray-100"
+              }`
+            }
+          >
+            Alerts
           </Tab>
         </TabList>
         <TabPanels className="mt-6">
