@@ -15,6 +15,9 @@ type SwiftlyAlert = CamelCaseAlert & {
   userFullname: string;
   // In the spec, this is an object with translations. Swiftly just provides text.
   descriptionText: string;
+  // Swiftly sends an array of activePeriods, even though they only actually send one element
+  // and only allow one active period to be entered in the console.
+  activePeriods: CamelCaseAlert["activePeriod"][];
   deletedAt?: string;
   deletedBy?: string;
 };
@@ -90,7 +93,7 @@ export async function GET(context: import("astro").APIContext) {
 
   const makeConciseAlert = (fullAlert: SwiftlyAlert) => {
     const conciseAlert: ConciseAlert = {
-      activePeriod: fullAlert.activePeriod,
+      activePeriod: fullAlert.activePeriods[0],
       headerText: fullAlert.headerText,
       descriptionText: fullAlert.descriptionText,
       effect: fullAlert.effect,
