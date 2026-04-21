@@ -8,6 +8,7 @@ import BusPill from "../../components/BusPill";
 import RailIcon from "../../components/RailIcon";
 import BusIcon from "../../components/BusIcon";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "../../lib/routeShortNameOverrides";
+import LineTabs from "../../components/LineTabs";
 
 export const prerender = true;
 
@@ -78,14 +79,6 @@ const route = await getRouteById(numericId ?? routeId);
     </div>
   </Column>
   <main>
-    <section>
-      <Column>
-        <h1 class="text-4xl font-bold">Line {route.routeShortName}</h1>
-        <p class="mt-0.5 mb-4 text-sm text-gray-500">
-          <small>ROUTE ID: <b>{route.routeId}</b></small>
-        </p>
-        <p class="text-gray-700">{route.routeLongName}</p>
-      </Column>
-    </section>
+    <LineTabs client:load />
   </main>
 </Layout>
