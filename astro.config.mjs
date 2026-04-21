@@ -31,4 +31,7 @@ export default defineConfig({
   },
   integrations: [importGTFS(), react()],
   adapter: netlify(),
+  devToolbar: {
+    enabled: false,
+  },
 });
