@@ -15,23 +15,21 @@ type SwiftlyAlert = CamelCaseAlert & {
   userFullname: string;
   // In the spec, this is an object with translations. Swiftly just provides text.
   descriptionText: string;
-  // Swiftly sends an array of activePeriods, even though they only actually send one element
-  // and only allow one active period to be entered in the console.
-  activePeriods: CamelCaseAlert["activePeriod"][];
+  // Swiftly sends an array of activePeriods (with JS datetime strings for start/end), even though
+  // they only actually send one element and only allow one active period to be entered in the console.
+  activePeriods: { start: string; end: string }[];
   deletedAt?: string;
   deletedBy?: string;
 };
 type AlertsApiResponse = SwiftlyAlert[];
 
+// activePeriod matches the GTFS spec: a single object with POSIX timestamps.
 export type ConciseAlert = Pick<
   SwiftlyAlert,
-  | "activePeriod"
-  | "headerText"
-  | "descriptionText"
-  | "effect"
-  | "cause"
-  | "informedEntities"
->;
+  "headerText" | "descriptionText" | "effect" | "cause" | "informedEntities"
+> & {
+  activePeriod: { start: number; end: number };
+};
 
 /**
  * GET /api/alerts
@@ -90,10 +88,14 @@ export async function GET(context: import("astro").APIContext) {
   }
 
   const alertsData: AlertsApiResponse = await alertsResponse.json();
-
   const makeConciseAlert = (fullAlert: SwiftlyAlert) => {
+    const rawPeriod = fullAlert.activePeriods[0];
     const conciseAlert: ConciseAlert = {
-      activePeriod: fullAlert.activePeriods[0],
+      // Convert Swiftly's JS datetime strings to POSIX timestamps (seconds) as the GTFS spec requires.
+      activePeriod: {
+        start: Math.floor(new Date(rawPeriod.start).getTime() / 1000),
+        end: Math.floor(new Date(rawPeriod.end).getTime() / 1000),
+      },
       headerText: fullAlert.headerText,
       descriptionText: fullAlert.descriptionText,
       effect: fullAlert.effect,
