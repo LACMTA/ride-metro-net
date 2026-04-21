@@ -1,6 +1,7 @@
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
 import Button from "./Button";
 import Column from "./Column";
+import AlertIcon from "./AlertIcon";
 
 export default function LineTabs() {
   return (
@@ -16,9 +17,17 @@ export default function LineTabs() {
             {({ selected }) => <Button selected={selected}>Alerts</Button>}
           </Tab>
         </TabList>
-        <TabPanels>
+        <TabPanels className="mt-6">
           <TabPanel>Maps &amp; Schedules</TabPanel>
-          <TabPanel>Alerts</TabPanel>
+          <TabPanel>
+            <h1 className="flex items-center gap-3 text-3xl font-bold">
+              <AlertIcon
+                className="text-yellow size-10"
+                markClassName="text-black"
+              />{" "}
+              Active Alerts
+            </h1>
+          </TabPanel>
         </TabPanels>
       </TabGroup>
     </Column>
