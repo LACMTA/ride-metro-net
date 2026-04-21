@@ -20,13 +20,20 @@ export default function LineTabs() {
         <TabPanels className="mt-6">
           <TabPanel>Maps &amp; Schedules</TabPanel>
           <TabPanel>
-            <h1 className="flex items-center gap-3 text-3xl font-bold">
+            <h2 className="flex items-center gap-3 text-3xl font-bold">
               <AlertIcon
                 className="text-yellow size-10"
                 markClassName="text-black"
               />{" "}
               Active Alerts
-            </h1>
+            </h2>
+            <h2 className="flex items-center gap-3 text-3xl font-bold">
+              <AlertIcon
+                className="text-yellow size-10"
+                markClassName="text-black"
+              />{" "}
+              Upcoming Alerts
+            </h2>
           </TabPanel>
         </TabPanels>
       </TabGroup>
