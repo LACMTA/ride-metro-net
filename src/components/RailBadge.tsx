@@ -16,7 +16,7 @@ export default function RailBadge({
 }: Props) {
   return (
     <span
-      className={`inline-flex h-8 w-8 items-center justify-center text-xl font-bold${busway ? "" : "rounded-full"}`}
+      className={`inline-flex h-8 w-8 items-center justify-center text-xl font-bold ${busway ? "" : "rounded-full"}`}
       style={{ backgroundColor: `#${color}`, color: `#${textColor}` }}
       aria-label={`${name} "line" ${busway ? "busway" : "train"}`}
     >
