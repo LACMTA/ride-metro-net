@@ -11,6 +11,7 @@ export default function RailIcon({ name, color, textColor }: Props) {
     <span
       className="inline-flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold"
       style={{ backgroundColor: `#${color}`, color: `#${textColor}` }}
+      aria-label={`${name} line train`}
     >
       {name}
     </span>

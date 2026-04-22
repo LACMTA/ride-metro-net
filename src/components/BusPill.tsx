@@ -4,7 +4,10 @@ interface Props {
 
 export default function BusPill({ name }: Props) {
   return (
-    <span className="text-background-white bg-bus-local rounded-lg px-2.5 py-0.5 text-xl font-bold">
+    <span
+      className="text-background-white bg-bus-local rounded-lg px-2.5 py-0.5 text-xl font-bold"
+      aria-label={`line ${name} bus`}
+    >
       {name}
     </span>
   );
