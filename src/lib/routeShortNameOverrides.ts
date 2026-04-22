@@ -27,6 +27,22 @@ export const ROUTE_ID_BY_SHORT_NAME: Record<string, string> = Object.fromEntries
 );
 
 /**
+ * Route ID prefixes that the GTFS lists as bus (type 3) but which Metro
+ * operates as dedicated busways and should be rendered like rail lines.
+ * Currently: G Line (901) and J Line (910).
+ */
+export const BUSWAY_ROUTE_PREFIXES = new Set(["901", "910"]);
+
+/**
+ * Returns true when a route is a busway (G or J Line) — i.e. GTFS type 3 but
+ * rendered with rail-style badges.
+ */
+export function isBuswayRoute(routeId: string): boolean {
+  const prefix = routeId.split("-")[0];
+  return BUSWAY_ROUTE_PREFIXES.has(prefix);
+}
+
+/**
  * Resolves a display short name from a route_id and raw route_short_name.
  * If the raw name is empty, uses the ROUTE_SHORT_NAME_OVERRIDES map.
  */

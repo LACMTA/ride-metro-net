@@ -4,10 +4,8 @@ import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
 import getRouteById from "../../lib/getRouteById";
 import Column from "../../components/Column";
-import BusPill from "../../components/BusBadge";
-import RailBadge from "../../components/RailBadge";
-import BusIcon from "../../components/BusIcon";
-import RailIcon from "../../components/RailIcon";
+import RouteBadge from "../../components/RouteBadge";
+import RouteIcon from "../../components/RouteIcon";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "../../lib/routeShortNameOverrides";
 import DataInjector from "../../components/DataInjector.astro";
 import LineTabs from "../../components/LineTabs";
@@ -71,32 +69,20 @@ const route = await getRouteById(numericId ?? routeId);
 <Layout title={`Line ${route.routeShortName}`}>
   <Column>
     <div class="mt-6 mb-4 flex items-center">
-      {
-        route.routeType !== 3 && (
-          <RailIcon className="text-metro-text mr-4 h-8 shrink-0" />
-        )
-      }
-      {
-        route.routeType === 3 && (
-          <BusIcon className="text-metro-text mr-4 h-8 shrink-0" />
-        )
-      }
+      <RouteIcon
+        routeType={route.routeType}
+        className="text-metro-text mr-4 h-8 shrink-0"
+      />
       <ul>
-        {
-          route.routeType !== 3 ? (
-            <li class="my-1 mr-1.5 inline-block">
-              <RailBadge
-                name={route.routeShortName}
-                color={route.routeColor}
-                textColor={route.routeTextColor}
-              />
-            </li>
-          ) : (
-            <li class="my-1 mr-1.5 inline-block">
-              <BusPill name={route.routeShortName} />
-            </li>
-          )
-        }
+        <li class="my-1 mr-1.5 inline-block">
+          <RouteBadge
+            routeId={route.routeId}
+            routeType={route.routeType}
+            name={route.routeShortName}
+            color={route.routeColor}
+            textColor={route.routeTextColor}
+          />
+        </li>
       </ul>
     </div>
   </Column>

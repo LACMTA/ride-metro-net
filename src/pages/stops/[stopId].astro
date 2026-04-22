@@ -9,8 +9,7 @@ import AlertList from "../../components/AlertList";
 import BusIcon from "../../components/BusIcon";
 import RailIcon from "../../components/RailIcon";
 import Column from "../../components/Column";
-import BusPill from "../../components/BusBadge";
-import RailBadge from "../../components/RailBadge";
+import RouteBadge from "../../components/RouteBadge";
 import ContactBlock from "../../components/ContactBlock";
 
 export const prerender = true;
@@ -88,21 +87,17 @@ const stop = await getStopWithRoutes(stopId);
       }
       <ul>
         {
-          stop.routes.map((route) =>
-            route.routeType !== 3 ? (
-              <li class="my-1 mr-1.5 inline-block">
-                <RailBadge
-                  name={route.routeShortName}
-                  color={route.routeColor}
-                  textColor={route.routeTextColor}
-                />
-              </li>
-            ) : (
-              <li class="my-1 mr-1.5 inline-block">
-                <BusPill name={route.routeShortName} />
-              </li>
-            ),
-          )
+          stop.routes.map((route) => (
+            <li class="my-1 mr-1.5 inline-block">
+              <RouteBadge
+                routeId={route.routeId}
+                routeType={route.routeType}
+                name={route.routeShortName}
+                color={route.routeColor}
+                textColor={route.routeTextColor}
+              />
+            </li>
+          ))
         }
       </ul>
     </div>
