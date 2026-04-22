@@ -1,5 +1,6 @@
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
 import { useStore } from "@nanostores/react";
+import { useState, useEffect } from "react";
 import Column from "./Column";
 import AlertIcon from "./AlertIcon";
 import { alerts } from "../lib/alertsStore";
@@ -12,6 +13,31 @@ interface Props {
 
 export default function LineTabs({ routeId }: Props) {
   const $alerts = useStore(alerts);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    const hash = window.location.hash.slice(1); // Remove the '#' character
+    if (hash === "alerts") {
+      setSelectedIndex(1);
+    } else if (hash === "schedule") {
+      setSelectedIndex(0);
+    }
+
+    // Listen for hash changes
+    const handleHashChange = () => {
+      const newHash = window.location.hash.slice(1);
+      if (newHash === "alerts") {
+        setSelectedIndex(1);
+      } else if (newHash === "schedule") {
+        setSelectedIndex(0);
+      }
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
 
   const routeAlerts = $alerts.filter((alert) =>
     alert.informedEntities.some((e) => e.routeId === routeId),
