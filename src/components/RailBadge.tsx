@@ -6,10 +6,10 @@ interface Props {
   textColor: string;
 }
 
-export default function RailIcon({ name, color, textColor }: Props) {
+export default function RailBadge({ name, color, textColor }: Props) {
   return (
     <span
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-xl font-bold"
       style={{ backgroundColor: `#${color}`, color: `#${textColor}` }}
       aria-label={`${name} line train`}
     >

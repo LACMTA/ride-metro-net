@@ -5,8 +5,9 @@ import { GTFSconfig } from "../../integrations/import-gtfs";
 import getRouteById from "../../lib/getRouteById";
 import Column from "../../components/Column";
 import BusPill from "../../components/BusBadge";
-import RailIcon from "../../components/RailBadge";
+import RailBadge from "../../components/RailBadge";
 import BusIcon from "../../components/BusIcon";
+import RailIcon from "../../components/RailIcon";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "../../lib/routeShortNameOverrides";
 import DataInjector from "../../components/DataInjector.astro";
 import LineTabs from "../../components/LineTabs";
@@ -71,6 +72,11 @@ const route = await getRouteById(numericId ?? routeId);
   <Column>
     <div class="mt-6 mb-4 flex items-center">
       {
+        route.routeType !== 3 && (
+          <RailIcon className="text-metro-text mr-4 h-8 shrink-0" />
+        )
+      }
+      {
         route.routeType === 3 && (
           <BusIcon className="text-metro-text mr-4 h-8 shrink-0" />
         )
@@ -79,7 +85,7 @@ const route = await getRouteById(numericId ?? routeId);
         {
           route.routeType !== 3 ? (
             <li class="my-1 mr-1.5 inline-block">
-              <RailIcon
+              <RailBadge
                 name={route.routeShortName}
                 color={route.routeColor}
                 textColor={route.routeTextColor}
