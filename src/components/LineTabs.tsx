@@ -47,10 +47,10 @@ export default function LineTabs({ routeId }: Props) {
             Alerts
           </Tab>
         </TabList>
-        <TabPanels className="mt-6">
+        <TabPanels className="mt-6 mb-10">
           <TabPanel>Maps &amp; Schedules</TabPanel>
           <TabPanel>
-            <h2 className="flex items-center gap-3 text-3xl font-bold">
+            <h2 className="mt-8 mb-4 flex items-center gap-3 text-3xl font-bold">
               <AlertIcon
                 className="text-yellow size-10"
                 markClassName="text-black"
@@ -64,7 +64,7 @@ export default function LineTabs({ routeId }: Props) {
             ) : (
               <p className="text-gray-600">No active alerts</p>
             )}
-            <h2 className="mt-6 flex items-center gap-3 text-3xl font-bold">
+            <h2 className="mt-8 mb-4 flex items-center gap-3 text-3xl font-bold">
               <AlertIcon
                 className="text-yellow size-10"
                 markClassName="text-black"
