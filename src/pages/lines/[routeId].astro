@@ -8,6 +8,7 @@ import BusPill from "../../components/BusPill";
 import RailIcon from "../../components/RailIcon";
 import BusIcon from "../../components/BusIcon";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "../../lib/routeShortNameOverrides";
+import DataInjector from "../../components/DataInjector.astro";
 import LineTabs from "../../components/LineTabs";
 
 export const prerender = true;
@@ -51,6 +52,21 @@ const { numericId } = Astro.props as { numericId: string };
 const route = await getRouteById(numericId ?? routeId);
 ---
 
+<DataInjector data={route} id="data-route" />
+<script>
+  import { getData } from "../../lib/getData";
+  import type { RouteWithInfo } from "../../lib/getRouteById";
+  import watchAlerts from "../../lib/watchAlerts";
+
+  const route = getData("data-route") as RouteWithInfo;
+
+  watchAlerts(
+    [], // no stop IDs for a route page
+    [route.routeId],
+    route.swiftlyAgencyId,
+  );
+</script>
+
 <Layout title={`Line ${route.routeShortName}`}>
   <Column>
     <div class="mt-6 mb-4 flex items-center">
@@ -79,6 +95,6 @@ const route = await getRouteById(numericId ?? routeId);
     </div>
   </Column>
   <main>
-    <LineTabs client:load />
+    <LineTabs routeId={route.routeId} client:load />
   </main>
 </Layout>

@@ -7,7 +7,7 @@ interface Props {
 
 export default function Alert({ alert }: Props) {
   return (
-    <div className="flex px-4 py-5 not-last:border-b not-last:border-b-gray-800">
+    <div className="bg-xlight-yellow flex px-4 py-5 not-last:border-b not-last:border-b-gray-800">
       <AlertIconColumn />
       <div>
         <h4 className="font-bold capitalize">

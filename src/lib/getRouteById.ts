@@ -11,6 +11,8 @@ export interface RouteWithInfo {
   routeType: number;
   routeColor: string;
   routeTextColor: string;
+  /** Swiftly real-time API agency key, derived from route_type at build time. */
+  swiftlyAgencyId: string;
 }
 
 interface DatabaseQueryResult {
@@ -79,6 +81,7 @@ export default async function (routeId: string) {
     routeType: res.route_type,
     routeColor: res.route_color,
     routeTextColor: res.route_text_color,
+    swiftlyAgencyId: res.route_type === 3 ? "lametro" : "lametro-rail",
   };
 
   return route;
