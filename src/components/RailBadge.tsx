@@ -4,14 +4,21 @@ interface Props {
   color: string;
   /** GTFS route_text_color — hex string without the leading '#' (e.g. "FFFFFF") */
   textColor: string;
+  /** When true, renders as a busway badge with no border radius */
+  busway?: boolean;
 }
 
-export default function RailBadge({ name, color, textColor }: Props) {
+export default function RailBadge({
+  name,
+  color,
+  textColor,
+  busway = false,
+}: Props) {
   return (
     <span
-      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-xl font-bold"
+      className={`inline-flex h-8 w-8 items-center justify-center text-xl font-bold${busway ? "" : "rounded-full"}`}
       style={{ backgroundColor: `#${color}`, color: `#${textColor}` }}
-      aria-label={`${name} line train`}
+      aria-label={`${name} "line" ${busway ? "busway" : "train"}`}
     >
       {name}
     </span>
