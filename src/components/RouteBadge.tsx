@@ -33,12 +33,19 @@ export default function RouteBadge({
 }: Props) {
   const mode = getRouteMode(routeId, routeType);
 
-  const shapeClass = mode === "bus" ? "px-3 rounded-lg" : `w-8${mode === "rail" ? " rounded-full" : ""}`;
+  const shapeClass =
+    mode === "bus"
+      ? "px-3 rounded-lg"
+      : `w-8 ${mode === "rail" ? "rounded-full" : ""}`;
   const colorClass = mode === "bus" ? "bg-bus-local text-background-white" : "";
-  const colorStyle = mode !== "bus" ? { backgroundColor: `#${color}`, color: `#${textColor}` } : undefined;
-  const ariaLabel  = mode === "bus"
-    ? `line ${name} bus`
-    : `${name} line ${mode === "busway" ? "busway" : "train"}`;
+  const colorStyle =
+    mode !== "bus"
+      ? { backgroundColor: `#${color}`, color: `#${textColor}` }
+      : undefined;
+  const ariaLabel =
+    mode === "bus"
+      ? `line ${name} bus`
+      : `${name} line ${mode === "busway" ? "busway" : "train"}`;
 
   return (
     <span
