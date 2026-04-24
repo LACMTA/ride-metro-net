@@ -5,6 +5,10 @@ interface CardProps {
   className?: string;
 }
 
+interface CardBodyProps extends CardProps {
+  margin?: boolean;
+}
+
 export function Card({ children, className = "" }: CardProps) {
   return (
     <div
@@ -25,6 +29,10 @@ export function CardHeader({ children, className = "" }: CardProps) {
   );
 }
 
-export function CardBody({ children, className = "" }: CardProps) {
-  return <div className={`m-4 ${className}`}>{children}</div>;
+export function CardBody({
+  children,
+  margin = true,
+  className = "",
+}: CardBodyProps) {
+  return <div className={`${margin && "m-4"} ${className}`}>{children}</div>;
 }

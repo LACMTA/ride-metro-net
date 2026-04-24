@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import Column from "../../components/Column";
 import AlertIcon from "../../components/AlertIcon";
 import RailIcon from "../../components/RailIcon";
+import { Card, CardBody, CardHeader } from "../../components/Card";
 ---
 
 <Layout title="Alerts">
@@ -20,5 +21,12 @@ import RailIcon from "../../components/RailIcon";
       </div>
     </Column>
   </main>
-  <div class="mt-6 bg-gray-200 py-6"></div>
+  <div class="mt-6 bg-gray-200 py-6">
+    <Card>
+      <CardHeader
+        ><RailIcon className="inline-block h-12" /> Rail & Busway</CardHeader
+      >
+      <CardBody margin={false}> ele </CardBody>
+    </Card>
+  </div>
 </Layout>
