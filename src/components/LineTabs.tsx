@@ -80,7 +80,7 @@ export default function LineTabs({ routeId }: Props) {
               <AlertIcon
                 className="text-yellow size-10"
                 markClassName="text-black"
-              />{" "}
+              />
               Active Alerts
             </h2>
             {activeAlerts.length > 0 ? (
@@ -94,7 +94,7 @@ export default function LineTabs({ routeId }: Props) {
               <AlertIcon
                 className="text-yellow size-10"
                 markClassName="text-black"
-              />{" "}
+              />
               Upcoming Alerts
             </h2>
             {upcomingAlerts.length > 0 ? (
