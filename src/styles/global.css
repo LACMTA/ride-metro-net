@@ -3,8 +3,8 @@
 
 @theme {
   --font-sans:
-    "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
   --color-*: initial;
   --color-black: #121212;
@@ -84,6 +84,7 @@
   --color-border-light: var(--color-gray-200);
   --color-border-xlight: var(--color-gray-100);
   --color-border-black: var(--color-black);
+  --color-divider-line: var(--color-gray-400);
 
   /* Background colors */
   --color-background-gray: var(--color-gray-100);

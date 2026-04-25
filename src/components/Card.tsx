@@ -11,10 +11,10 @@ interface CardBodyProps extends CardProps {
 }
 
 interface CardLinkListItemProps extends CardProps {
-  link?: string;
+  href: string;
 }
 
-const BODY_MARGIN = "m-4";
+const BODY_PADDING = "p-4";
 
 export function Card({ children, className = "" }: CardProps) {
   return (
@@ -42,16 +42,20 @@ export function CardBody({
   className = "",
 }: CardBodyProps) {
   return (
-    <div className={`${margin && BODY_MARGIN} ${className}`}>{children}</div>
+    <div className={`${margin && BODY_PADDING} ${className}`}>{children}</div>
   );
 }
 
 export function CardLinkListItem({
   children,
   className = "",
+  href,
 }: CardLinkListItemProps) {
   return (
-    <a className={`${BODY_MARGIN} flex items-center justify-between`}>
+    <a
+      href={href}
+      className={` ${BODY_PADDING} border-divider-line flex items-center justify-between py-6 not-last:border-b`}
+    >
       {children}
       <ChevronIcon className="h-2 rotate-270" />
     </a>
