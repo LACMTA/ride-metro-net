@@ -3,13 +3,39 @@ import Layout from "../../layouts/Layout.astro";
 import Column from "../../components/Column";
 import AlertIcon from "../../components/AlertIcon";
 import RailIcon from "../../components/RailIcon";
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  CardLinkListItem,
-} from "../../components/Card";
+import { Card, CardBody, CardHeader } from "../../components/Card";
+import DataInjector from "../../components/DataInjector.astro";
+import getAllRailBuswayRoutes from "../../lib/getAllRailBuswayRoutes";
+import LineAlertStatus from "../../components/LineAlertStatus";
+
+export const prerender = true;
+
+const routes = await getAllRailBuswayRoutes();
 ---
+
+<DataInjector data={routes} id="data-routes" />
+<script>
+  import { getData } from "../../lib/getData";
+  import type { RouteWithInfo } from "../../lib/getRouteById";
+  import watchAlerts from "../../lib/watchAlerts";
+
+  const routes = getData("data-routes") as RouteWithInfo[];
+
+  // Rail lines (lametro-rail) and busway lines (lametro) use different Swiftly
+  // agency keys — pass both as separate queries so watchAlerts fetches them
+  // concurrently and merges them into the shared alerts atom.
+  const railRouteIds = routes
+    .filter((r) => r.swiftlyAgencyId === "lametro-rail")
+    .map((r) => r.routeId);
+  const buswayRouteIds = routes
+    .filter((r) => r.swiftlyAgencyId === "lametro")
+    .map((r) => r.routeId);
+
+  watchAlerts([
+    { stopIds: [], routeIds: railRouteIds, agency: "lametro-rail" },
+    { stopIds: [], routeIds: buswayRouteIds, agency: "lametro" },
+  ]);
+</script>
 
 <Layout title="Alerts">
   <main>
@@ -33,8 +59,7 @@ import {
           ><RailIcon className="inline-block h-10" /> Rail & Busway</CardHeader
         >
         <CardBody margin={false}>
-          <CardLinkListItem href="#"> Test </CardLinkListItem>
-          <CardLinkListItem href="#"> Test </CardLinkListItem>
+          {routes.map((route) => <LineAlertStatus route={route} client:load />)}
         </CardBody>
       </Card>
     </Column>

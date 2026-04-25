@@ -59,11 +59,13 @@ const route = await getRouteById(numericId ?? routeId);
 
   const route = getData("data-route") as RouteWithInfo;
 
-  watchAlerts(
-    [], // no stop IDs for a route page
-    [route.routeId],
-    route.swiftlyAgencyId,
-  );
+  watchAlerts([
+    {
+      stopIds: [], // no stop IDs for a route page
+      routeIds: [route.routeId],
+      agency: route.swiftlyAgencyId,
+    },
+  ]);
 </script>
 
 <Layout title={`Line ${route.routeShortName}`}>

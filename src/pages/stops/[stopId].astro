@@ -63,12 +63,14 @@ const stop = await getStopWithRoutes(stopId);
   const effectiveStopIds =
     stop.childStopIds.length > 0 ? stop.childStopIds : [stop.stopId];
 
-  watchAlerts(
-    // Include both the parent station ID and child IDs — alerts may be tagged to either.
-    [stop.stopId, ...stop.childStopIds],
-    stop.routes.map((route) => route.routeId),
-    stop.swiftlyAgencyId,
-  );
+  watchAlerts([
+    {
+      // Include both the parent station ID and child IDs — alerts may be tagged to either.
+      stopIds: [stop.stopId, ...stop.childStopIds],
+      routeIds: stop.routes.map((route) => route.routeId),
+      agency: stop.swiftlyAgencyId,
+    },
+  ]);
   watchPredictions(effectiveStopIds, stop.swiftlyAgencyId);
 </script>
 
