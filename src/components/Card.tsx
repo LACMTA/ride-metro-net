@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import ChevronIcon from "./ChevronIcon";
 
 interface CardProps {
   children: ReactNode;
@@ -8,6 +9,12 @@ interface CardProps {
 interface CardBodyProps extends CardProps {
   margin?: boolean;
 }
+
+interface CardLinkListItemProps extends CardProps {
+  link?: string;
+}
+
+const BODY_MARGIN = "m-4";
 
 export function Card({ children, className = "" }: CardProps) {
   return (
@@ -34,5 +41,19 @@ export function CardBody({
   margin = true,
   className = "",
 }: CardBodyProps) {
-  return <div className={`${margin && "m-4"} ${className}`}>{children}</div>;
+  return (
+    <div className={`${margin && BODY_MARGIN} ${className}`}>{children}</div>
+  );
+}
+
+export function CardLinkListItem({
+  children,
+  className = "",
+}: CardLinkListItemProps) {
+  return (
+    <a className={`${BODY_MARGIN} flex items-center justify-between`}>
+      {children}
+      <ChevronIcon className="h-2 rotate-270" />
+    </a>
+  );
 }
