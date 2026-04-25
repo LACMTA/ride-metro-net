@@ -6,7 +6,7 @@ import RailIcon from "../../components/RailIcon";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import DataInjector from "../../components/DataInjector.astro";
 import getAllRailBuswayRoutes from "../../lib/getAllRailBuswayRoutes";
-import LineAlertStatus from "../../components/LineAlertStatus";
+import LineAlertStatusList from "../../components/LineAlertStatusList";
 
 export const prerender = true;
 
@@ -59,7 +59,7 @@ const routes = await getAllRailBuswayRoutes();
           ><RailIcon className="inline-block h-10" /> Rail & Busway</CardHeader
         >
         <CardBody margin={false}>
-          {routes.map((route) => <LineAlertStatus route={route} client:load />)}
+          <LineAlertStatusList routes={routes} client:load />
         </CardBody>
       </Card>
     </Column>
