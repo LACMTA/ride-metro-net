@@ -19,25 +19,17 @@ export default function LineTabs({ routeId }: Props) {
     const hash = window.location.hash.slice(1); // Remove the '#' character
     if (hash === "alerts") {
       setSelectedIndex(1);
-    } else if (hash === "schedule") {
+    } else if (hash === "schedules") {
       setSelectedIndex(0);
     }
-
-    // Listen for hash changes
-    const handleHashChange = () => {
-      const newHash = window.location.hash.slice(1);
-      if (newHash === "alerts") {
-        setSelectedIndex(1);
-      } else if (newHash === "schedule") {
-        setSelectedIndex(0);
-      }
-    };
-
-    window.addEventListener("hashchange", handleHashChange);
-    return () => {
-      window.removeEventListener("hashchange", handleHashChange);
-    };
   }, []);
+
+  useEffect(() => {
+    const hash = selectedIndex === 1 ? "alerts" : "schedules";
+    if (window.location.hash.slice(1) !== hash) {
+      history.replaceState(null, "", `#${hash}`);
+    }
+  }, [selectedIndex]);
 
   const routeAlerts = $alerts.filter((alert) =>
     alert.informedEntities.some((e) => e.routeId === routeId),
