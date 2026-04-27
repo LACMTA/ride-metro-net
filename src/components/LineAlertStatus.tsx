@@ -32,7 +32,7 @@ export default function LineAlertStatus({ route }: Props) {
   const slug = letter ? letter.toLowerCase() : route.routeId;
 
   return (
-    <CardLinkListItem href={`/lines/${slug}`}>
+    <CardLinkListItem href={`/lines/${slug}#alerts`}>
       <span className="flex items-center gap-3">
         <RouteBadge
           routeId={route.routeId}

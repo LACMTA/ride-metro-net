@@ -48,7 +48,7 @@ export default function LineTabs({ routeId }: Props) {
 
   return (
     <Column>
-      <TabGroup>
+      <TabGroup selectedIndex={selectedIndex} onChange={setSelectedIndex}>
         <TabList className="flex gap-2">
           <Tab
             className={({ selected }) =>
