@@ -52,7 +52,7 @@ export default function BusAlertBadgeList({ routes }: Props) {
         const groupRoutes = grouped[group];
         if (groupRoutes.length === 0) return null;
         return (
-          <Disclosure key={group} defaultOpen>
+          <Disclosure key={group}>
             {({ open }) => (
               <div className="border-b-divider-line border-b pb-2">
                 <DisclosureButton className="flex w-full items-center justify-between text-left">
@@ -60,7 +60,7 @@ export default function BusAlertBadgeList({ routes }: Props) {
                     {GROUP_LABELS[group]}
                   </h3>
                   <ChevronIcon
-                    className={`mt-2 h-5 w-5 ${open ? "rotate-180" : ""}`}
+                    className={`mt-2 w-4 ${open ? "rotate-180" : ""}`}
                   />
                 </DisclosureButton>
                 <DisclosurePanel>
