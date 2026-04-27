@@ -10,6 +10,8 @@ interface Props {
   textColor?: string;
   /** Optional URL — when provided the badge renders as an `<a>` element. */
   href?: string;
+  /** Optional className for overrides */
+  className?: string;
 }
 
 type RouteMode = "rail" | "busway" | "bus";
@@ -33,6 +35,7 @@ export default function RouteBadge({
   color,
   textColor,
   href,
+  className,
 }: Props) {
   const mode = getRouteMode(routeId, routeType);
 
@@ -50,13 +53,14 @@ export default function RouteBadge({
       ? `line ${name} bus`
       : `${name} line ${mode === "busway" ? "busway" : "train"}`;
 
-  const className = `inline-flex h-8 items-center justify-center text-xl font-bold ${shapeClass} ${colorClass}`.trim();
+  const allClassName =
+    `inline-flex h-8 items-center justify-center text-xl font-bold ${shapeClass} ${colorClass} ${className}`.trim();
 
   if (href) {
     return (
       <a
         href={href}
-        className={className}
+        className={allClassName}
         style={colorStyle}
         aria-label={ariaLabel}
       >
@@ -66,11 +70,7 @@ export default function RouteBadge({
   }
 
   return (
-    <span
-      className={className}
-      style={colorStyle}
-      aria-label={ariaLabel}
-    >
+    <span className={allClassName} style={colorStyle} aria-label={ariaLabel}>
       {name}
     </span>
   );
