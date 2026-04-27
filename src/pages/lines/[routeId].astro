@@ -6,7 +6,7 @@ import getRouteById from "../../lib/getRouteById";
 import Column from "../../components/Column";
 import RouteBadge from "../../components/RouteBadge";
 import RouteIcon from "../../components/RouteIcon";
-import { ROUTE_SHORT_NAME_OVERRIDES } from "../../lib/routeShortNameOverrides";
+import { ROUTE_SHORT_NAME_OVERRIDES, isBuswayRoute } from "../../lib/routeShortNameOverrides";
 import DataInjector from "../../components/DataInjector.astro";
 import LineTabs from "../../components/LineTabs";
 
@@ -68,7 +68,7 @@ const route = await getRouteById(numericId ?? routeId);
   ]);
 </script>
 
-<Layout title={`Line ${route.routeShortName}`}>
+<Layout title={route.routeType !== 3 || isBuswayRoute(route.routeId) ? `${route.routeShortName} Line` : `Line ${route.routeShortName}`}>
   <Column>
     <div class="mt-6 mb-4 flex items-center">
       <RouteIcon
