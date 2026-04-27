@@ -1,3 +1,4 @@
+import AlertIcon from "./AlertIcon";
 import { isBuswayRoute } from "../lib/routeShortNameOverrides";
 
 interface Props {
@@ -14,6 +15,8 @@ interface Props {
   className?: string;
   /** Optional: use the alternative presentation for bus badges */
   altBusColors?: boolean;
+  /** Optional: show an alert badge after the route name */
+  busAlertBadge?: boolean;
 }
 
 type RouteMode = "rail" | "busway" | "bus";
@@ -39,12 +42,13 @@ export default function RouteBadge({
   href,
   className,
   altBusColors = false,
+  busAlertBadge = false,
 }: Props) {
   const mode = getRouteMode(routeId, routeType);
 
   const shapeClass =
     mode === "bus"
-      ? "px-3 rounded-lg"
+      ? `px-3 ${busAlertBadge && "pr-2"} rounded-lg`
       : `w-8 ${mode === "rail" ? "rounded-full" : ""}`;
   const busColorClass = altBusColors
     ? "bg-background-gray text-metro-text border-metro-text border"
@@ -62,6 +66,13 @@ export default function RouteBadge({
   const allClassName =
     `inline-flex h-8 items-center justify-center text-xl font-bold ${shapeClass} ${colorClass} ${className}`.trim();
 
+  const alertIcon = busAlertBadge && (
+    <AlertIcon
+      className="text-alert ml-1.5 h-5"
+      markClassName="text-metro-text"
+    />
+  );
+
   if (href) {
     return (
       <a
@@ -71,6 +82,7 @@ export default function RouteBadge({
         aria-label={ariaLabel}
       >
         {name}
+        {alertIcon}
       </a>
     );
   }
@@ -78,6 +90,7 @@ export default function RouteBadge({
   return (
     <span className={allClassName} style={colorStyle} aria-label={ariaLabel}>
       {name}
+      {alertIcon}
     </span>
   );
 }

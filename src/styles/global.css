@@ -71,6 +71,8 @@
   --color-warning: var(--color-yellow);
   --color-warning-xlight: var(--color-xlight-yellow);
 
+  --color-alert: var(--color-yellow);
+
   /* Active/Info colors */
   --color-highlight: var(--color-light-blue);
   --color-highlight-light: var(--color-sky-blue);
