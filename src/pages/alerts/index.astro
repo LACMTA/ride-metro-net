@@ -8,7 +8,7 @@ import getAllRailBuswayRoutes from "../../lib/getAllRailBuswayRoutes";
 import getAllBusRoutes from "../../lib/getAllBusRoutes";
 import LineAlertStatusList from "../../components/LineAlertStatusList";
 import BusIcon from "../../components/BusIcon";
-import RouteBadge from "../../components/RouteBadge";
+import BusAlertBadgeList from "../../components/BusAlertBadgeList";
 
 export const prerender = true;
 
@@ -51,19 +51,7 @@ const busRoutes = await getAllBusRoutes();
         <CardHeader><BusIcon className="inline-block h-10" /> Bus</CardHeader>
         <CardBody>
           <div class="flex-wrap">
-            {
-              busRoutes.map((route) => (
-                <RouteBadge
-                  routeId={route.routeId}
-                  routeType={route.routeType}
-                  name={route.routeShortName}
-                  href={`/lines/${route.routeShortName}#alerts`}
-                  altBusColors
-                  busAlertBadge
-                  className="mr-3 mb-4"
-                />
-              ))
-            }
+            <BusAlertBadgeList routes={busRoutes} client:load />
           </div>
         </CardBody>
       </Card>
