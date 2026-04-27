@@ -4,10 +4,12 @@ interface Props {
   routeId: string;
   routeType: number;
   name: string;
-  /** GTFS route_color — hex string without the leading '#' (e.g. "0072BC") */
-  color: string;
-  /** GTFS route_text_color — hex string without the leading '#' (e.g. "FFFFFF") */
-  textColor: string;
+  /** GTFS route_color — hex string without the leading '#' (e.g. "0072BC"). Not required for bus routes (routeType === 3). */
+  color?: string;
+  /** GTFS route_text_color — hex string without the leading '#' (e.g. "FFFFFF"). Not required for bus routes (routeType === 3). */
+  textColor?: string;
+  /** Optional URL — when provided the badge renders as an `<a>` element. */
+  href?: string;
 }
 
 type RouteMode = "rail" | "busway" | "bus";
@@ -30,6 +32,7 @@ export default function RouteBadge({
   name,
   color,
   textColor,
+  href,
 }: Props) {
   const mode = getRouteMode(routeId, routeType);
 
@@ -47,9 +50,24 @@ export default function RouteBadge({
       ? `line ${name} bus`
       : `${name} line ${mode === "busway" ? "busway" : "train"}`;
 
+  const className = `inline-flex h-8 items-center justify-center text-xl font-bold ${shapeClass} ${colorClass}`.trim();
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={className}
+        style={colorStyle}
+        aria-label={ariaLabel}
+      >
+        {name}
+      </a>
+    );
+  }
+
   return (
     <span
-      className={`inline-flex h-8 items-center justify-center text-xl font-bold ${shapeClass} ${colorClass}`.trim()}
+      className={className}
       style={colorStyle}
       aria-label={ariaLabel}
     >

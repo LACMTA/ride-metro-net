@@ -6,11 +6,15 @@ import RailIcon from "../../components/RailIcon";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import DataInjector from "../../components/DataInjector.astro";
 import getAllRailBuswayRoutes from "../../lib/getAllRailBuswayRoutes";
+import getAllBusRoutes from "../../lib/getAllBusRoutes";
 import LineAlertStatusList from "../../components/LineAlertStatusList";
+import BusIcon from "../../components/BusIcon";
+import RouteBadge from "../../components/RouteBadge";
 
 export const prerender = true;
 
 const routes = await getAllRailBuswayRoutes();
+const busRoutes = await getAllBusRoutes();
 ---
 
 <DataInjector data={routes} id="data-routes" />
@@ -60,6 +64,27 @@ const routes = await getAllRailBuswayRoutes();
         >
         <CardBody margin={false}>
           <LineAlertStatusList routes={routes} client:load />
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader><BusIcon className="inline-block h-10" /> Bus</CardHeader>
+        <CardBody>
+          <div
+            class="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-y-6"
+          >
+            {
+              busRoutes.map((route) => (
+                <div class="flex justify-center">
+                  <RouteBadge
+                    routeId={route.routeId}
+                    routeType={route.routeType}
+                    name={route.routeShortName}
+                    href={`/lines/${route.routeShortName}#alerts`}
+                  />
+                </div>
+              ))
+            }
+          </div>
         </CardBody>
       </Card>
     </Column>
