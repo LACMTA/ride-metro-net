@@ -1,27 +1,9 @@
-import type { Alert } from "gtfs-types";
-import type { CamelCasedPropertiesDeep } from "type-fest";
+import {
+  fetchSwiftlyAlerts,
+  type SwiftlyAlert,
+} from "../../lib/fetchSwiftlyAlerts";
 
 export const prerender = false;
-
-type CamelCaseAlert = CamelCasedPropertiesDeep<Alert>;
-
-// Swiftly uses `informedEntities` instead of `informedEntity` as in the spec (their docs have it right; the API does not)
-// and also has a number of non-spec fields in the response, many of which we want to scrub before passing on.
-type SwiftlyAlert = CamelCaseAlert & {
-  informedEntities: CamelCaseAlert["informedEntity"];
-  agencyId: string;
-  createdAt: string;
-  userEmail: string;
-  userFullname: string;
-  // In the spec, this is an object with translations. Swiftly just provides text.
-  descriptionText: string;
-  // Swiftly sends an array of activePeriods (with JS datetime strings for start/end), even though
-  // they only actually send one element and only allow one active period to be entered in the console.
-  activePeriods: { start: string; end: string }[];
-  deletedAt?: string;
-  deletedBy?: string;
-};
-type AlertsApiResponse = SwiftlyAlert[];
 
 // activePeriod matches the GTFS spec: a single object with POSIX timestamps.
 export type ConciseAlert = Pick<
@@ -47,37 +29,13 @@ export async function GET(context: import("astro").APIContext) {
   if (!agency)
     return new Response("agency query parameter is required", { status: 400 });
 
-  const alertsUrl = new URL(
-    `https://api.goswift.ly/real-time/${agency}/gtfs-rt-alerts/v2`,
-  );
-  // TODO: consider using protocol buffer for network performance
-  // it's possible the response will actually match the GTFS spec in this case
-  alertsUrl.searchParams.append("format", "json");
+  const result = await fetchSwiftlyAlerts(agency, API_KEY as string);
 
-  // TODO: consider caching alerts
-  console.log(`Fetching alerts from: ${alertsUrl.toString()}`);
-
-  const alertsResponse = await fetch(alertsUrl.toString(), {
-    method: "GET",
-    headers: {
-      Accept:
-        "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
-      Authorization: API_KEY as string,
-    },
-    // Add timeout for better cold start handling
-    signal: AbortSignal.timeout(25000), // 25 second timeout
-  });
-
-  if (!alertsResponse.ok) {
-    const errorText = await alertsResponse.text();
-    console.error(
-      `Swiftly alerts API error (${alertsResponse.status}):`,
-      errorText,
-    );
+  if (!result.ok) {
     return new Response(
       JSON.stringify({
         error: "External API request failed",
-        status: alertsResponse.status,
+        status: result.status,
         timestamp: new Date().toISOString(),
       }),
       {
@@ -87,10 +45,9 @@ export async function GET(context: import("astro").APIContext) {
     );
   }
 
-  const alertsData: AlertsApiResponse = await alertsResponse.json();
-  const makeConciseAlert = (fullAlert: SwiftlyAlert) => {
+  const makeConciseAlert = (fullAlert: SwiftlyAlert): ConciseAlert => {
     const rawPeriod = fullAlert.activePeriods[0];
-    const conciseAlert: ConciseAlert = {
+    return {
       // Convert Swiftly's JS datetime strings to POSIX timestamps (seconds) as the GTFS spec requires.
       activePeriod: {
         start: Math.floor(new Date(rawPeriod.start).getTime() / 1000),
@@ -102,29 +59,29 @@ export async function GET(context: import("astro").APIContext) {
       cause: fullAlert.cause,
       informedEntities: fullAlert.informedEntities,
     };
-    return conciseAlert;
   };
 
-  const filteredAlerts = alertsData.reduce<ConciseAlert[]>(
-    (result, alert, index) => {
+  // Route IDs in informedEntities are already normalised to prefix-only form
+  // by fetchSwiftlyAlerts, so simple equality checks work here.
+  const filteredAlerts = result.alerts.reduce<ConciseAlert[]>(
+    (acc, alert) => {
       const matchesStop = stopIds.some((stopId) =>
         alert.informedEntities.some((entity) => entity.stopId === stopId),
       );
 
       if (matchesStop) {
-        result.push(makeConciseAlert(alert));
-        return result;
+        acc.push(makeConciseAlert(alert));
+        return acc;
       }
 
-      // Same pattern for routes
       const matchesRoute = routeIds.some((routeId) =>
         alert.informedEntities.some((entity) => entity.routeId === routeId),
       );
 
       if (matchesRoute) {
-        result.push(makeConciseAlert(alert));
+        acc.push(makeConciseAlert(alert));
       }
-      return result;
+      return acc;
     },
     [],
   );

@@ -1,58 +1,16 @@
 import { isCurrent } from "../../lib/isCurrent";
+import { fetchSwiftlyAlerts, type SwiftlyAlert } from "../../lib/fetchSwiftlyAlerts";
 
 export const prerender = false;
-
-/**
- * Shape of a single alert coming back from the Swiftly JSON endpoint.
- * We only care about `informedEntities` (for route IDs) and
- * `activePeriods` (to check whether the alert is current).
- */
-interface SwiftlyAlertSummary {
-  informedEntities: { routeId?: string; stopId?: string }[];
-  activePeriods: { start: string; end: string }[];
-}
 
 /** Response type: route-ID prefix → number of active alerts. */
 export type AlertStatusMap = Record<string, number>;
 
 /**
- * Fetch all alerts for a single Swiftly agency and return the raw array.
- */
-async function fetchAgencyAlerts(
-  agency: string,
-  apiKey: string,
-): Promise<SwiftlyAlertSummary[]> {
-  const url = new URL(
-    `https://api.goswift.ly/real-time/${agency}/gtfs-rt-alerts/v2`,
-  );
-  url.searchParams.append("format", "json");
-
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      Accept:
-        "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
-      Authorization: apiKey,
-    },
-    signal: AbortSignal.timeout(25000),
-  });
-
-  if (!res.ok) {
-    console.error(
-      `Swiftly alerts API error for ${agency} (${res.status}):`,
-      await res.text(),
-    );
-    return [];
-  }
-
-  return res.json();
-}
-
-/**
- * Convert a raw Swiftly alert into the `{ activePeriod }` shape that the
+ * Convert a normalised SwiftlyAlert into the `{ activePeriod }` shape that the
  * shared `isCurrent` helper expects (POSIX seconds).
  */
-function toActivePeriod(alert: SwiftlyAlertSummary) {
+function toActivePeriod(alert: SwiftlyAlert) {
   const raw = alert.activePeriods?.[0];
   if (!raw)
     return {
@@ -79,10 +37,14 @@ function toActivePeriod(alert: SwiftlyAlertSummary) {
 export async function GET() {
   const API_KEY = import.meta.env.API_KEY;
 
-  const [lametroAlerts, railAlerts] = await Promise.all([
-    fetchAgencyAlerts("lametro", API_KEY as string),
-    fetchAgencyAlerts("lametro-rail", API_KEY as string),
+  const [lametroResult, railResult] = await Promise.all([
+    fetchSwiftlyAlerts("lametro", API_KEY as string),
+    fetchSwiftlyAlerts("lametro-rail", API_KEY as string),
   ]);
+
+  // Silently treat upstream failures as empty — alert-status is best-effort.
+  const lametroAlerts = lametroResult.ok ? lametroResult.alerts : [];
+  const railAlerts = railResult.ok ? railResult.alerts : [];
 
   const allAlerts = [...lametroAlerts, ...railAlerts];
   const counts: AlertStatusMap = {};
@@ -92,11 +54,11 @@ export async function GET() {
 
     // Deduplicate so a single alert is only counted once per route prefix,
     // even if the route appears multiple times in informedEntities.
+    // Route IDs are already normalised to prefix-only by fetchSwiftlyAlerts.
     const prefixes = new Set(
       alert.informedEntities
         .filter((e) => e.routeId)
-        // Strip the GTFS version suffix (e.g. "801-13196" → "801").
-        .map((e) => e.routeId!.split("-")[0]),
+        .map((e) => e.routeId!),
     );
     for (const prefix of prefixes) {
       counts[prefix] = (counts[prefix] ?? 0) + 1;
