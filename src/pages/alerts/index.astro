@@ -50,19 +50,17 @@ const busRoutes = await getAllBusRoutes();
       <Card>
         <CardHeader><BusIcon className="inline-block h-10" /> Bus</CardHeader>
         <CardBody>
-          <div
-            class="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-y-6"
-          >
+          <div class="flex-wrap">
             {
               busRoutes.map((route) => (
-                <div class="flex justify-center">
-                  <RouteBadge
-                    routeId={route.routeId}
-                    routeType={route.routeType}
-                    name={route.routeShortName}
-                    href={`/lines/${route.routeShortName}#alerts`}
-                  />
-                </div>
+                <RouteBadge
+                  routeId={route.routeId}
+                  routeType={route.routeType}
+                  name={route.routeShortName}
+                  href={`/lines/${route.routeShortName}#alerts`}
+                  altBusColors
+                  className="mr-3 mb-4"
+                />
               ))
             }
           </div>

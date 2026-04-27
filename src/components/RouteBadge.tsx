@@ -12,6 +12,8 @@ interface Props {
   href?: string;
   /** Optional className for overrides */
   className?: string;
+  /** Optional: use the alternative presentation for bus badges */
+  altBusColors?: boolean;
 }
 
 type RouteMode = "rail" | "busway" | "bus";
@@ -36,6 +38,7 @@ export default function RouteBadge({
   textColor,
   href,
   className,
+  altBusColors = false,
 }: Props) {
   const mode = getRouteMode(routeId, routeType);
 
@@ -43,7 +46,10 @@ export default function RouteBadge({
     mode === "bus"
       ? "px-3 rounded-lg"
       : `w-8 ${mode === "rail" ? "rounded-full" : ""}`;
-  const colorClass = mode === "bus" ? "bg-bus-local text-background-white" : "";
+  const busColorClass = altBusColors
+    ? "bg-background-gray text-metro-text border-metro-text border"
+    : "bg-bus-local text-background-white";
+  const colorClass = mode === "bus" ? busColorClass : "";
   const colorStyle =
     mode !== "bus"
       ? { backgroundColor: `#${color}`, color: `#${textColor}` }
