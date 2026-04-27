@@ -90,5 +90,19 @@ export async function fetchSwiftlyAlerts(
     }
   }
 
+  // TEMPORARY FIX: Swiftly does not support "ACCESSIBILITY_ISSUE"
+  // as an effect currelty. Until this is solved, override the effect
+  // to "ACCESSIBILITY_ISSUE" whenever the alert header or description
+  // mentions "elevator" or "escalator".
+  const accessibilityKeywords = /elevator|escalator/i;
+  for (const alert of raw) {
+    if (
+      accessibilityKeywords.test(alert.headerText) ||
+      accessibilityKeywords.test(alert.descriptionText)
+    ) {
+      alert.effect = "ACCESSIBILITY_ISSUE";
+    }
+  }
+
   return { ok: true, alerts: raw };
 }
