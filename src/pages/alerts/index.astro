@@ -4,7 +4,6 @@ import Column from "../../components/Column";
 import AlertIcon from "../../components/AlertIcon";
 import RailIcon from "../../components/RailIcon";
 import { Card, CardBody, CardHeader } from "../../components/Card";
-import DataInjector from "../../components/DataInjector.astro";
 import getAllRailBuswayRoutes from "../../lib/getAllRailBuswayRoutes";
 import getAllBusRoutes from "../../lib/getAllBusRoutes";
 import LineAlertStatusList from "../../components/LineAlertStatusList";
@@ -17,28 +16,10 @@ const routes = await getAllRailBuswayRoutes();
 const busRoutes = await getAllBusRoutes();
 ---
 
-<DataInjector data={routes} id="data-routes" />
 <script>
-  import { getData } from "../../lib/getData";
-  import type { RouteWithInfo } from "../../lib/getRouteById";
-  import watchAlerts from "../../lib/watchAlerts";
+  import watchAlertStatus from "../../lib/watchAlertStatus";
 
-  const routes = getData("data-routes") as RouteWithInfo[];
-
-  // Rail lines (lametro-rail) and busway lines (lametro) use different Swiftly
-  // agency keys — pass both as separate queries so watchAlerts fetches them
-  // concurrently and merges them into the shared alerts atom.
-  const railRouteIds = routes
-    .filter((r) => r.swiftlyAgencyId === "lametro-rail")
-    .map((r) => r.routeId);
-  const buswayRouteIds = routes
-    .filter((r) => r.swiftlyAgencyId === "lametro")
-    .map((r) => r.routeId);
-
-  watchAlerts([
-    { stopIds: [], routeIds: railRouteIds, agency: "lametro-rail" },
-    { stopIds: [], routeIds: buswayRouteIds, agency: "lametro" },
-  ]);
+  watchAlertStatus();
 </script>
 
 <Layout title="Alerts">

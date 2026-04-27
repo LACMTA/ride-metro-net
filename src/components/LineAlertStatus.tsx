@@ -1,7 +1,6 @@
 import { useStore } from "@nanostores/react";
-import { alerts } from "../lib/alertsStore";
+import { alertStatus } from "../lib/alertStatusStore";
 import type { RouteWithInfo } from "../lib/getRouteById";
-import { isCurrent } from "../lib/isCurrent";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "../lib/routeShortNameOverrides";
 import { CardLinkListItem } from "./Card";
 import RouteBadge from "./RouteBadge";
@@ -18,13 +17,9 @@ interface Props {
  * matching this route.
  */
 export default function LineAlertStatus({ route }: Props) {
-  const $alerts = useStore(alerts);
+  const $alertStatus = useStore(alertStatus);
 
-  const alertCount = $alerts.filter(
-    (alert) =>
-      isCurrent(alert) &&
-      alert.informedEntities.some((entity) => entity.routeId === route.routeId),
-  ).length;
+  const alertCount = $alertStatus[route.routeId] ?? 0;
 
   // Derive the URL slug — lettered routes (A–K) use the lowercase letter,
   // all others use the numeric prefix directly.
