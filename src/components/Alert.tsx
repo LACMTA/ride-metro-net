@@ -11,7 +11,7 @@ export default function Alert({ alert }: Props) {
       <AlertIconColumn />
       <div>
         <h4 className="font-bold capitalize">
-          {String(alert.cause).toLowerCase().replace("_", " ")}
+          {String(alert.effect).toLowerCase().replace("_", " ")}
         </h4>
         <p>{alert.descriptionText}</p>
       </div>
