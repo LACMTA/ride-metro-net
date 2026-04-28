@@ -47,7 +47,7 @@ export default function BusAlertBadgeList({ routes }: Props) {
   }
 
   return (
-    <>
+    <div className="flex-wrap">
       {GROUP_ORDER.map((group) => {
         const groupRoutes = grouped[group];
         if (groupRoutes.length === 0) return null;
@@ -84,6 +84,6 @@ export default function BusAlertBadgeList({ routes }: Props) {
           </Disclosure>
         );
       })}
-    </>
+    </div>
   );
 }
