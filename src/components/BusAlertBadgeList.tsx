@@ -55,7 +55,7 @@ export default function BusAlertBadgeList({ routes }: Props) {
           <Disclosure key={group}>
             {({ open }) => (
               <div className="border-b-divider-line border-b">
-                <DisclosureButton className="flex w-full items-center justify-between text-left">
+                <DisclosureButton className="flex w-full cursor-pointer items-center justify-between text-left">
                   <h3 className="my-4 text-2xl font-bold">
                     {GROUP_LABELS[group]}
                   </h3>
