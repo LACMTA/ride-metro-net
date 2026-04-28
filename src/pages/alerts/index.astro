@@ -10,6 +10,7 @@ import LineAlertStatusList from "../../components/LineAlertStatusList";
 import BusIcon from "../../components/BusIcon";
 import BusAlertBadgeList from "../../components/BusAlertBadgeList";
 import ElevatorIcon from "../../components/ElevatorIcon";
+import AccessibilityAlertStopList from "../../components/AccessibilityAlertStopList";
 
 export const prerender = true;
 
@@ -58,7 +59,9 @@ const busRoutes = await getAllBusRoutes();
         <CardHeader
           ><ElevatorIcon className="inline-block h-10" /> Accessibility</CardHeader
         >
-        <CardBody margin={false}> accessibility </CardBody>
+        <CardBody margin={false}>
+          <AccessibilityAlertStopList client:load />
+        </CardBody>
       </Card>
     </Column>
   </div>
