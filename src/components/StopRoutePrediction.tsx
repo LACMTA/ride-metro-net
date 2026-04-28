@@ -24,12 +24,9 @@ export default function StopRoutePrediction({ route }: Props) {
     (r) => r.routeId.split("-")[0] === route.routeId,
   );
 
-  // For rail/tram/subway routes directionId is null — show all destinations.
-  // For bus routes, filter to the specific direction stored at build time.
+  // Filter predictions to the specific direction stored at build time.
   const destinations = predictionsRoute?.destinations.filter(
-    (d) =>
-      route.directionId === null ||
-      Number(d.directionId) === Number(route.directionId),
+    (d) => Number(d.directionId) === Number(route.directionId),
   );
 
   // Combine predictions across headsigns
@@ -98,7 +95,11 @@ export default function StopRoutePrediction({ route }: Props) {
     <table className="w-full">
       <thead className="text-left text-sm text-gray-600 uppercase">
         <tr>
-          <th>Destination</th>
+          <th>
+            {route.routeType !== 3
+              ? `Direction ${route.directionId}`
+              : "Destination"}
+          </th>
           <th className="max-w-sm text-right text-nowrap">Arrives in</th>
         </tr>
       </thead>
