@@ -10,15 +10,21 @@ import { isBuswayRoute } from "../lib/routeShortNameOverrides";
 import { Card, CardHeader, CardBody } from "./Card";
 
 interface Props {
-  route: StopRoute;
+  routes: StopRoute[];
 }
 
 interface DestinationPrediction extends Prediction {
   headsign: string;
 }
 
-export default function StopRoutePrediction({ route }: Props) {
-  const $routePredictions = useStore(routePredictions);
+function RouteTable({
+  route,
+  $routePredictions,
+}: {
+  route: StopRoute;
+  $routePredictions: ReturnType<typeof useStore<typeof routePredictions>>;
+}) {
+  const isRailOrBusway = route.routeType !== 3 || isBuswayRoute(route.routeId);
 
   const predictionsRoute = $routePredictions.find(
     (r) => r.routeId.split("-")[0] === route.routeId,
@@ -31,7 +37,7 @@ export default function StopRoutePrediction({ route }: Props) {
 
   // Combine predictions across headsigns
   const allPredictions = destinations
-    ?.reduce<DestinationPrediction[]>((result, destination, index) => {
+    ?.reduce<DestinationPrediction[]>((result, destination) => {
       const destinationPredictions = destination.predictions.map(
         (prediction) => ({
           headsign: destination.headsign,
@@ -41,8 +47,6 @@ export default function StopRoutePrediction({ route }: Props) {
       return result.concat(destinationPredictions);
     }, [])
     .sort((a, b) => a.sec - b.sec);
-
-  const isRailOrBusway = route.routeType !== 3 || isBuswayRoute(route.routeId);
 
   function HeadsignTd({ children }: { children: ReactNode }) {
     return (
@@ -67,6 +71,10 @@ export default function StopRoutePrediction({ route }: Props) {
     );
   }
 
+  const predictionsNotAvailable =
+    allPredictions?.length === 0 ||
+    ($routePredictions.length > 0 && !predictionsRoute);
+
   const predictionsTable = allPredictions?.map((prediction, index) => (
     <tr key={index}>
       <HeadsignTd>{prediction.headsign}</HeadsignTd>
@@ -75,10 +83,6 @@ export default function StopRoutePrediction({ route }: Props) {
       </td>
     </tr>
   ));
-
-  const predictionsNotAvailable =
-    allPredictions?.length === 0 ||
-    ($routePredictions.length > 0 && !predictionsRoute);
 
   const exceptionTable = route.headsigns.map((headsign, index) => (
     <tr key={index}>
@@ -91,8 +95,8 @@ export default function StopRoutePrediction({ route }: Props) {
     </tr>
   ));
 
-  const table = (
-    <table className="w-full">
+  return (
+    <table className="w-full not-first:mt-4">
       <thead className="text-left text-sm text-gray-600 uppercase">
         <tr>
           <th>
@@ -110,20 +114,35 @@ export default function StopRoutePrediction({ route }: Props) {
       </tbody>
     </table>
   );
+}
+
+export default function StopRoutePrediction({ routes }: Props) {
+  const $routePredictions = useStore(routePredictions);
+
+  // All routes in the group share the same route identity — use the first for the header.
+  const primaryRoute = routes[0];
 
   return (
     <Card>
       <CardHeader>
         <RouteBadge
-          routeId={route.routeId}
-          routeType={route.routeType}
-          name={route.routeShortName}
-          color={route.routeColor}
-          textColor={route.routeTextColor}
+          routeId={primaryRoute.routeId}
+          routeType={primaryRoute.routeType}
+          name={primaryRoute.routeShortName}
+          color={primaryRoute.routeColor}
+          textColor={primaryRoute.routeTextColor}
         />
       </CardHeader>
-      <CardBody>{table}</CardBody>
-      <AlertList routeIds={[route.routeId]} alertEntityType="Route" />
+      <CardBody>
+        {routes.map((route) => (
+          <RouteTable
+            key={route.directionId}
+            route={route}
+            $routePredictions={$routePredictions}
+          />
+        ))}
+      </CardBody>
+      <AlertList routeIds={[primaryRoute.routeId]} alertEntityType="Route" />
     </Card>
   );
 }

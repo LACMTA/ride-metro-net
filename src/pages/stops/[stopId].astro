@@ -3,7 +3,7 @@ import { openDb, type Stop } from "gtfs";
 import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
 import DataInjector from "../../components/DataInjector.astro";
-import getStopWithRoutes from "../../lib/getStopWithRoutes";
+import getStopWithRoutes, { type StopRoute } from "../../lib/getStopWithRoutes";
 import StopRoutePrediction from "../../components/StopRoutePrediction";
 import AlertList from "../../components/AlertList";
 import BusIcon from "../../components/BusIcon";
@@ -112,9 +112,19 @@ const allStopIds = [stop.stopId, ...stop.childStopIds];
       <div class="mt-6 bg-gray-200 py-6">
         <Column>
           {
-            stop.routes.map((route) => (
-              <StopRoutePrediction route={route} client:load />
-            ))
+            (() => {
+              // Group routes by routeId so that rail routes with two directions
+              // share a single Card with two tables.
+              const grouped: StopRoute[][] = stop.routes.reduce((acc, route) => {
+                const existing = acc.find((g) => g[0].routeId === route.routeId);
+                if (existing) existing.push(route);
+                else acc.push([route]);
+                return acc;
+              }, [] as StopRoute[][]);
+              return grouped.map((routes) => (
+                <StopRoutePrediction routes={routes} client:load />
+              ));
+            })()
           }
         </Column>
       </div>
