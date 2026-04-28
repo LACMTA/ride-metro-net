@@ -87,17 +87,22 @@ const allStopIds = [stop.stopId, ...stop.childStopIds];
       }
       <ul>
         {
-          stop.routes.map((route) => (
-            <li class="my-1 mr-1.5 inline-block">
-              <RouteBadge
-                routeId={route.routeId}
-                routeType={route.routeType}
-                name={route.routeShortName}
-                color={route.routeColor}
-                textColor={route.routeTextColor}
-              />
-            </li>
-          ))
+          stop.routes
+            .filter(
+              (route, index, self) =>
+                self.findIndex((r) => r.routeId === route.routeId) === index,
+            )
+            .map((route) => (
+              <li class="my-1 mr-1.5 inline-block">
+                <RouteBadge
+                  routeId={route.routeId}
+                  routeType={route.routeType}
+                  name={route.routeShortName}
+                  color={route.routeColor}
+                  textColor={route.routeTextColor}
+                />
+              </li>
+            ))
         }
       </ul>
     </div>
