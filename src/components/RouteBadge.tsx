@@ -17,6 +17,8 @@ interface Props {
   altBusColors?: boolean;
   /** Optional: show an alert badge after the route name */
   busAlertBadge?: boolean;
+  /** Optional size variant. Defaults to "md". */
+  size?: "sm" | "md" | "lg";
 }
 
 type RouteMode = "rail" | "busway" | "bus";
@@ -26,6 +28,12 @@ function getRouteMode(routeId: string, routeType: number): RouteMode {
   if (isBuswayRoute(routeId)) return "busway";
   return "bus";
 }
+
+const sizes = {
+  sm: { h: "h-6",  w: "w-6",  px: "px-2", pxAlert: "pr-1.5", text: "text-base", alert: "h-4" },
+  md: { h: "h-8",  w: "w-8",  px: "px-3", pxAlert: "pr-2",   text: "text-xl",   alert: "h-5" },
+  lg: { h: "h-10", w: "w-10", px: "px-4", pxAlert: "pr-2.5", text: "text-2xl",  alert: "h-6" },
+} as const;
 
 /**
  * Renders the correct badge for any route:
@@ -43,13 +51,15 @@ export default function RouteBadge({
   className,
   altBusColors = false,
   busAlertBadge = false,
+  size = "md",
 }: Props) {
   const mode = getRouteMode(routeId, routeType);
+  const s = sizes[size];
 
   const shapeClass =
     mode === "bus"
-      ? `px-3 ${busAlertBadge && "pr-2"} rounded-lg`
-      : `w-8 ${mode === "rail" ? "rounded-full" : ""}`;
+      ? `${s.px} ${busAlertBadge && s.pxAlert} rounded-lg`
+      : `${s.w} ${mode === "rail" ? "rounded-full" : ""}`;
   const busColorClass = altBusColors
     ? "bg-background-gray text-metro-text border-metro-text border"
     : "bg-bus-local text-background-white";
@@ -64,11 +74,11 @@ export default function RouteBadge({
       : `${name} line ${mode === "busway" ? "busway" : "train"}`;
 
   const allClassName =
-    `inline-flex h-8 items-center justify-center text-xl ${!altBusColors && "font-bold"} ${shapeClass} ${colorClass} ${className}`.trim();
+    `inline-flex ${s.h} items-center justify-center ${s.text} ${!altBusColors && "font-bold"} ${shapeClass} ${colorClass} ${className}`.trim();
 
   const alertIcon = busAlertBadge && (
     <AlertIcon
-      className="text-alert ml-1.5 h-5"
+      className={`text-alert ml-1.5 ${s.alert}`}
       markClassName="text-metro-text"
     />
   );

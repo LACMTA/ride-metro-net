@@ -6,6 +6,7 @@ import AlertList from "./AlertList";
 import RouteBadge from "./RouteBadge";
 import type { ReactNode } from "react";
 import ArrowIcon from "./ArrowIcon";
+import { isBuswayRoute } from "../lib/routeShortNameOverrides";
 import { Card, CardHeader, CardBody } from "./Card";
 
 interface Props {
@@ -44,11 +45,25 @@ export default function StopRoutePrediction({ route }: Props) {
     }, [])
     .sort((a, b) => a.sec - b.sec);
 
+  const isRailOrBusway = route.routeType !== 3 || isBuswayRoute(route.routeId);
+
   function HeadsignTd({ children }: { children: ReactNode }) {
     return (
-      <td className="mr-auto flex w-full py-3 pr-2 font-bold">
+      <td className="mr-auto flex w-full items-center py-3 pr-2 font-bold">
         <span>
-          <ArrowIcon className="text-bus-local mr-2 inline h-4 align-middle" />
+          {isRailOrBusway ? (
+            <RouteBadge
+              routeId={route.routeId}
+              routeType={route.routeType}
+              name={route.routeShortName}
+              color={route.routeColor}
+              textColor={route.routeTextColor}
+              size="sm"
+              className="mr-2 inline align-middle"
+            />
+          ) : (
+            <ArrowIcon className="text-bus-local mr-2 inline h-4 align-middle" />
+          )}
         </span>
         {children}
       </td>
