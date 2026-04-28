@@ -2,6 +2,7 @@ import {
   fetchSwiftlyAlerts,
   type SwiftlyAlert,
 } from "../../lib/fetchSwiftlyAlerts";
+import stopLookup from "../../generated/railBuswayStopLookup.json";
 
 export const prerender = false;
 
@@ -22,7 +23,14 @@ export type ConciseAlert = Pick<
 export async function GET(context: import("astro").APIContext) {
   const API_KEY = import.meta.env.API_KEY;
 
-  const stopIds = context.url.searchParams.get("stopId")?.split(",") || [];
+  const rawStopIds = context.url.searchParams.get("stopId")?.split(",") || [];
+
+  // Expand each requested stop ID to also include its child stop IDs
+  // (from the build-time GTFS lookup) so alerts tagged on child stops are
+  // matched from the parent
+  const children = stopLookup.children as Record<string, string[]>;
+  const stopIds = rawStopIds.flatMap((id) => [id, ...(children[id] ?? [])]);
+
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
   const agency = context.url.searchParams.get("agency");
 
@@ -63,28 +71,25 @@ export async function GET(context: import("astro").APIContext) {
 
   // Route IDs in informedEntities are already normalised to prefix-only form
   // by fetchSwiftlyAlerts, so simple equality checks work here.
-  const filteredAlerts = result.alerts.reduce<ConciseAlert[]>(
-    (acc, alert) => {
-      const matchesStop = stopIds.some((stopId) =>
-        alert.informedEntities.some((entity) => entity.stopId === stopId),
-      );
+  const filteredAlerts = result.alerts.reduce<ConciseAlert[]>((acc, alert) => {
+    const matchesStop = stopIds.some((stopId) =>
+      alert.informedEntities.some((entity) => entity.stopId === stopId),
+    );
 
-      if (matchesStop) {
-        acc.push(makeConciseAlert(alert));
-        return acc;
-      }
-
-      const matchesRoute = routeIds.some((routeId) =>
-        alert.informedEntities.some((entity) => entity.routeId === routeId),
-      );
-
-      if (matchesRoute) {
-        acc.push(makeConciseAlert(alert));
-      }
+    if (matchesStop) {
+      acc.push(makeConciseAlert(alert));
       return acc;
-    },
-    [],
-  );
+    }
+
+    const matchesRoute = routeIds.some((routeId) =>
+      alert.informedEntities.some((entity) => entity.routeId === routeId),
+    );
+
+    if (matchesRoute) {
+      acc.push(makeConciseAlert(alert));
+    }
+    return acc;
+  }, []);
 
   return new Response(JSON.stringify(filteredAlerts));
 }
