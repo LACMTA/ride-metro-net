@@ -1,10 +1,24 @@
 import { isCurrent } from "../../lib/isCurrent";
-import { fetchSwiftlyAlerts, type SwiftlyAlert } from "../../lib/fetchSwiftlyAlerts";
+import {
+  fetchSwiftlyAlerts,
+  type SwiftlyAlert,
+} from "../../lib/fetchSwiftlyAlerts";
 
 export const prerender = false;
 
-/** Response type: route-ID prefix → number of active alerts. */
+/** Route-ID prefix → number of active alerts. */
 export type AlertStatusMap = Record<string, number>;
+
+/** Full shape returned by GET /api/alert-status. */
+export interface AlertStatusResponse {
+  /** Route-ID prefix → number of currently active alerts. */
+  routeAlertCounts: AlertStatusMap;
+  /**
+   * Stop IDs that appear as `informedEntities` on at least one currently
+   * active alert whose `effect` is `"ACCESSIBILITY_ISSUE"`.
+   */
+  accessibilityAlertStopIds: string[];
+}
 
 /**
  * Convert a normalised SwiftlyAlert into the `{ activePeriod }` shape that the
@@ -27,12 +41,20 @@ function toActivePeriod(alert: SwiftlyAlert) {
 /**
  * GET /api/alert-status
  *
- * Returns a JSON object mapping route-ID prefixes to the number of currently
- * active alerts for that route.  Fetches from both `lametro` and
- * `lametro-rail` Swiftly agencies in parallel and merges the results.
+ * Returns a JSON object with two fields:
+ *   - `routeAlertCounts` — route-ID prefix → number of currently active alerts.
+ *     Routes with zero alerts are omitted.
+ *   - `accessibilityAlertStopIds` — deduplicated list of stop IDs that are
+ *     `informedEntities` on at least one currently active alert whose
+ *     `effect` is `"ACCESSIBILITY_ISSUE"`.
  *
- * Example response: `{ "801": 1, "720": 3 }`
- * Routes with zero alerts are omitted.
+ * Fetches from both `lametro` and `lametro-rail` Swiftly agencies in
+ * parallel and merges the results.
+ *
+ * Example response:
+ * ```json
+ * { "routeAlertCounts": { "801": 1, "720": 3 }, "accessibilityAlertStopIds": ["12345"] }
+ * ```
  */
 export async function GET() {
   const API_KEY = import.meta.env.API_KEY;
@@ -47,7 +69,8 @@ export async function GET() {
   const railAlerts = railResult.ok ? railResult.alerts : [];
 
   const allAlerts = [...lametroAlerts, ...railAlerts];
-  const counts: AlertStatusMap = {};
+  const routeAlertCounts: AlertStatusMap = {};
+  const accessibilityStopIdSet = new Set<string>();
 
   for (const alert of allAlerts) {
     if (!isCurrent(toActivePeriod(alert))) continue;
@@ -56,16 +79,28 @@ export async function GET() {
     // even if the route appears multiple times in informedEntities.
     // Route IDs are already normalised to prefix-only by fetchSwiftlyAlerts.
     const prefixes = new Set(
-      alert.informedEntities
-        .filter((e) => e.routeId)
-        .map((e) => e.routeId!),
+      alert.informedEntities.filter((e) => e.routeId).map((e) => e.routeId!),
     );
     for (const prefix of prefixes) {
-      counts[prefix] = (counts[prefix] ?? 0) + 1;
+      routeAlertCounts[prefix] = (routeAlertCounts[prefix] ?? 0) + 1;
+    }
+
+    // Collect stop IDs from accessibility alerts.
+    if (alert.effect === "ACCESSIBILITY_ISSUE") {
+      for (const entity of alert.informedEntities) {
+        if (entity.stopId) {
+          accessibilityStopIdSet.add(entity.stopId);
+        }
+      }
     }
   }
 
-  return new Response(JSON.stringify(counts), {
+  const body: AlertStatusResponse = {
+    routeAlertCounts,
+    accessibilityAlertStopIds: [...accessibilityStopIdSet],
+  };
+
+  return new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
   });
 }

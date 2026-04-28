@@ -1,5 +1,5 @@
-import type { AlertStatusMap } from "../pages/api/alert-status";
-import { alertStatus } from "./alertStatusStore";
+import type { AlertStatusResponse } from "../pages/api/alert-status";
+import { alertStatus, accessibilityAlertStopIds } from "./alertStatusStore";
 
 async function fetchAlertStatus(): Promise<void> {
   const res = await fetch("/api/alert-status");
@@ -7,9 +7,10 @@ async function fetchAlertStatus(): Promise<void> {
     console.error("Failed to fetch alert status:", await res.text());
     return;
   }
-  const data = (await res.json()) as AlertStatusMap;
+  const data = (await res.json()) as AlertStatusResponse;
   console.log("Received alerts status", data);
-  alertStatus.set(data);
+  alertStatus.set(data.routeAlertCounts);
+  accessibilityAlertStopIds.set(data.accessibilityAlertStopIds);
 }
 
 export default function watchAlertStatus(
