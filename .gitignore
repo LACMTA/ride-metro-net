@@ -4,6 +4,9 @@ dist/
 # generated types
 .astro/
 
+# build-time generated lookup data
+src/generated/
+
 # dependencies
 node_modules/
 

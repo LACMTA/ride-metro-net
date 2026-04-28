@@ -1,5 +1,5 @@
 import type { AlertStatusResponse } from "../pages/api/alert-status";
-import { alertStatus, accessibilityAlertStopIds } from "./alertStatusStore";
+import { alertStatus, accessibilityAlertStops } from "./alertStatusStore";
 
 async function fetchAlertStatus(): Promise<void> {
   const res = await fetch("/api/alert-status");
@@ -10,7 +10,7 @@ async function fetchAlertStatus(): Promise<void> {
   const data = (await res.json()) as AlertStatusResponse;
   console.log("Received alerts status", data);
   alertStatus.set(data.routeAlertCounts);
-  accessibilityAlertStopIds.set(data.accessibilityAlertStopIds);
+  accessibilityAlertStops.set(data.accessibilityAlertStops);
 }
 
 export default function watchAlertStatus(
