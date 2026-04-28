@@ -3,7 +3,7 @@ import { routePredictions } from "../lib/routePredictionsStore";
 import type { StopRoute } from "../lib/getStopWithRoutes";
 import type { Prediction } from "../pages/api/predictions";
 import AlertList from "./AlertList";
-import BusIcon from "./BusIcon";
+import RouteBadge from "./RouteBadge";
 import type { ReactNode } from "react";
 import ArrowIcon from "./ArrowIcon";
 import { Card, CardHeader, CardBody } from "./Card";
@@ -98,10 +98,13 @@ export default function StopRoutePrediction({ route }: Props) {
   return (
     <Card>
       <CardHeader>
-        {route.routeType === 3 && (
-          <BusIcon className="mr-3 inline h-9 align-baseline" />
-        )}
-        {route.routeShortName}
+        <RouteBadge
+          routeId={route.routeId}
+          routeType={route.routeType}
+          name={route.routeShortName}
+          color={route.routeColor}
+          textColor={route.routeTextColor}
+        />
       </CardHeader>
       <CardBody>{table}</CardBody>
       <AlertList routeIds={[route.routeId]} alertEntityType="Route" />
