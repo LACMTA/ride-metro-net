@@ -71,7 +71,7 @@ export default function BusAlertBadgeList({ routes }: Props) {
                         routeId={route.routeId}
                         routeType={route.routeType}
                         name={route.routeShortName}
-                        href={`/lines/${route.routeShortName}#alerts`}
+                        href={`/lines/${route.routeId}#alerts`}
                         altBusColors
                         busAlertBadge={($alertStatus[route.routeId] ?? 0) > 0}
                         className="mr-3 mb-4"
