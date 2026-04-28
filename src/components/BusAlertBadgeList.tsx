@@ -56,7 +56,7 @@ export default function BusAlertBadgeList({ routes }: Props) {
             {({ open }) => (
               <div className="border-b-divider-line border-b pb-2">
                 <DisclosureButton className="flex w-full items-center justify-between text-left">
-                  <h3 className="mt-4 mb-2 text-2xl font-bold">
+                  <h3 className="mt-4 mb-4 text-2xl font-bold">
                     {GROUP_LABELS[group]}
                   </h3>
                   <ChevronIcon
