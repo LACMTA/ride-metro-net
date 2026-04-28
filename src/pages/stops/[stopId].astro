@@ -92,6 +92,9 @@ const allStopIds = [stop.stopId, ...stop.childStopIds];
               (route, index, self) =>
                 self.findIndex((r) => r.routeId === route.routeId) === index,
             )
+            .sort((a, b) =>
+              (a.routeShortName ?? "").localeCompare(b.routeShortName ?? "", undefined, { numeric: true, sensitivity: "base" }),
+            )
             .map((route) => (
               <li class="my-1 mr-1.5 inline-block">
                 <RouteBadge
