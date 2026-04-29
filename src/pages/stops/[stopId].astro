@@ -73,48 +73,48 @@ const allStopIds = [stop.stopId, ...stop.childStopIds];
 </script>
 
 <Layout title={stop.stopName}>
-  <Column>
-    <div class="mt-6 mb-4 flex items-center">
-      {
-        stop.routes.some((r) => r.routeType !== 3) && (
-          <RailIcon className="text-metro-text mr-4 h-8 shrink-0" />
-        )
-      }
-      {
-        stop.routes.some((r) => r.routeType === 3) && (
-          <BusIcon className="text-metro-text mr-4 h-8 shrink-0" />
-        )
-      }
-      <ul>
-        {
-          stop.routes
-            .filter(
-              (route, index, self) =>
-                self.findIndex((r) => r.routeId === route.routeId) === index,
-            )
-            .sort((a, b) =>
-              (a.routeShortName ?? "").localeCompare(
-                b.routeShortName ?? "",
-                undefined,
-                { numeric: true, sensitivity: "base" },
-              ),
-            )
-            .map((route) => (
-              <li class="my-1 mr-1.5 inline-block">
-                <RouteBadge
-                  routeId={route.routeId}
-                  routeType={route.routeType}
-                  name={route.routeShortName}
-                  color={route.routeColor}
-                  textColor={route.routeTextColor}
-                />
-              </li>
-            ))
-        }
-      </ul>
-    </div>
-  </Column>
   <main>
+    <Column>
+      <div class="mt-6 mb-4 flex items-center">
+        {
+          stop.routes.some((r) => r.routeType !== 3) && (
+            <RailIcon className="text-metro-text mr-4 h-8 shrink-0" />
+          )
+        }
+        {
+          stop.routes.some((r) => r.routeType === 3) && (
+            <BusIcon className="text-metro-text mr-4 h-8 shrink-0" />
+          )
+        }
+        <ul>
+          {
+            stop.routes
+              .filter(
+                (route, index, self) =>
+                  self.findIndex((r) => r.routeId === route.routeId) === index,
+              )
+              .sort((a, b) =>
+                (a.routeShortName ?? "").localeCompare(
+                  b.routeShortName ?? "",
+                  undefined,
+                  { numeric: true, sensitivity: "base" },
+                ),
+              )
+              .map((route) => (
+                <li class="my-1 mr-1.5 inline-block">
+                  <RouteBadge
+                    routeId={route.routeId}
+                    routeType={route.routeType}
+                    name={route.routeShortName}
+                    color={route.routeColor}
+                    textColor={route.routeTextColor}
+                  />
+                </li>
+              ))
+          }
+        </ul>
+      </div>
+    </Column>
     <section>
       <Column>
         <h1 class="text-4xl font-bold">{stop.stopName}</h1>

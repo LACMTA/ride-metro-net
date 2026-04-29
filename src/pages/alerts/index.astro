@@ -41,31 +41,31 @@ const busRoutes = await getAllBusRoutes();
         </p>
       </div>
     </Column>
+    <div class="mt-6 bg-gray-200 py-6">
+      <Column>
+        <Card>
+          <CardHeader
+            ><RailIcon className="inline-block h-10" /> Rail & Busway</CardHeader
+          >
+          <CardBody margin={false}>
+            <LineAlertStatusList routes={routes} client:load />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader><BusIcon className="inline-block h-10" /> Bus</CardHeader>
+          <CardBody>
+            <BusAlertBadgeList routes={busRoutes} client:load />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader
+            ><ElevatorIcon className="inline-block h-10" /> Accessibility</CardHeader
+          >
+          <CardBody margin={false}>
+            <AccessibilityAlertStopList client:load />
+          </CardBody>
+        </Card>
+      </Column>
+    </div>
   </main>
-  <div class="mt-6 bg-gray-200 py-6">
-    <Column>
-      <Card>
-        <CardHeader
-          ><RailIcon className="inline-block h-10" /> Rail & Busway</CardHeader
-        >
-        <CardBody margin={false}>
-          <LineAlertStatusList routes={routes} client:load />
-        </CardBody>
-      </Card>
-      <Card>
-        <CardHeader><BusIcon className="inline-block h-10" /> Bus</CardHeader>
-        <CardBody>
-          <BusAlertBadgeList routes={busRoutes} client:load />
-        </CardBody>
-      </Card>
-      <Card>
-        <CardHeader
-          ><ElevatorIcon className="inline-block h-10" /> Accessibility</CardHeader
-        >
-        <CardBody margin={false}>
-          <AccessibilityAlertStopList client:load />
-        </CardBody>
-      </Card>
-    </Column>
-  </div>
 </Layout>
