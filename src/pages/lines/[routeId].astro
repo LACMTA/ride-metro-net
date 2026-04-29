@@ -52,6 +52,10 @@ const { numericId } = Astro.props as { numericId: string };
 // Use the numeric prefix for the DB lookup regardless of whether the URL slug
 // is a letter (e.g. "a" → "801") or a plain numeric id (e.g. "720").
 const route = await getRouteById(numericId ?? routeId);
+const title =
+  route.routeType !== 3 || isBuswayRoute(route.routeId)
+    ? `${route.routeShortName} Line`
+    : `Line ${route.routeShortName}`;
 ---
 
 <DataInjector data={route} id="data-route" />
@@ -71,11 +75,7 @@ const route = await getRouteById(numericId ?? routeId);
   ]);
 </script>
 
-<Layout
-  title={route.routeType !== 3 || isBuswayRoute(route.routeId)
-    ? `${route.routeShortName} Line`
-    : `Line ${route.routeShortName}`}
->
+<Layout title={title}>
   <main>
     <Column>
       <div class="mt-6 mb-4 flex items-center">
@@ -95,6 +95,7 @@ const route = await getRouteById(numericId ?? routeId);
           </li>
         </ul>
       </div>
+      <h1 class="mb-4 text-4xl font-bold">{title}</h1>
     </Column>
     <LineTabs routeId={route.routeId} client:load />
   </main>
