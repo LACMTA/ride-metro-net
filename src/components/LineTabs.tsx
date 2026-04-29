@@ -1,19 +1,14 @@
-import { TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
-import { useStore } from "@nanostores/react";
+import { TabGroup, TabPanels, TabPanel } from "@headlessui/react";
 import { useState, useEffect } from "react";
 import Column from "./Column";
-import AlertIcon from "./AlertIcon";
-import { alerts } from "../lib/alertsStore";
-import { isCurrent } from "../lib/isCurrent";
-import Alert from "./Alert";
 import { StyledTab, StyledTabList, StyledTabPanelWrapper } from "./StyledTabs";
+import AlertsSection from "./AlertsSection";
 
 interface Props {
   routeId: string;
 }
 
 export default function LineTabs({ routeId }: Props) {
-  const $alerts = useStore(alerts);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
@@ -32,13 +27,6 @@ export default function LineTabs({ routeId }: Props) {
     }
   }, [selectedIndex]);
 
-  const routeAlerts = $alerts.filter((alert) =>
-    alert.informedEntities.some((e) => e.routeId === routeId),
-  );
-
-  const activeAlerts = routeAlerts.filter((a) => isCurrent(a));
-  const upcomingAlerts = routeAlerts.filter((a) => !isCurrent(a));
-
   return (
     <TabGroup selectedIndex={selectedIndex} onChange={setSelectedIndex}>
       <Column>
@@ -52,34 +40,7 @@ export default function LineTabs({ routeId }: Props) {
           <TabPanels>
             <TabPanel>Maps &amp; Schedules</TabPanel>
             <TabPanel>
-              <h2 className="mt-8 mb-4 flex items-center gap-3 text-3xl font-bold">
-                <AlertIcon
-                  className="text-yellow size-10"
-                  markClassName="text-black"
-                />
-                Active Alerts
-              </h2>
-              {activeAlerts.length > 0 ? (
-                activeAlerts.map((alert, index) => (
-                  <Alert key={index} alert={alert} />
-                ))
-              ) : (
-                <p className="text-gray-600">No active alerts</p>
-              )}
-              <h2 className="mt-8 mb-4 flex items-center gap-3 text-3xl font-bold">
-                <AlertIcon
-                  className="text-yellow size-10"
-                  markClassName="text-black"
-                />
-                Upcoming Alerts
-              </h2>
-              {upcomingAlerts.length > 0 ? (
-                upcomingAlerts.map((alert, index) => (
-                  <Alert key={index} alert={alert} />
-                ))
-              ) : (
-                <p className="text-gray-600">No upcoming alerts</p>
-              )}
+              <AlertsSection routeId={routeId} />
             </TabPanel>
           </TabPanels>
         </Column>
