@@ -38,7 +38,10 @@ export default function LineAlertStatus({ route }: Props) {
         />
         {alertCount > 0 ? (
           <>
-            <AlertIcon className="text-yellow h-5 shrink-0" />
+            <AlertIcon
+              className="text-yellow h-5 shrink-0"
+              markClassName="text-metro-text"
+            />
             <span className="font-bold">
               {alertCount} {alertCount === 1 ? "Alert" : "Alerts"}
             </span>

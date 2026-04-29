@@ -1,6 +1,7 @@
 import { useStore } from "@nanostores/react";
 import { accessibilityAlertStops } from "../lib/alertStatusStore";
 import { CardLinkListItem } from "./Card";
+import AlertIcon from "./AlertIcon";
 
 /**
  * Renders a list of rail/busway stops that currently have an active
@@ -17,7 +18,13 @@ export default function AccessibilityAlertStopList() {
     <>
       {stops.map((stop) => (
         <CardLinkListItem key={stop.stopId} href={`/stops/${stop.stopId}`}>
-          <span className="font-bold">{stop.stopName}</span>
+          <span className="flex font-bold">
+            <AlertIcon
+              className="text-yellow mr-3 inline h-5 shrink"
+              markClassName="text-metro-text"
+            />
+            {stop.stopName}
+          </span>
         </CardLinkListItem>
       ))}
     </>
