@@ -27,6 +27,12 @@ export interface StopRoute {
   headsigns: string[];
   /** Always 0 or 1 — one card per direction for every route type. */
   directionId: 0 | 1;
+  /**
+   * The actual child stop_id (platform) that serves this route/direction at
+   * a parent station.  For non-parent stops this equals the stop itself.
+   * Used to merge rail cards that share a platform.
+   */
+  childStopId: string;
 }
 
 interface DatabaseQueryResult {
@@ -77,6 +83,7 @@ const query = `
         CASE WHEN routes.route_type = 3 THEN 'lametro' ELSE 'lametro-rail' END AS swiftly_agency_id,
         trips.direction_id,
         MIN(stop_times.stop_sequence) AS min_stop_sequence,
+        MIN(rs.stop_id) AS child_stop_id,
         JSON_GROUP_ARRAY(
           DISTINCT SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
         ) AS headsigns
@@ -98,6 +105,7 @@ const query = `
           'route_color', COALESCE(route_headsigns.route_color, ''),
           'route_text_color', COALESCE(route_headsigns.route_text_color, ''),
           'direction_id', route_headsigns.direction_id,
+          'child_stop_id', route_headsigns.child_stop_id,
           'headsigns', JSON(route_headsigns.headsigns)
         )
       ) AS routes

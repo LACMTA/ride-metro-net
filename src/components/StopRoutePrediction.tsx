@@ -15,40 +15,64 @@ interface Props {
 
 interface DestinationPrediction extends Prediction {
   headsign: string;
+  /** The route this prediction belongs to (needed for badge rendering in merged cards). */
+  route: StopRoute;
 }
 
-function RouteTable({
-  route,
+/**
+ * Renders one predictions table for a single direction.
+ *
+ * `routes` may contain more than one StopRoute when multiple rail lines
+ * share the same child stop — their predictions are interleaved by time.
+ */
+function DirectionTable({
+  routes,
   $routePredictions,
 }: {
-  route: StopRoute;
+  routes: StopRoute[];
   $routePredictions: ReturnType<typeof useStore<typeof routePredictions>>;
 }) {
-  const isRailOrBusway = route.routeType !== 3 || isBuswayRoute(route.routeId);
+  const directionId = routes[0].directionId;
+  const isRailOrBusway =
+    routes[0].routeType !== 3 || isBuswayRoute(routes[0].routeId);
 
-  const predictionsRoute = $routePredictions.find(
-    (r) => r.routeId.split("-")[0] === route.routeId,
-  );
+  // Gather predictions from every route in this direction and interleave.
+  const allPredictions: DestinationPrediction[] = [];
+  let anyRouteFound = false;
 
-  // Filter predictions to the specific direction stored at build time.
-  const destinations = predictionsRoute?.destinations.filter(
-    (d) => Number(d.directionId) === Number(route.directionId),
-  );
+  for (const route of routes) {
+    const predictionsRoute = $routePredictions.find(
+      (r) => r.routeId.split("-")[0] === route.routeId,
+    );
 
-  // Combine predictions across headsigns
-  const allPredictions = destinations
-    ?.reduce<DestinationPrediction[]>((result, destination) => {
-      const destinationPredictions = destination.predictions.map(
-        (prediction) => ({
-          headsign: destination.headsign,
-          ...prediction,
-        }),
-      );
-      return result.concat(destinationPredictions);
-    }, [])
-    .sort((a, b) => a.sec - b.sec);
+    if (predictionsRoute) anyRouteFound = true;
 
-  function HeadsignTd({ children }: { children: ReactNode }) {
+    const destinations = predictionsRoute?.destinations.filter(
+      (d) => Number(d.directionId) === Number(route.directionId),
+    );
+
+    if (destinations) {
+      for (const dest of destinations) {
+        for (const prediction of dest.predictions) {
+          allPredictions.push({
+            headsign: dest.headsign,
+            route,
+            ...prediction,
+          });
+        }
+      }
+    }
+  }
+
+  allPredictions.sort((a, b) => a.sec - b.sec);
+
+  function HeadsignTd({
+    children,
+    route,
+  }: {
+    children: ReactNode;
+    route: StopRoute;
+  }) {
     return (
       <td className="mr-auto flex w-full items-center py-3 pr-2 font-bold">
         <span>
@@ -72,45 +96,51 @@ function RouteTable({
   }
 
   const predictionsNotAvailable =
-    allPredictions?.length === 0 ||
-    ($routePredictions.length > 0 && !predictionsRoute);
+    allPredictions.length === 0 &&
+    ($routePredictions.length > 0 && (anyRouteFound || !routes.some((route) =>
+      $routePredictions.some(
+        (r) => r.routeId.split("-")[0] === route.routeId,
+      ),
+    )));
 
-  const predictionsTable = allPredictions?.map((prediction, index) => (
+  const predictionsTable = allPredictions.map((prediction, index) => (
     <tr key={index}>
-      <HeadsignTd>{prediction.headsign}</HeadsignTd>
+      <HeadsignTd route={prediction.route}>{prediction.headsign}</HeadsignTd>
       <td className="text-right">
         <b className="text-2xl">{prediction.min}</b> mins
       </td>
     </tr>
   ));
 
-  const exceptionTable = route.headsigns.map((headsign, index) => (
-    <tr key={index}>
-      <HeadsignTd>{headsign}</HeadsignTd>
-      <td className="text-right">
-        {predictionsNotAvailable
-          ? "No predictions available"
-          : "Loading predictions..."}
-      </td>
-    </tr>
-  ));
+  // Fallback rows: show one row per (route, headsign) pair across all routes
+  // in this direction.
+  const exceptionRows = routes.flatMap((route) =>
+    route.headsigns.map((headsign, i) => (
+      <tr key={`${route.routeId}-${i}`}>
+        <HeadsignTd route={route}>{headsign}</HeadsignTd>
+        <td className="text-right">
+          {predictionsNotAvailable
+            ? "No predictions available"
+            : "Loading predictions..."}
+        </td>
+      </tr>
+    )),
+  );
 
   return (
     <table className="w-full not-first:mt-4">
       <thead className="text-left text-sm text-gray-600 uppercase">
         <tr>
           <th>
-            {route.routeType !== 3
-              ? `Direction ${route.directionId}`
+            {routes[0].routeType !== 3
+              ? `Direction ${directionId}`
               : "Destination"}
           </th>
           <th className="max-w-sm text-right text-nowrap">Arrives in</th>
         </tr>
       </thead>
       <tbody>
-        {allPredictions && allPredictions?.length > 0
-          ? predictionsTable
-          : exceptionTable}
+        {allPredictions.length > 0 ? predictionsTable : exceptionRows}
       </tbody>
     </table>
   );
@@ -119,30 +149,52 @@ function RouteTable({
 export default function StopRoutePrediction({ routes }: Props) {
   const $routePredictions = useStore(routePredictions);
 
-  // All routes in the group share the same route identity — use the first for the header.
-  const primaryRoute = routes[0];
+  // Group the incoming routes by directionId so each direction gets one table.
+  const byDirection: StopRoute[][] = routes.reduce(
+    (acc, route) => {
+      const existing = acc.find(
+        (g) => g[0].directionId === route.directionId,
+      );
+      if (existing) existing.push(route);
+      else acc.push([route]);
+      return acc;
+    },
+    [] as StopRoute[][],
+  );
+
+  // Collect all unique routeIds for the header badges and alert list.
+  const uniqueRoutes = routes.filter(
+    (route, index, self) =>
+      self.findIndex((r) => r.routeId === route.routeId) === index,
+  );
+
+  const allRouteIds = uniqueRoutes.map((r) => r.routeId);
 
   return (
     <Card>
       <CardHeader>
-        <RouteBadge
-          routeId={primaryRoute.routeId}
-          routeType={primaryRoute.routeType}
-          name={primaryRoute.routeShortName}
-          color={primaryRoute.routeColor}
-          textColor={primaryRoute.routeTextColor}
-        />
+        {uniqueRoutes.map((route) => (
+          <RouteBadge
+            key={route.routeId}
+            routeId={route.routeId}
+            routeType={route.routeType}
+            name={route.routeShortName}
+            color={route.routeColor}
+            textColor={route.routeTextColor}
+            className={uniqueRoutes.length > 1 ? "mr-2" : undefined}
+          />
+        ))}
       </CardHeader>
       <CardBody>
-        {routes.map((route) => (
-          <RouteTable
-            key={route.directionId}
-            route={route}
+        {byDirection.map((dirRoutes) => (
+          <DirectionTable
+            key={dirRoutes[0].directionId}
+            routes={dirRoutes}
             $routePredictions={$routePredictions}
           />
         ))}
       </CardBody>
-      <AlertList routeIds={[primaryRoute.routeId]} alertEntityType="Route" />
+      <AlertList routeIds={allRouteIds} alertEntityType="Route" />
     </Card>
   );
 }

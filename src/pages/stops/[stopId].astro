@@ -93,7 +93,11 @@ const allStopIds = [stop.stopId, ...stop.childStopIds];
                 self.findIndex((r) => r.routeId === route.routeId) === index,
             )
             .sort((a, b) =>
-              (a.routeShortName ?? "").localeCompare(b.routeShortName ?? "", undefined, { numeric: true, sensitivity: "base" }),
+              (a.routeShortName ?? "").localeCompare(
+                b.routeShortName ?? "",
+                undefined,
+                { numeric: true, sensitivity: "base" },
+              ),
             )
             .map((route) => (
               <li class="my-1 mr-1.5 inline-block">
@@ -121,14 +125,26 @@ const allStopIds = [stop.stopId, ...stop.childStopIds];
         <Column>
           {
             (() => {
-              // Group routes by routeId so that rail routes with two directions
-              // share a single Card with two tables.
-              const grouped: StopRoute[][] = stop.routes.reduce((acc, route) => {
-                const existing = acc.find((g) => g[0].routeId === route.routeId);
-                if (existing) existing.push(route);
-                else acc.push([route]);
-                return acc;
-              }, [] as StopRoute[][]);
+              // Group routes so they share a single Card:
+              //   • Rail routes: group by childStopId — lines sharing the same
+              //     platform (child stop) are merged into one card with
+              //     interleaved predictions.
+              //   • Bus routes: group by routeId.
+              const grouped: StopRoute[][] = stop.routes.reduce(
+                (acc, route) => {
+                  const isRail = route.routeType !== 3;
+                  const existing = acc.find((g) =>
+                    isRail
+                      ? g[0].routeType !== 3 &&
+                        g[0].childStopId === route.childStopId
+                      : g[0].routeId === route.routeId,
+                  );
+                  if (existing) existing.push(route);
+                  else acc.push([route]);
+                  return acc;
+                },
+                [] as StopRoute[][],
+              );
               return grouped.map((routes) => (
                 <StopRoutePrediction routes={routes} client:load />
               ));
