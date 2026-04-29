@@ -1,4 +1,4 @@
-import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
+import { TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
 import { useStore } from "@nanostores/react";
 import { useState, useEffect } from "react";
 import Column from "./Column";
@@ -6,6 +6,7 @@ import AlertIcon from "./AlertIcon";
 import { alerts } from "../lib/alertsStore";
 import { isCurrent } from "../lib/isCurrent";
 import Alert from "./Alert";
+import StyledTab from "./StyledTab";
 
 interface Props {
   routeId: string;
@@ -42,28 +43,8 @@ export default function LineTabs({ routeId }: Props) {
     <Column>
       <TabGroup selectedIndex={selectedIndex} onChange={setSelectedIndex}>
         <TabList className="flex gap-2">
-          <Tab
-            className={({ selected }) =>
-              `cursor-pointer rounded-sm border-2 border-black px-5 py-2 font-bold transition-colors ${
-                selected
-                  ? "bg-black text-white"
-                  : "bg-white text-black hover:bg-gray-100"
-              }`
-            }
-          >
-            Maps &amp; Schedules
-          </Tab>
-          <Tab
-            className={({ selected }) =>
-              `cursor-pointer rounded-sm border-2 border-black px-5 py-2 font-bold transition-colors ${
-                selected
-                  ? "bg-black text-white"
-                  : "bg-white text-black hover:bg-gray-100"
-              }`
-            }
-          >
-            Alerts
-          </Tab>
+          <StyledTab>Maps &amp; Schedules</StyledTab>
+          <StyledTab>Alerts</StyledTab>
         </TabList>
         <TabPanels className="mt-6 mb-10">
           <TabPanel>Maps &amp; Schedules</TabPanel>

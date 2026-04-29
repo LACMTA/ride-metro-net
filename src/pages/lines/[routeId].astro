@@ -3,15 +3,13 @@ import { openDb } from "gtfs";
 import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
 import getRouteById from "../../lib/getRouteById";
-import Column from "../../components/Column";
-import RouteBadge from "../../components/RouteBadge";
-import RouteIcon from "../../components/RouteIcon";
 import {
   ROUTE_SHORT_NAME_OVERRIDES,
   isBuswayRoute,
 } from "../../lib/routeShortNameOverrides";
 import DataInjector from "../../components/DataInjector.astro";
 import LineTabs from "../../components/LineTabs";
+import PageHeader from "../../components/PageHeader";
 
 export const prerender = true;
 
@@ -77,26 +75,7 @@ const title =
 
 <Layout title={title}>
   <main>
-    <Column>
-      <div class="mt-6 mb-4 flex items-center">
-        <RouteIcon
-          routeType={route.routeType}
-          className="text-metro-text mr-4 h-8 shrink-0"
-        />
-        <ul>
-          <li class="my-1 mr-1.5 inline-block">
-            <RouteBadge
-              routeId={route.routeId}
-              routeType={route.routeType}
-              name={route.routeShortName}
-              color={route.routeColor}
-              textColor={route.routeTextColor}
-            />
-          </li>
-        </ul>
-      </div>
-      <h1 class="mb-4 text-4xl font-bold">{title}</h1>
-    </Column>
+    <PageHeader routes={[route]} title={title} />
     <LineTabs routeId={route.routeId} client:load />
   </main>
 </Layout>
