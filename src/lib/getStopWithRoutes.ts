@@ -105,7 +105,10 @@ const query = `
     JOIN route_headsigns ON route_headsigns.stop_id = stops.stop_id
     WHERE stops.stop_id = @stopId
       AND NOT EXISTS (
-        -- Exclude this direction if another direction for the same route has stop_sequence=1
+        -- For bus routes only, exclude this direction if another direction
+        -- for the same route has stop_sequence=1 (i.e. this stop is the
+        -- origin for the other direction).  Rail routes always show both
+        -- directions because trains run in both directions at every station.
         SELECT 1
         FROM route_headsigns rh2
         WHERE rh2.route_id = route_headsigns.route_id
@@ -113,6 +116,7 @@ const query = `
           AND rh2.direction_id != route_headsigns.direction_id
           AND rh2.min_stop_sequence = 1
           AND route_headsigns.min_stop_sequence != 1
+          AND route_headsigns.route_type = 3
       )
     GROUP BY stops.stop_id, stops.stop_name;
         `;
