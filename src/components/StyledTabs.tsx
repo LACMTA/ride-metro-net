@@ -1,4 +1,4 @@
-import { Tab } from "@headlessui/react";
+import { Tab, TabList } from "@headlessui/react";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -6,7 +6,7 @@ interface Props {
   className?: string;
 }
 
-export default function StyledTab({ children, className = "" }: Props) {
+export function StyledTab({ children, className = "" }: Props) {
   return (
     <Tab
       className={({ selected }) =>
@@ -19,5 +19,17 @@ export default function StyledTab({ children, className = "" }: Props) {
     >
       {children}
     </Tab>
+  );
+}
+
+export function StyledTabList({ children, className = "" }: Props) {
+  return <TabList className="flex gap-2">{children}</TabList>;
+}
+
+export function StyledTabPanelWrapper({ children, className = "" }: Props) {
+  return (
+    <div className={`bg-background-gray pt-3 pb-10 ${className}`}>
+      {children}
+    </div>
   );
 }
