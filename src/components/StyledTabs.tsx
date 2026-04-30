@@ -41,7 +41,7 @@ export function StyledTab({
 }
 
 export function StyledTabList({ children, className = "" }: Props) {
-  return <TabList className="flex gap-2">{children}</TabList>;
+  return <TabList className={`flex gap-2 ${className}`}>{children}</TabList>;
 }
 
 export function StyledTabPanelWrapper({ children, className = "" }: Props) {
