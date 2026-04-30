@@ -62,8 +62,7 @@ const allStopIds = [stop.stopId, ...stop.childStopIds];
 
   watchAlerts([
     {
-      // the API automatically checks for alerts at child stop Ids
-      stopIds: [stop.stopId],
+      stopIds: allStopIds,
       routeIds: stop.routes.map((route) => route.routeId),
       agency: stop.swiftlyAgencyId,
     },
@@ -75,7 +74,7 @@ const allStopIds = [stop.stopId, ...stop.childStopIds];
   <main>
     <PageHeader routes={stop.routes} title={stop.stopName} />
     <section>
-      <StopTabs routes={stop.routes} stopId={stop.stopId} client:load />
+      <StopTabs routes={stop.routes} stopId={stop.stopId} allStopIds={allStopIds} client:load />
     </section>
   </main>
 </Layout>

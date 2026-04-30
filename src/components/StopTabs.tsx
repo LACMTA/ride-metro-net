@@ -12,13 +12,15 @@ import { alerts } from "../lib/alertsStore";
 interface Props {
   routes: StopRoute[];
   stopId: string;
+  allStopIds?: string[];
 }
 
-export default function StopTabs({ routes, stopId }: Props) {
+export default function StopTabs({ routes, stopId, allStopIds }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const $alerts = useStore(alerts);
+  const stopIdSet = new Set(allStopIds ?? [stopId]);
   const alertCount = $alerts.filter((alert) =>
-    alert.informedEntities.some((e) => e.stopId === stopId),
+    alert.informedEntities.some((e) => e.stopId && stopIdSet.has(e.stopId)),
   ).length;
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function StopTabs({ routes, stopId }: Props) {
           </TabPanel>
           <TabPanel>
             <Column>
-              <AlertsSection stopId={stopId} />
+              <AlertsSection stopIds={allStopIds ?? [stopId]} />
             </Column>
           </TabPanel>
         </TabPanels>
