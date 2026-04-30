@@ -85,7 +85,7 @@ export function CardDiscolsureButton({
 export function CardDisclosurePanel({ children, className = "" }: CardProps) {
   return (
     <DisclosurePanel
-      className={`${BODY_PADDING} border-divider-line not-last:border-b ${className}`}
+      className={`${BODY_PADDING} border-divider-line pt-0 not-last:border-b ${className}`}
     >
       {children}
     </DisclosurePanel>
