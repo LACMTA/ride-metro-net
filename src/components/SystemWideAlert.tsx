@@ -15,9 +15,9 @@ export default function SystemWideAlert() {
   if (!systemAlert) return null;
 
   return (
-    <div className="bg-alert py-4">
+    <div className="bg-alert">
       <Column>
-        <Alert alert={systemAlert} />;
+        <Alert alert={systemAlert} fullWidth />
       </Column>
     </div>
   );

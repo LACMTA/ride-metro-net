@@ -3,11 +3,14 @@ import AlertIconColumn from "./AlertIconColumn";
 
 interface Props {
   alert: ConciseAlert;
+  fullWidth?: boolean;
 }
 
-export default function Alert({ alert }: Props) {
+export default function Alert({ alert, fullWidth = false }: Props) {
   return (
-    <div className="flex px-4 py-5 not-last:border-b not-last:border-b-gray-800">
+    <div
+      className={`flex ${fullWidth ? "" : "px-4"} py-5 not-last:border-b not-last:border-b-gray-800`}
+    >
       <AlertIconColumn />
       <div>
         <h4 className="font-bold capitalize">
