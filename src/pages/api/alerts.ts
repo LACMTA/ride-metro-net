@@ -72,6 +72,17 @@ export async function GET(context: import("astro").APIContext) {
   // Route IDs in informedEntities are already normalised to prefix-only form
   // by fetchSwiftlyAlerts, so simple equality checks work here.
   const filteredAlerts = result.alerts.reduce<ConciseAlert[]>((acc, alert) => {
+    // Always include alerts that have an agencyId set on any informed entity.
+    // These are system-wide alerts.
+    const matchesAgency = alert.informedEntities.some(
+      (entity) => entity.agencyId != null && entity.agencyId !== "",
+    );
+
+    if (matchesAgency) {
+      acc.push(makeConciseAlert(alert));
+      return acc;
+    }
+
     const matchesStop = stopIds.some((stopId) =>
       alert.informedEntities.some((entity) => entity.stopId === stopId),
     );

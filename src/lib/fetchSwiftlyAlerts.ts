@@ -24,6 +24,7 @@ export function routeIdPrefix(routeId: string): string {
 export interface SwiftlyAlertEntity {
   routeId?: string;
   stopId?: string;
+  agencyId: string;
 }
 
 /**  Shape of a single alert coming back from the Swiftly JSON endpoint. */
