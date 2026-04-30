@@ -15,8 +15,9 @@ export async function getStaticPaths() {
   const db = openDb(GTFSconfig);
   // Build pages for:
   //   1. Stops that have scheduled arrivals (stop_times) and are NOT a child stop (no parent_station).
-  //   2. Stops that ARE a parent_station for other stops (even if they have no direct stop_times).
-  // Do NOT build pages for child stops (those that have a parent_station value).
+  //   2. Stops that ARE a parent_station for at least one child stop that has scheduled arrivals.
+  // Do NOT build pages for child stops (those that have a parent_station value),
+  // or for parent stations whose children have no stop_times yet (not yet in service).
   const allStops = (await db
     .prepare(
       `
@@ -29,6 +30,7 @@ export async function getStaticPaths() {
 
       SELECT DISTINCT s.parent_station AS stop_id
       FROM stops s
+      INNER JOIN stop_times st ON st.stop_id = s.stop_id
       WHERE s.parent_station IS NOT NULL AND s.parent_station != ''
       `,
     )
