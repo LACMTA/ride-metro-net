@@ -6,7 +6,18 @@ interface Props {
   className?: string;
 }
 
-export function StyledTab({ children, className = "" }: Props) {
+interface TabProps extends Props {
+  badge?: string | number;
+  badgeAlert?: boolean;
+}
+
+export function StyledTab({
+  children,
+  className = "",
+  badge,
+  badgeAlert,
+}: TabProps) {
+  const hasBadge = typeof badge !== "undefined";
   return (
     <Tab
       className={({ selected }) =>
@@ -14,10 +25,17 @@ export function StyledTab({ children, className = "" }: Props) {
           selected
             ? "bg-black text-white"
             : "bg-white text-black hover:bg-gray-100"
-        } ${className}`
+        } ${hasBadge && "pr-4"} ${className}`
       }
     >
       {children}
+      {hasBadge && (
+        <span
+          className={`ml-2 inline-block rounded-sm px-1.5 text-black ${badgeAlert ? "bg-alert" : "bg-gray-300"}`}
+        >
+          {badge}
+        </span>
+      )}
     </Tab>
   );
 }
