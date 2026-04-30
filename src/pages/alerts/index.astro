@@ -53,7 +53,7 @@ const busRoutes = await getAllBusRoutes();
         </Card>
         <Card>
           <CardHeader><BusIcon className="inline-block h-10" /> Bus</CardHeader>
-          <CardBody>
+          <CardBody margin={false}>
             <BusAlertBadgeList routes={busRoutes} client:load />
           </CardBody>
         </Card>

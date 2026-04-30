@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import ChevronIcon from "./ChevronIcon";
+import { DisclosureButton, DisclosurePanel } from "@headlessui/react";
 
 interface CardProps {
   children: ReactNode;
@@ -12,6 +13,10 @@ interface CardBodyProps extends CardProps {
 
 interface CardLinkListItemProps extends CardProps {
   href: string;
+}
+
+interface CardDiscolsureButtonProps extends CardProps {
+  open: boolean;
 }
 
 const BODY_PADDING = "p-4";
@@ -54,10 +59,35 @@ export function CardLinkListItem({
   return (
     <a
       href={href}
-      className={` ${BODY_PADDING} border-divider-line flex items-center justify-between py-6 not-last:border-b`}
+      className={` ${BODY_PADDING} border-divider-line flex items-center justify-between py-6 font-bold not-last:border-b`}
     >
       {children}
       <ChevronIcon className="h-2 rotate-270" />
     </a>
+  );
+}
+
+export function CardDiscolsureButton({
+  children,
+  className = "",
+  open,
+}: CardDiscolsureButtonProps) {
+  return (
+    <DisclosureButton
+      className={` ${BODY_PADDING} border-divider-line flex w-full cursor-pointer items-center justify-between py-6 font-bold ${!open && "not-last:border-b"}`}
+    >
+      <span>{children}</span>
+      <ChevronIcon className={`h-2 ${open ? "rotate-180" : ""}`} />
+    </DisclosureButton>
+  );
+}
+
+export function CardDisclosurePanel({ children, className = "" }: CardProps) {
+  return (
+    <DisclosurePanel
+      className={`${BODY_PADDING} border-divider-line not-last:border-b ${className}`}
+    >
+      {children}
+    </DisclosurePanel>
   );
 }

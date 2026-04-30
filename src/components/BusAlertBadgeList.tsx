@@ -8,6 +8,7 @@ import { alertStatus } from "../lib/alertStatusStore";
 import type { RouteWithInfo } from "../lib/getRouteById";
 import ChevronIcon from "./ChevronIcon";
 import RouteBadge from "./RouteBadge";
+import { CardDisclosurePanel, CardDiscolsureButton } from "./Card";
 
 interface Props {
   routes: RouteWithInfo[];
@@ -54,16 +55,11 @@ export default function BusAlertBadgeList({ routes }: Props) {
         return (
           <Disclosure key={group}>
             {({ open }) => (
-              <div className="border-b-divider-line border-b">
-                <DisclosureButton className="flex w-full cursor-pointer items-center justify-between text-left">
-                  <h3 className="my-4 text-2xl font-bold">
-                    {GROUP_LABELS[group]}
-                  </h3>
-                  <ChevronIcon
-                    className={`mt-2 w-4 ${open ? "rotate-180" : ""}`}
-                  />
-                </DisclosureButton>
-                <DisclosurePanel>
+              <>
+                <CardDiscolsureButton open={open}>
+                  {GROUP_LABELS[group]}
+                </CardDiscolsureButton>
+                <CardDisclosurePanel>
                   <div>
                     {groupRoutes.map((route) => (
                       <RouteBadge
@@ -78,8 +74,8 @@ export default function BusAlertBadgeList({ routes }: Props) {
                       />
                     ))}
                   </div>
-                </DisclosurePanel>
-              </div>
+                </CardDisclosurePanel>
+              </>
             )}
           </Disclosure>
         );

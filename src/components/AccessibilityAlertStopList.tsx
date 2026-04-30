@@ -17,8 +17,11 @@ export default function AccessibilityAlertStopList() {
   return (
     <>
       {stops.map((stop) => (
-        <CardLinkListItem key={stop.stopId} href={`/stops/${stop.stopId}`}>
-          <span className="flex font-bold">
+        <CardLinkListItem
+          key={stop.stopId}
+          href={`/stops/${stop.stopId}#alerts`}
+        >
+          <span className="flex">
             <AlertIcon
               className="text-yellow mr-3 inline h-5 shrink"
               markClassName="text-metro-text"
