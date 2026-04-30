@@ -83,6 +83,14 @@ const query = `
         CASE WHEN routes.route_type = 3 THEN 'lametro' ELSE 'lametro-rail' END AS swiftly_agency_id,
         trips.direction_id,
         MIN(stop_times.stop_sequence) AS min_stop_sequence,
+        -- 1 if this stop has at least one following stop in any trip for this
+        -- route/direction (i.e. not a pure terminus); 0 if always the last stop.
+        MAX(CASE
+          WHEN stop_times.stop_sequence < (
+            SELECT MAX(st2.stop_sequence) FROM stop_times st2
+            WHERE st2.trip_id = stop_times.trip_id
+          ) THEN 1 ELSE 0
+        END) AS has_stops_after,
         MIN(rs.stop_id) AS child_stop_id,
         JSON_GROUP_ARRAY(
           DISTINCT SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
@@ -115,8 +123,7 @@ const query = `
       AND NOT EXISTS (
         -- For bus routes only, exclude this direction if another direction
         -- for the same route has stop_sequence=1 (i.e. this stop is the
-        -- origin for the other direction).  Rail routes always show both
-        -- directions because trains run in both directions at every station.
+        -- origin for the other direction).
         SELECT 1
         FROM route_headsigns rh2
         WHERE rh2.route_id = route_headsigns.route_id
@@ -125,6 +132,13 @@ const query = `
           AND rh2.min_stop_sequence = 1
           AND route_headsigns.min_stop_sequence != 1
           AND route_headsigns.route_type = 3
+      )
+      -- For rail routes, exclude this direction if this stop is always the
+      -- terminus (last stop) in that direction — no trains depart from here
+      -- in this direction.
+      AND NOT (
+        route_headsigns.route_type != 3
+        AND route_headsigns.has_stops_after = 0
       )
     GROUP BY stops.stop_id, stops.stop_name;
         `;
