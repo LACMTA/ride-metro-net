@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useStore } from "@nanostores/react";
 import Column from "./Column";
 import { StyledTab, StyledTabList, StyledTabPanelWrapper } from "./StyledTabs";
-import AlertList from "./AlertList";
 import StopRoutePrediction from "./StopRoutePrediction";
 import type { StopRoute } from "../lib/getStopWithRoutes";
 import AlertsSection from "./AlertsSection";

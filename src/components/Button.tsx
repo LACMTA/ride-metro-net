@@ -16,11 +16,7 @@ export default function Button({
   return (
     <button
       onClick={onClick}
-      className={`cursor-pointer rounded-sm border-2 border-black px-5 py-2 font-bold transition-colors ${
-        selected
-          ? "bg-black text-white"
-          : "bg-white text-black hover:bg-gray-100"
-      } ${className}`}
+      className={`bg-blue cursor-pointer rounded-sm px-5 py-2 text-white ${className}`}
     >
       {children}
     </button>

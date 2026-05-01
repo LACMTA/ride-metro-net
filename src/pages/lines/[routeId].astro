@@ -77,7 +77,7 @@ const title =
   <main>
     <PageHeader routes={[route]} title={title} />
     <section>
-      <LineTabs routeId={route.routeId} client:load />
+      <LineTabs routeId={route.routeId} lineTitle={title} client:load />
     </section>
   </main>
 </Layout>

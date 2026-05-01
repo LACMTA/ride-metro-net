@@ -5,12 +5,15 @@ import Column from "./Column";
 import { StyledTab, StyledTabList, StyledTabPanelWrapper } from "./StyledTabs";
 import AlertsSection from "./AlertsSection";
 import { alerts } from "../lib/alertsStore";
+import Button from "./Button";
+import DownloadIcon from "./DownloadIcon";
 
 interface Props {
   routeId: string;
+  lineTitle: string;
 }
 
-export default function LineTabs({ routeId }: Props) {
+export default function LineTabs({ routeId, lineTitle }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const $alerts = useStore(alerts);
   const alertCount = $alerts.filter((alert) =>
@@ -48,7 +51,19 @@ export default function LineTabs({ routeId }: Props) {
       <StyledTabPanelWrapper>
         <Column>
           <TabPanels>
-            <TabPanel>Maps &amp; Schedules</TabPanel>
+            <TabPanel>
+              <div className="pt-5 pb-50">
+                <h2 className="mb-3 text-2xl font-bold">
+                  {lineTitle} Overview
+                </h2>
+                <p></p>
+                <h2 className="mb-3 text-2xl font-bold">{lineTitle} Details</h2>
+                <Button>
+                  View Schedule and Map{" "}
+                  <DownloadIcon className="inline text-white" />
+                </Button>
+              </div>
+            </TabPanel>
             <TabPanel>
               <AlertsSection routeId={routeId} />
             </TabPanel>
