@@ -11,9 +11,10 @@ import DownloadIcon from "./DownloadIcon";
 interface Props {
   routeId: string;
   lineTitle: string;
+  pdfUrl: string;
 }
 
-export default function LineTabs({ routeId, lineTitle }: Props) {
+export default function LineTabs({ routeId, lineTitle, pdfUrl }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const $alerts = useStore(alerts);
   const alertCount = $alerts.filter((alert) =>
@@ -54,7 +55,12 @@ export default function LineTabs({ routeId, lineTitle }: Props) {
             <TabPanel>
               <div className="pt-5 pb-50">
                 <h2 className="mb-3 text-2xl font-bold">{lineTitle} Details</h2>
-                <Button>
+                <Button
+                  as="a"
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   View Schedule and Map{" "}
                   <DownloadIcon className="inline text-white" />
                 </Button>

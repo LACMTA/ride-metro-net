@@ -10,6 +10,7 @@ import {
 import DataInjector from "../../components/DataInjector.astro";
 import LineTabs from "../../components/LineTabs";
 import PageHeader from "../../components/PageHeader";
+import pdfSchedules from "../../data/pdf-schedules.json";
 
 export const prerender = true;
 
@@ -54,6 +55,8 @@ const title =
   route.routeType !== 3 || isBuswayRoute(route.routeId)
     ? `Metro ${route.routeShortName} Line`
     : `Line ${route.routeShortName} Bus`;
+const pdfUrl =
+  (pdfSchedules as Record<string, string>)[numericId ?? routeId] ?? null;
 ---
 
 <DataInjector data={route} id="data-route" />
@@ -77,7 +80,12 @@ const title =
   <main>
     <PageHeader routes={[route]} title={title} badgeSize="xl" />
     <section>
-      <LineTabs routeId={route.routeId} lineTitle={title} client:load />
+      <LineTabs
+        routeId={route.routeId}
+        lineTitle={title}
+        pdfUrl={pdfUrl}
+        client:load
+      />
     </section>
   </main>
 </Layout>
