@@ -30,8 +30,11 @@ export default function Alert({
         <p>{alert.descriptionText}</p>
         <p className="mt-2 flex items-center text-gray-600">
           <CalendarIcon className="mr-1.5 inline h-4" />
-          {getDateInPT(alert.activePeriod.start) ===
-          getDateInPT(alert.activePeriod.end) ? (
+          {/* The alert is active */}
+          {Date.now() / 1000 >= alert.activePeriod.start ? (
+            <>Ends {formatTimestamp(alert.activePeriod.end)}.</>
+          ) : getDateInPT(alert.activePeriod.start) ===
+            getDateInPT(alert.activePeriod.end) ? (
             <>
               {getDateInPT(alert.activePeriod.start)} from{" "}
               {formatTimeOnly(alert.activePeriod.start)} to{" "}
