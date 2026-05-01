@@ -11,6 +11,7 @@ import DataInjector from "../../components/DataInjector.astro";
 import LineTabs from "../../components/LineTabs";
 import PageHeader from "../../components/PageHeader";
 import getRouteOverview from "../../lib/getRouteOverview";
+import pdfSchedules from "../../data/pdf-schedules.json";
 
 export const prerender = true;
 
@@ -53,10 +54,11 @@ const { numericId } = Astro.props as { numericId: string };
 const route = await getRouteById(numericId ?? routeId);
 const title =
   route.routeType !== 3 || isBuswayRoute(route.routeId)
-    ? `${route.routeShortName} Line`
-    : `Line ${route.routeShortName}`;
-
+    ? `Metro ${route.routeShortName} Line`
+    : `Line ${route.routeShortName} Bus`;
 const routeOverview = await getRouteOverview(route.routeId);
+const pdfUrl =
+  (pdfSchedules as Record<string, string>)[numericId ?? routeId] ?? null;
 ---
 
 <DataInjector data={route} id="data-route" />
@@ -78,12 +80,13 @@ const routeOverview = await getRouteOverview(route.routeId);
 
 <Layout title={title}>
   <main>
-    <PageHeader routes={[route]} title={title} />
+    <PageHeader routes={[route]} title={title} badgeSize="xl" />
     <section>
       <LineTabs
         routeId={route.routeId}
         lineTitle={title}
         routeOverview={routeOverview}
+        pdfUrl={pdfUrl}
         client:load
       />
     </section>

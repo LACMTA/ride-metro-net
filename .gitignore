@@ -34,7 +34,7 @@ pnpm-debug.log*
 !.env.example
 
 
-data
+/data
 # Local Netlify folder
 .netlify
 

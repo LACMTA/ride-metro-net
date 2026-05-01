@@ -13,13 +13,21 @@ interface Props {
   routeId: string;
   lineTitle: string;
   routeOverview: RouteOverview;
+  pdfUrl: string;
 }
 
-export default function LineTabs({ routeId, lineTitle, routeOverview }: Props) {
+export default function LineTabs({
+  routeId,
+  lineTitle,
+  pdfUrl,
+  routeOverview,
+}: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const $alerts = useStore(alerts);
-  const alertCount = $alerts.filter((alert) =>
-    alert.informedEntities.some((e) => e.routeId === routeId),
+  const alertCount = $alerts.filter(
+    (alert) =>
+      alert.effect !== "ACCESSIBILITY_ISSUE" &&
+      alert.informedEntities.some((e) => e.routeId === routeId),
   ).length;
 
   useEffect(() => {
@@ -60,7 +68,12 @@ export default function LineTabs({ routeId, lineTitle, routeOverview }: Props) {
                 </h2>
                 <p>{JSON.stringify(routeOverview)}</p>
                 <h2 className="mb-3 text-2xl font-bold">{lineTitle} Details</h2>
-                <Button>
+                <Button
+                  as="a"
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   View Schedule and Map{" "}
                   <DownloadIcon className="inline text-white" />
                 </Button>
