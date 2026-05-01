@@ -1,5 +1,6 @@
 import type { ConciseAlert } from "../pages/api/alerts";
 import AlertIconColumn from "./AlertIconColumn";
+import { formatTimestamp } from "../lib/formatTimestamp";
 
 interface Props {
   alert: ConciseAlert;
@@ -22,6 +23,10 @@ export default function Alert({
           {String(alert.effect).toLowerCase().replace("_", " ")}
         </h4>
         <p>{alert.descriptionText}</p>
+        <p className="mt-2">
+          From {formatTimestamp(alert.activePeriod.start)} until{" "}
+          {formatTimestamp(alert.activePeriod.end)}.
+        </p>
       </div>
     </div>
   );
