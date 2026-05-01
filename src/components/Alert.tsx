@@ -4,14 +4,19 @@ import AlertIconColumn from "./AlertIconColumn";
 interface Props {
   alert: ConciseAlert;
   fullWidth?: boolean;
+  showAlertIcon?: boolean;
 }
 
-export default function Alert({ alert, fullWidth = false }: Props) {
+export default function Alert({
+  alert,
+  fullWidth = false,
+  showAlertIcon = true,
+}: Props) {
   return (
     <div
-      className={`flex ${fullWidth ? "" : "px-4"} py-5 not-last:border-b not-last:border-b-gray-800`}
+      className={`flex ${fullWidth ? "" : "px-4"} not-last:border-b-divider-line py-5 not-last:border-b`}
     >
-      <AlertIconColumn />
+      {showAlertIcon && <AlertIconColumn />}
       <div>
         <h4 className="font-bold capitalize">
           {String(alert.effect).toLowerCase().replace("_", " ")}

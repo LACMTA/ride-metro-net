@@ -7,6 +7,10 @@ interface CardProps {
   className?: string;
 }
 
+interface CardHeaderProps extends CardProps {
+  background?: "black" | "white";
+}
+
 interface CardBodyProps extends CardProps {
   margin?: boolean;
 }
@@ -31,11 +35,17 @@ export function Card({ children, className = "" }: CardProps) {
   );
 }
 
-export function CardHeader({ children, className = "" }: CardProps) {
+export function CardHeader({
+  children,
+  className = "",
+  background = "black",
+}: CardHeaderProps) {
+  const bgClass =
+    background === "white"
+      ? "bg-background-white text-metro-text border-b border-divider-line"
+      : "text-background-white bg-metro-text";
   return (
-    <h2
-      className={`text-background-white bg-black p-4 text-3xl font-bold ${className}`}
-    >
+    <h2 className={`${bgClass} p-4 text-3xl font-bold ${className}`}>
       {children}
     </h2>
   );
