@@ -26,6 +26,8 @@ export async function getStaticPaths() {
       SELECT DISTINCT r.route_id
       FROM routes r
       JOIN trips t ON t.route_id = r.route_id
+      -- long name is only null on stadium expresses, which we don't build for now
+      WHERE r.route_long_name IS NOT NULL AND r.route_long_name != ''
       ORDER BY r.route_id
       `,
     )
