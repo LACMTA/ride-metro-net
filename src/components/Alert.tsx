@@ -1,6 +1,11 @@
 import type { ConciseAlert } from "../pages/api/alerts";
 import AlertIconColumn from "./AlertIconColumn";
-import { formatTimestamp } from "../lib/formatTimestamp";
+import {
+  formatTimestamp,
+  formatTimeOnly,
+  getDateInPT,
+} from "../lib/formatTimestamp";
+import CalendarIcon from "./CalendarIcon";
 
 interface Props {
   alert: ConciseAlert;
@@ -23,9 +28,21 @@ export default function Alert({
           {String(alert.effect).toLowerCase().replace("_", " ")}
         </h4>
         <p>{alert.descriptionText}</p>
-        <p className="mt-2">
-          From {formatTimestamp(alert.activePeriod.start)} until{" "}
-          {formatTimestamp(alert.activePeriod.end)}.
+        <p className="mt-2 flex items-center text-gray-600">
+          <CalendarIcon className="mr-1.5 inline h-4" />
+          {getDateInPT(alert.activePeriod.start) ===
+          getDateInPT(alert.activePeriod.end) ? (
+            <>
+              {getDateInPT(alert.activePeriod.start)} from{" "}
+              {formatTimeOnly(alert.activePeriod.start)} to{" "}
+              {formatTimeOnly(alert.activePeriod.end)}.
+            </>
+          ) : (
+            <>
+              {formatTimestamp(alert.activePeriod.start)} to{" "}
+              {formatTimestamp(alert.activePeriod.end)}.
+            </>
+          )}
         </p>
       </div>
     </div>
