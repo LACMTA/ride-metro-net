@@ -25,14 +25,14 @@ export default function LineOverview({
       <div className="flex">
         <MapPinIcon aria-hidden="true" className="mr-3 inline h-6 w-6" />
         <p>
-          {pluralVehicleName} run from{" "}
+          {pluralVehicleName} run between{" "}
           <a
             href={`/stops/${routeOverview.firstStopId}`}
             className="text-blue underline"
           >
             {routeOverview.firstStopName}
           </a>
-          {" to "}
+          {" and "}
           <a
             href={`/stops/${routeOverview.lastStopId}`}
             className="text-blue underline"
