@@ -53,10 +53,6 @@ export default function LineTabs({ routeId, lineTitle }: Props) {
           <TabPanels>
             <TabPanel>
               <div className="pt-5 pb-50">
-                <h2 className="mb-3 text-2xl font-bold">
-                  {lineTitle} Overview
-                </h2>
-                <p></p>
                 <h2 className="mb-3 text-2xl font-bold">{lineTitle} Details</h2>
                 <Button>
                   View Schedule and Map{" "}
