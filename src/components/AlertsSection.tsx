@@ -3,6 +3,7 @@ import { alerts } from "../lib/alertsStore";
 import { isCurrent } from "../lib/isCurrent";
 import Alert from "./Alert";
 import AlertIcon from "./AlertIcon";
+import { Card, CardBody, CardHeader } from "./Card";
 
 interface Props {
   routeId?: string;
@@ -27,26 +28,34 @@ export default function AlertsSection({ routeId, stopId, stopIds }: Props) {
 
   return (
     <div>
-      <h2 className="mt-8 mb-4 flex items-center gap-3 text-3xl font-bold">
-        <AlertIcon className="text-yellow size-10" markClassName="text-black" />
-        Active Alerts
-      </h2>
-      {activeAlerts.length > 0 ? (
-        activeAlerts.map((alert, index) => <Alert key={index} alert={alert} />)
-      ) : (
-        <p className="text-gray-600">No active alerts</p>
-      )}
-      <h2 className="mt-8 mb-4 flex items-center gap-3 text-3xl font-bold">
-        <AlertIcon className="text-yellow size-10" markClassName="text-black" />
-        Upcoming Alerts
-      </h2>
-      {upcomingAlerts.length > 0 ? (
-        upcomingAlerts.map((alert, index) => (
-          <Alert key={index} alert={alert} />
-        ))
-      ) : (
-        <p className="text-gray-600">No upcoming alerts</p>
-      )}
+      <Card>
+        <CardHeader className="flex items-center gap-3">
+          <AlertIcon className="text-yellow size-10" markClassName="text-black" />
+          Active Alerts
+        </CardHeader>
+        <CardBody>
+          {activeAlerts.length > 0 ? (
+            activeAlerts.map((alert, index) => <Alert key={index} alert={alert} />)
+          ) : (
+            <p className="text-gray-600">No active alerts</p>
+          )}
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader className="flex items-center gap-3">
+          <AlertIcon className="text-yellow size-10" markClassName="text-black" />
+          Upcoming Alerts
+        </CardHeader>
+        <CardBody>
+          {upcomingAlerts.length > 0 ? (
+            upcomingAlerts.map((alert, index) => (
+              <Alert key={index} alert={alert} />
+            ))
+          ) : (
+            <p className="text-gray-600">No upcoming alerts</p>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 }
