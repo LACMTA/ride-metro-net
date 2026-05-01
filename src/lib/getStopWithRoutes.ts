@@ -77,6 +77,7 @@ const query = `
         @stopId AS stop_id,
         routes.route_id,
         routes.route_short_name,
+        routes.route_long_name,
         routes.route_type,
         routes.route_color,
         routes.route_text_color,
@@ -133,6 +134,8 @@ const query = `
           AND route_headsigns.min_stop_sequence != 1
           AND route_headsigns.route_type = 3
       )
+      -- Exclude routes with no route_long_name (e.g. event-only express shuttles).
+      AND (route_headsigns.route_long_name IS NOT NULL AND route_headsigns.route_long_name != '')
       -- For rail routes, exclude this direction if this stop is always the
       -- terminus (last stop) in that direction — no trains depart from here
       -- in this direction.
