@@ -35,12 +35,14 @@ export default function Alert({
             <>Ends {formatTimestamp(alert.activePeriod.end)}.</>
           ) : getDateInPT(alert.activePeriod.start) ===
             getDateInPT(alert.activePeriod.end) ? (
+            // Alert starts and ends on the same day
             <>
               {getDateInPT(alert.activePeriod.start)} from{" "}
               {formatTimeOnly(alert.activePeriod.start)} to{" "}
               {formatTimeOnly(alert.activePeriod.end)}.
             </>
           ) : (
+            // Alert starts and ends on different days
             <>
               {formatTimestamp(alert.activePeriod.start)} to{" "}
               {formatTimestamp(alert.activePeriod.end)}.
