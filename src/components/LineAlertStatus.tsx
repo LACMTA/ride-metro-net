@@ -1,7 +1,7 @@
 import { useStore } from "@nanostores/react";
 import { alertStatus } from "../lib/alertStatusStore";
 import type { RouteWithInfo } from "../lib/getRouteById";
-import { ROUTE_SHORT_NAME_OVERRIDES } from "../lib/routeShortNameOverrides";
+import { getLineSlug } from "../lib/routeShortNameOverrides";
 import { CardLinkListItem } from "./Card";
 import RouteBadge from "./RouteBadge";
 import AlertIcon from "./AlertIcon";
@@ -21,10 +21,7 @@ export default function LineAlertStatus({ route }: Props) {
 
   const alertCount = $alertStatus[route.routeId] ?? 0;
 
-  // Derive the URL slug — lettered routes (A–K) use the lowercase letter,
-  // all others use the numeric prefix directly.
-  const letter = ROUTE_SHORT_NAME_OVERRIDES[route.routeId];
-  const slug = letter ? letter.toLowerCase() : route.routeId;
+  const slug = getLineSlug(route.routeId);
 
   return (
     <CardLinkListItem href={`/lines/${slug}#alerts`}>

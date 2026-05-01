@@ -34,6 +34,17 @@ export const ROUTE_ID_BY_SHORT_NAME: Record<string, string> = Object.fromEntries
 export const BUSWAY_ROUTE_PREFIXES = new Set(["901", "910"]);
 
 /**
+ * Returns the URL slug for a given route ID.
+ * Lettered routes (A–K) use the lowercase letter; all others use the numeric
+ * prefix directly (e.g. "720" → "720").
+ */
+export function getLineSlug(routeId: string): string {
+  const prefix = routeId.split("-")[0];
+  const letter = ROUTE_SHORT_NAME_OVERRIDES[prefix];
+  return letter ? letter.toLowerCase() : prefix;
+}
+
+/**
  * Returns true when a route is a busway (G or J Line) — i.e. GTFS type 3 but
  * rendered with rail-style badges.
  */

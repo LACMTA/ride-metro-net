@@ -35,14 +35,16 @@ export default function LineTabs({ routeId }: Props) {
 
   return (
     <TabGroup selectedIndex={selectedIndex} onChange={setSelectedIndex}>
-      <Column>
-        <StyledTabList>
-          <StyledTab>Maps &amp; Schedules</StyledTab>
-          <StyledTab badge={alertCount} badgeAlert={alertCount > 0}>
-            Alerts
-          </StyledTab>
-        </StyledTabList>
-      </Column>
+      <div className="bg-metro-text">
+        <Column>
+          <StyledTabList>
+            <StyledTab>Maps &amp; Schedules</StyledTab>
+            <StyledTab badge={alertCount} badgeAlert={alertCount > 0}>
+              Alerts
+            </StyledTab>
+          </StyledTabList>
+        </Column>
+      </div>
       <StyledTabPanelWrapper>
         <Column>
           <TabPanels>
