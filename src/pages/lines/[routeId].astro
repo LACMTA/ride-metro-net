@@ -52,8 +52,8 @@ const { numericId } = Astro.props as { numericId: string };
 const route = await getRouteById(numericId ?? routeId);
 const title =
   route.routeType !== 3 || isBuswayRoute(route.routeId)
-    ? `${route.routeShortName} Line`
-    : `Line ${route.routeShortName}`;
+    ? `Metro ${route.routeShortName} Line`
+    : `Line ${route.routeShortName} Bus`;
 ---
 
 <DataInjector data={route} id="data-route" />
@@ -75,7 +75,7 @@ const title =
 
 <Layout title={title}>
   <main>
-    <PageHeader routes={[route]} title={title} />
+    <PageHeader routes={[route]} title={title} badgeSize="xl" />
     <section>
       <LineTabs routeId={route.routeId} lineTitle={title} client:load />
     </section>

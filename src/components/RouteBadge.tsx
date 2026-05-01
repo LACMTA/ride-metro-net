@@ -1,6 +1,8 @@
 import AlertIcon from "./AlertIcon";
 import { isBuswayRoute } from "../lib/routeShortNameOverrides";
 
+export type BadgeSizes = "sm" | "md" | "lg" | "xl";
+
 interface Props {
   routeId: string;
   routeType: number;
@@ -18,7 +20,7 @@ interface Props {
   /** Optional: show an alert badge after the route name */
   busAlertBadge?: boolean;
   /** Optional size variant. Defaults to "md". */
-  size?: "sm" | "md" | "lg";
+  size?: BadgeSizes;
 }
 
 type RouteMode = "rail" | "busway" | "bus";
@@ -30,9 +32,38 @@ function getRouteMode(routeId: string, routeType: number): RouteMode {
 }
 
 const sizes = {
-  sm: { h: "h-6",  w: "w-6",  px: "px-2", pxAlert: "pr-1.5", text: "text-base", alert: "h-4" },
-  md: { h: "h-8",  w: "w-8",  px: "px-3", pxAlert: "pr-2",   text: "text-xl",   alert: "h-5" },
-  lg: { h: "h-10", w: "w-10", px: "px-4", pxAlert: "pr-2.5", text: "text-2xl",  alert: "h-6" },
+  sm: {
+    h: "h-6",
+    w: "w-6",
+    px: "px-2",
+    pxAlert: "pr-1.5",
+    text: "text-base",
+    alert: "h-4",
+  },
+  md: {
+    h: "h-8",
+    w: "w-8",
+    px: "px-3",
+    pxAlert: "pr-2",
+    text: "text-xl",
+    alert: "h-5",
+  },
+  lg: {
+    h: "h-10",
+    w: "w-10",
+    px: "px-4",
+    pxAlert: "pr-2.5",
+    text: "text-2xl",
+    alert: "h-6",
+  },
+  xl: {
+    h: "h-14",
+    w: "w-14",
+    px: "px-5",
+    pxAlert: "pr-3",
+    text: "text-4xl",
+    alert: "h-8",
+  },
 } as const;
 
 /**

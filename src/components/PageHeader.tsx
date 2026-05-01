@@ -1,7 +1,7 @@
 import Column from "./Column";
 import RailIcon from "./RailIcon";
 import BusIcon from "./BusIcon";
-import RouteBadge from "./RouteBadge";
+import RouteBadge, { type BadgeSizes } from "./RouteBadge";
 import { getLineSlug } from "../lib/routeShortNameOverrides";
 
 interface Route {
@@ -15,6 +15,7 @@ interface Route {
 interface Props {
   routes: Route[];
   title: string;
+  badgeSize?: BadgeSizes;
 }
 
 /**
@@ -26,10 +27,7 @@ interface Props {
  *   - A deduplicated, numerically-sorted list of RouteBadges
  *   - An <h1> with the supplied title
  */
-export default function PageHeader({ routes, title }: Props) {
-  const hasRail = routes.some((r) => r.routeType !== 3);
-  const hasBus = routes.some((r) => r.routeType === 3);
-
+export default function PageHeader({ routes, title, badgeSize = "lg" }: Props) {
   const uniqueSortedRoutes = routes
     .filter(
       (route, index, self) =>
@@ -59,7 +57,7 @@ export default function PageHeader({ routes, title }: Props) {
                   name={route.routeShortName}
                   color={route.routeColor}
                   textColor={route.routeTextColor}
-                  size="lg"
+                  size={badgeSize}
                   href={`/lines/${getLineSlug(route.routeId)}`}
                 />
               </li>
