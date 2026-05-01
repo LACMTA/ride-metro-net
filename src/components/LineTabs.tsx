@@ -7,13 +7,15 @@ import AlertsSection from "./AlertsSection";
 import { alerts } from "../lib/alertsStore";
 import Button from "./Button";
 import DownloadIcon from "./DownloadIcon";
+import type { RouteOverview } from "../lib/getRouteOverview";
 
 interface Props {
   routeId: string;
   lineTitle: string;
+  routeOverview: RouteOverview;
 }
 
-export default function LineTabs({ routeId, lineTitle }: Props) {
+export default function LineTabs({ routeId, lineTitle, routeOverview }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const $alerts = useStore(alerts);
   const alertCount = $alerts.filter((alert) =>
@@ -56,7 +58,7 @@ export default function LineTabs({ routeId, lineTitle }: Props) {
                 <h2 className="mb-3 text-2xl font-bold">
                   {lineTitle} Overview
                 </h2>
-                <p></p>
+                <p>{JSON.stringify(routeOverview)}</p>
                 <h2 className="mb-3 text-2xl font-bold">{lineTitle} Details</h2>
                 <Button>
                   View Schedule and Map{" "}

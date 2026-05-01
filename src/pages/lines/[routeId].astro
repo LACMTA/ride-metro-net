@@ -10,6 +10,7 @@ import {
 import DataInjector from "../../components/DataInjector.astro";
 import LineTabs from "../../components/LineTabs";
 import PageHeader from "../../components/PageHeader";
+import getRouteOverview from "../../lib/getRouteOverview";
 
 export const prerender = true;
 
@@ -54,6 +55,8 @@ const title =
   route.routeType !== 3 || isBuswayRoute(route.routeId)
     ? `${route.routeShortName} Line`
     : `Line ${route.routeShortName}`;
+
+const routeOverview = await getRouteOverview(route.routeId);
 ---
 
 <DataInjector data={route} id="data-route" />
@@ -77,7 +80,12 @@ const title =
   <main>
     <PageHeader routes={[route]} title={title} />
     <section>
-      <LineTabs routeId={route.routeId} lineTitle={title} client:load />
+      <LineTabs
+        routeId={route.routeId}
+        lineTitle={title}
+        routeOverview={routeOverview}
+        client:load
+      />
     </section>
   </main>
 </Layout>
