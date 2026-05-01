@@ -44,6 +44,8 @@ export default function StopTabs({ routes, stopId, allStopIds }: Props) {
   //     platform (child stop) are merged into one card with
   //     interleaved predictions.
   //   • Bus routes: group by routeId.
+  const hasRail = routes.some((route) => route.routeType !== 3);
+
   const grouped: StopRoute[][] = routes.reduce((acc, route) => {
     const isRail = route.routeType !== 3;
     const existing = acc.find((g) =>
@@ -63,7 +65,7 @@ export default function StopTabs({ routes, stopId, allStopIds }: Props) {
           <StyledTabList>
             <StyledTab>Arrivals</StyledTab>
             <StyledTab badge={alertCount} badgeAlert={alertCount > 0}>
-              Alerts
+              {hasRail ? "Station Alerts" : "Stop Alerts"}
             </StyledTab>
           </StyledTabList>
         </Column>
