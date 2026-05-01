@@ -17,7 +17,9 @@ export default function AlertsSection({ routeId, stopId, stopIds }: Props) {
 
   const filteredAlerts = $alerts.filter(
     (alert) =>
-      alert.effect !== "ACCESSIBILITY_ISSUE" &&
+      // Accessibility alerts are surfaced separately on line pages and should
+      // not appear in the route-scoped alerts list. Stop pages still show them.
+      (!routeId || alert.effect !== "ACCESSIBILITY_ISSUE") &&
       alert.informedEntities.some((e) => {
         if (routeId) return e.routeId === routeId;
         if (stopIdSet.size > 0)
