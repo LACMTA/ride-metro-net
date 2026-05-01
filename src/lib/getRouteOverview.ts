@@ -137,10 +137,10 @@ const query = `
   )
 
   SELECT
-    -- Terminal stop IDs and names: prefer parent station name for rail platforms.
-    s_first.stop_id                                  AS first_stop_id,
+    -- Terminal stop IDs and names: prefer parent station for rail platforms.
+    COALESCE(ps_first.stop_id,   s_first.stop_id)    AS first_stop_id,
     COALESCE(ps_first.stop_name, s_first.stop_name)  AS first_stop_name,
-    s_last.stop_id                                   AS last_stop_id,
+    COALESCE(ps_last.stop_id,    s_last.stop_id)     AS last_stop_id,
     COALESCE(ps_last.stop_name,  s_last.stop_name)   AS last_stop_name,
 
     agg.stop_count,
