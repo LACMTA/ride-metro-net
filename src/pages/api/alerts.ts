@@ -16,6 +16,11 @@ export type ConciseAlert = Pick<
 
 /**
  * GET /api/alerts
+ *
+ * Always fetches alerts from both `lametro` and `lametro-rail` agencies in
+ * parallel so system-wide alerts (those with `agencyId` set) from either
+ * agency are always included in the response.
+ *
  * @param {string} [stopId] - Comma-separated list of stop IDs to filter by
  * @param {string} [routeId] - Comma-separated list of route IDs to filter by
  * @returns {ConciseAlert[]} Array of alerts
@@ -32,18 +37,21 @@ export async function GET(context: import("astro").APIContext) {
   const stopIds = rawStopIds.flatMap((id) => [id, ...(children[id] ?? [])]);
 
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
-  const agency = context.url.searchParams.get("agency");
 
-  if (!agency)
-    return new Response("agency query parameter is required", { status: 400 });
+  // Always fetch from both agencies in parallel — system-wide alerts can be
+  // published under either agency, and route/stop data merges cleanly across
+  // the two GTFS feeds.
+  const [lametroResult, railResult] = await Promise.all([
+    fetchSwiftlyAlerts("lametro", API_KEY as string),
+    fetchSwiftlyAlerts("lametro-rail", API_KEY as string),
+  ]);
 
-  const result = await fetchSwiftlyAlerts(agency, API_KEY as string);
-
-  if (!result.ok) {
+  // Only treat it as a hard failure when both agencies are unavailable.
+  if (!lametroResult.ok && !railResult.ok) {
     return new Response(
       JSON.stringify({
         error: "External API request failed",
-        status: result.status,
+        status: lametroResult.status,
         timestamp: new Date().toISOString(),
       }),
       {
@@ -52,6 +60,11 @@ export async function GET(context: import("astro").APIContext) {
       },
     );
   }
+
+  const allAlerts = [
+    ...(lametroResult.ok ? lametroResult.alerts : []),
+    ...(railResult.ok ? railResult.alerts : []),
+  ];
 
   const makeConciseAlert = (fullAlert: SwiftlyAlert): ConciseAlert => {
     const rawPeriod = fullAlert.activePeriods[0];
@@ -71,7 +84,7 @@ export async function GET(context: import("astro").APIContext) {
 
   // Route IDs in informedEntities are already normalised to prefix-only form
   // by fetchSwiftlyAlerts, so simple equality checks work here.
-  const filteredAlerts = result.alerts.reduce<ConciseAlert[]>((acc, alert) => {
+  const filteredAlerts = allAlerts.reduce<ConciseAlert[]>((acc, alert) => {
     // Always include alerts that have an agencyId set on any informed entity.
     // These are system-wide alerts.
     const matchesAgency = alert.informedEntities.some(

@@ -20,8 +20,10 @@ const busRoutes = await getAllBusRoutes();
 
 <script>
   import watchAlertStatus from "../../lib/watchAlertStatus";
+  import watchAlerts from "../../lib/watchAlerts";
 
   watchAlertStatus();
+  watchAlerts();
 </script>
 
 <Layout title="Alerts">

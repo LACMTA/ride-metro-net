@@ -4,12 +4,13 @@ import { alerts } from "./alertsStore";
 export interface AlertsQuery {
   stopIds: string[];
   routeIds: string[];
-  agency: string;
+  /** @deprecated The API now always queries both agencies internally. */
+  agency?: string;
 }
 
 async function fetchAlerts(query: AlertsQuery): Promise<ConciseAlert[]> {
   const res = await fetch(
-    `/api/alerts?stopId=${query.stopIds.join(",")}&routeId=${query.routeIds.join(",")}&agency=${query.agency}`,
+    `/api/alerts?stopId=${query.stopIds.join(",")}&routeId=${query.routeIds.join(",")}`,
   );
   if (!res.ok) {
     console.error(await res.text());
@@ -26,7 +27,7 @@ async function getAllAlerts(queries: AlertsQuery[]) {
 }
 
 export default async function watchAlerts(
-  queries: AlertsQuery[],
+  queries: AlertsQuery[] = [{ stopIds: [], routeIds: [] }],
   // 5 minutes
   pollInterval: number = 300000,
 ) {
