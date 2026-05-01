@@ -101,11 +101,14 @@ export async function GET() {
     // Deduplicate so a single alert is only counted once per route prefix,
     // even if the route appears multiple times in informedEntities.
     // Route IDs are already normalised to prefix-only by fetchSwiftlyAlerts.
-    const prefixes = new Set(
-      alert.informedEntities.filter((e) => e.routeId).map((e) => e.routeId!),
-    );
-    for (const prefix of prefixes) {
-      routeAlertCounts[prefix] = (routeAlertCounts[prefix] ?? 0) + 1;
+    // Accessibility alerts are surfaced separately and excluded from the count.
+    if (alert.effect !== "ACCESSIBILITY_ISSUE") {
+      const prefixes = new Set(
+        alert.informedEntities.filter((e) => e.routeId).map((e) => e.routeId!),
+      );
+      for (const prefix of prefixes) {
+        routeAlertCounts[prefix] = (routeAlertCounts[prefix] ?? 0) + 1;
+      }
     }
 
     // Collect stop IDs from accessibility alerts, resolved to station names.

@@ -17,8 +17,10 @@ interface Props {
 export default function LineTabs({ routeId, lineTitle, pdfUrl }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const $alerts = useStore(alerts);
-  const alertCount = $alerts.filter((alert) =>
-    alert.informedEntities.some((e) => e.routeId === routeId),
+  const alertCount = $alerts.filter(
+    (alert) =>
+      alert.effect !== "ACCESSIBILITY_ISSUE" &&
+      alert.informedEntities.some((e) => e.routeId === routeId),
   ).length;
 
   useEffect(() => {

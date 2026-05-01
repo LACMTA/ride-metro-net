@@ -15,13 +15,15 @@ export default function AlertsSection({ routeId, stopId, stopIds }: Props) {
   const $alerts = useStore(alerts);
   const stopIdSet = new Set(stopIds ?? (stopId ? [stopId] : []));
 
-  const filteredAlerts = $alerts.filter((alert) =>
-    alert.informedEntities.some((e) => {
-      if (routeId) return e.routeId === routeId;
-      if (stopIdSet.size > 0)
-        return e.stopId != null && stopIdSet.has(e.stopId);
-      return false;
-    }),
+  const filteredAlerts = $alerts.filter(
+    (alert) =>
+      alert.effect !== "ACCESSIBILITY_ISSUE" &&
+      alert.informedEntities.some((e) => {
+        if (routeId) return e.routeId === routeId;
+        if (stopIdSet.size > 0)
+          return e.stopId != null && stopIdSet.has(e.stopId);
+        return false;
+      }),
   );
 
   const activeAlerts = filteredAlerts.filter((a) => isCurrent(a));
