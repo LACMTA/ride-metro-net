@@ -8,6 +8,9 @@ import { alerts } from "../lib/alertsStore";
 import Button from "./Button";
 import DownloadIcon from "./DownloadIcon";
 import type { RouteOverview } from "../lib/getRouteOverview";
+import MapPinIcon from "./MapPinIcon";
+import ClockIcon from "./ClockIcon";
+import { formatGTFSTime } from "../lib/formatGTFSTime";
 
 interface Props {
   routeId: string;
@@ -63,11 +66,64 @@ export default function LineTabs({
           <TabPanels>
             <TabPanel>
               <div className="pt-5 pb-50">
-                <h2 className="mb-3 text-2xl font-bold">
+                <h2 className="mb-6 text-2xl font-bold">
                   {lineTitle} Overview
                 </h2>
-                <p>{JSON.stringify(routeOverview)}</p>
-                <h2 className="mb-3 text-2xl font-bold">{lineTitle} Details</h2>
+                <div className="flex">
+                  <MapPinIcon
+                    aria-hidden="true"
+                    className="mr-3 inline h-6 w-6"
+                  />
+                  <p>
+                    Busses run from{" "}
+                    <a
+                      href={`/stops/${routeOverview.firstStopId}`}
+                      className="text-blue underline"
+                    >
+                      {routeOverview.firstStopName}
+                    </a>
+                    {" to "}
+                    <a
+                      href={`/stops/${routeOverview.lastStopId}`}
+                      className="text-blue underline"
+                    >
+                      {routeOverview.lastStopName}
+                    </a>{" "}
+                    with {routeOverview.stopCount} stops between.
+                  </p>
+                </div>
+                {routeOverview.weekday.first &&
+                  routeOverview.weekday.last &&
+                  routeOverview.weekend.first &&
+                  routeOverview.weekend.last && (
+                    <div className="mt-6 mb-10 flex">
+                      <ClockIcon
+                        aria-hidden="true"
+                        className="mr-3 inline h-6 w-6"
+                      />
+                      <div>
+                        <p>
+                          <b>Monday through Friday</b>
+                          <br />
+                          Busses run between{" "}
+                          {formatGTFSTime(routeOverview.weekday.first)} and{" "}
+                          {formatGTFSTime(routeOverview.weekday.last)}
+                        </p>
+                        <p className="mt-1">
+                          <b>Saturdays, Sundays, and Holidays</b>
+                          <br />
+                          Busses run between{" "}
+                          {formatGTFSTime(routeOverview.weekday.first)} and{" "}
+                          {formatGTFSTime(routeOverview.weekday.last)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                <h2 className="mb-4 text-2xl font-bold">{lineTitle} Details</h2>
+                <p className="mb-4">
+                  Find stop times, maps, and more in the document below.
+                </p>
                 <Button
                   as="a"
                   href={pdfUrl}
@@ -75,7 +131,10 @@ export default function LineTabs({
                   rel="noopener noreferrer"
                 >
                   View Schedule and Map{" "}
-                  <DownloadIcon className="inline text-white" />
+                  <DownloadIcon
+                    className="inline text-white"
+                    aria-hidden="true"
+                  />
                 </Button>
               </div>
             </TabPanel>
