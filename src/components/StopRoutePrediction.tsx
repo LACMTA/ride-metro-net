@@ -214,7 +214,11 @@ export default function StopRoutePrediction({ routes }: Props) {
           />
         ))}
       </CardBody>
-      <AlertList routeIds={allRouteIds} alertEntityType="Route" />
+      <AlertList
+        routeIds={allRouteIds}
+        alertEntityType="line"
+        excludeAccessibility
+      />
     </Card>
   );
 }
