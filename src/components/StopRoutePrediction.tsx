@@ -139,7 +139,7 @@ function DirectionTable({
           const direction =
             railCardinalDirections[
               route.routeId as keyof typeof railCardinalDirections
-            ][directionId as 0 | 1];
+            ][directionId];
           if (!res.includes(direction)) {
             res.push(direction);
           }
