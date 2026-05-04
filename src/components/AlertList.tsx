@@ -58,12 +58,12 @@ export default function AlertList({
           analyticsEvent({ event: "click", target: "alert_accordion" })
         }
       >
-        <h3 className="flex">
+        <span className="flex">
           <AlertIconColumn />
           {alertsCount}
           {includeUpcoming ? "" : " current"} {pluralAlerts}{" "}
           {alertEntityType ? `for this ${alertEntityType}` : ""}
-        </h3>
+        </span>
         <ChevronIcon className="h-3.5 group-data-open:rotate-180" />
       </DisclosureButton>
       <DisclosurePanel className="bg-light-yellow">
