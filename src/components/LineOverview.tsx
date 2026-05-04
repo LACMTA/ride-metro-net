@@ -23,7 +23,10 @@ export default function LineOverview({
     <div className="pt-5 pb-50">
       <h2 className="mb-6 text-2xl font-bold">{lineTitle} Overview</h2>
       <div className="flex">
-        <MapPinIcon aria-hidden="true" className="mr-3 inline h-6 w-6" />
+        <MapPinIcon
+          aria-hidden="true"
+          className="mr-3 inline h-6 w-6 shrink-0"
+        />
         <p>
           {pluralVehicleName} run between{" "}
           <a
@@ -47,7 +50,10 @@ export default function LineOverview({
         routeOverview.weekend.first &&
         routeOverview.weekend.last && (
           <div className="mt-6 mb-10 flex">
-            <ClockIcon aria-hidden="true" className="mr-3 inline h-6 w-6" />
+            <ClockIcon
+              aria-hidden="true"
+              className="mr-3 inline h-6 w-6 shrink-0"
+            />
             <div>
               <p>
                 <b>Monday through Friday</b>
