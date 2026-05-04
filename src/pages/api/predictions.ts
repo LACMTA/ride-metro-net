@@ -88,5 +88,18 @@ export async function GET(context: import("astro").APIContext) {
   const results = await Promise.all(stopIds.map(fetchForStop));
   const allPredictions = results.flat();
 
-  return new Response(JSON.stringify(allPredictions));
+  // clamping any values less then 0 (Swiftly returns this sometimes)
+  const sanitizedPredictions = allPredictions.map((route) => ({
+    ...route,
+    destinations: route.destinations.map((dest) => ({
+      ...dest,
+      predictions: dest.predictions.map((p) => ({
+        ...p,
+        sec: p.sec < 0 ? 0 : p.sec,
+        min: p.min < 0 ? 0 : p.min,
+      })),
+    })),
+  }));
+
+  return new Response(JSON.stringify(sanitizedPredictions));
 }
