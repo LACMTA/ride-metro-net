@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import ArrowIcon from "./ArrowIcon";
 import { isBuswayRoute } from "../lib/routeShortNameOverrides";
 import { Card, CardHeader, CardBody } from "./Card";
+import railCardinalDirections from "../data/railCardinalDirections";
 
 interface Props {
   routes: StopRoute[];
@@ -97,11 +98,13 @@ function DirectionTable({
 
   const predictionsNotAvailable =
     allPredictions.length === 0 &&
-    ($routePredictions.length > 0 && (anyRouteFound || !routes.some((route) =>
-      $routePredictions.some(
-        (r) => r.routeId.split("-")[0] === route.routeId,
-      ),
-    )));
+    $routePredictions.length > 0 &&
+    (anyRouteFound ||
+      !routes.some((route) =>
+        $routePredictions.some(
+          (r) => r.routeId.split("-")[0] === route.routeId,
+        ),
+      ));
 
   const predictionsTable = allPredictions.map((prediction, index) => (
     <tr key={index}>
@@ -127,15 +130,32 @@ function DirectionTable({
     )),
   );
 
+  const getDirectionIndicator = (routes: StopRoute[]) => {
+    // Bus
+    if (routes[0].routeType === 3) return "Destination";
+    const cardinalDirections = routes.reduce(
+      (res: string[], route: StopRoute) => {
+        if (route.routeId in railCardinalDirections) {
+          const direction =
+            railCardinalDirections[
+              route.routeId as keyof typeof railCardinalDirections
+            ][directionId as 0 | 1];
+          if (!res.includes(direction)) {
+            res.push(direction);
+          }
+        }
+        return res;
+      },
+      [],
+    );
+    return cardinalDirections.join("/");
+  };
+
   return (
     <table className="w-full not-first:mt-4">
       <thead className="text-left text-sm text-gray-600 uppercase">
         <tr>
-          <th>
-            {routes[0].routeType !== 3
-              ? `Direction ${directionId}`
-              : "Destination"}
-          </th>
+          <th>{getDirectionIndicator(routes)}</th>
           <th className="max-w-sm text-right text-nowrap">Arrives in</th>
         </tr>
       </thead>
@@ -150,17 +170,12 @@ export default function StopRoutePrediction({ routes }: Props) {
   const $routePredictions = useStore(routePredictions);
 
   // Group the incoming routes by directionId so each direction gets one table.
-  const byDirection: StopRoute[][] = routes.reduce(
-    (acc, route) => {
-      const existing = acc.find(
-        (g) => g[0].directionId === route.directionId,
-      );
-      if (existing) existing.push(route);
-      else acc.push([route]);
-      return acc;
-    },
-    [] as StopRoute[][],
-  );
+  const byDirection: StopRoute[][] = routes.reduce((acc, route) => {
+    const existing = acc.find((g) => g[0].directionId === route.directionId);
+    if (existing) existing.push(route);
+    else acc.push([route]);
+    return acc;
+  }, [] as StopRoute[][]);
 
   // Collect all unique routeIds for the header badges and alert list.
   const uniqueRoutes = routes.filter(
