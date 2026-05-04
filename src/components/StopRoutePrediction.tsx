@@ -148,7 +148,12 @@ function DirectionTable({
       },
       [],
     );
-    return cardinalDirections.join("/");
+    // If we somehow don't match any directions, default to "Destination"
+    if (cardinalDirections.length > 0) {
+      return cardinalDirections.join("/");
+    } else {
+      return "Destination";
+    }
   };
 
   return (
