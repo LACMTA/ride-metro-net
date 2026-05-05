@@ -56,7 +56,7 @@ export default function BusAlertBadgeList({ routes }: Props) {
           <Disclosure key={group}>
             {({ open }) => (
               <>
-                <CardDiscolsureButton open={open}>
+                <CardDiscolsureButton open={open} className="text-lg">
                   {GROUP_LABELS[group]}
                 </CardDiscolsureButton>
                 <CardDisclosurePanel>

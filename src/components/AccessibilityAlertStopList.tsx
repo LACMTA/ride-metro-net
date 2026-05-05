@@ -23,10 +23,13 @@ export default function AccessibilityAlertStopList() {
         <Disclosure key={stop.stopId}>
           {({ open }) => (
             <>
-              <CardDiscolsureButton open={open}>
-                <span className="flex">
+              <CardDiscolsureButton open={open} className="">
+                <span
+                  className="flex items-center text-left text-lg"
+                  items-center
+                >
                   <AlertIcon
-                    className="text-yellow mr-3 inline h-5 shrink"
+                    className="text-yellow mr-3 inline h-5 shrink-0"
                     markClassName="text-metro-text"
                   />
                   {stop.stopName}

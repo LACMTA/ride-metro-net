@@ -69,7 +69,7 @@ export function CardLinkListItem({
   return (
     <a
       href={href}
-      className={` ${BODY_PADDING} border-divider-line flex items-center justify-between py-6 font-bold not-last:border-b`}
+      className={` ${BODY_PADDING} border-divider-line flex items-center justify-between py-6 font-bold not-last:border-b ${className}`}
     >
       {children}
       <ChevronIcon className="h-2 rotate-270" />
@@ -84,9 +84,9 @@ export function CardDiscolsureButton({
 }: CardDiscolsureButtonProps) {
   return (
     <DisclosureButton
-      className={` ${BODY_PADDING} border-divider-line flex w-full cursor-pointer items-center justify-between py-6 font-bold ${!open && "not-last:border-b"}`}
+      className={` ${BODY_PADDING} border-divider-line flex w-full cursor-pointer items-center justify-between py-6 font-bold ${!open && "not-last:border-b"} ${className}`}
     >
-      <span>{children}</span>
+      <span className="mr-3">{children}</span>
       <ChevronIcon className={`h-2 ${open ? "rotate-180" : ""}`} />
     </DisclosureButton>
   );
