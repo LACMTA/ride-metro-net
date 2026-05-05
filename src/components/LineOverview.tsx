@@ -66,7 +66,12 @@ export default function LineOverview({
       <p className="mb-4">
         Find stop times, maps, and more in the document below.
       </p>
-      <Button as="a" href={pdfUrl} target="_blank" rel="noopener noreferrer">
+      <Button
+        as="a"
+        href={pdfUrl}
+        target="_blank"
+        className="not-sm:inline-block not-sm:w-full not-sm:text-center"
+      >
         View Schedule and Map{" "}
         <DownloadIcon className="inline text-white" aria-hidden="true" />
       </Button>
