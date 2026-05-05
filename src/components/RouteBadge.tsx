@@ -96,7 +96,7 @@ export default function RouteBadge({
       ? `${s.minW} ${s.px} ${busAlertBadge && s.pxAlert} rounded-lg`
       : `${s.w} ${mode === "rail" ? "rounded-full" : ""}`;
   const busColorClass = altBusColors
-    ? "bg-background-gray text-metro-text border-gray-300 border"
+    ? "bg-gray-100 text-metro-text border-gray-300 border"
     : "bg-bus-local text-background-white";
   const colorClass = mode === "bus" ? busColorClass : "";
   const colorStyle =
