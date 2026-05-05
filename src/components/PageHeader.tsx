@@ -3,6 +3,7 @@ import RailIcon from "./RailIcon";
 import BusIcon from "./BusIcon";
 import RouteBadge, { type BadgeSizes } from "./RouteBadge";
 import { getLineSlug } from "../lib/routeShortNameOverrides";
+import ChevronIcon from "./ChevronIcon";
 
 interface Route {
   routeId: string;
@@ -45,8 +46,11 @@ export default function PageHeader({ routes, title, badgeSize = "lg" }: Props) {
     );
 
   return (
-    <div className="bg-metro-text border-t border-gray-800 pt-12 pb-8 text-white">
+    <div className="bg-metro-text border-t border-gray-800 pt-4 pb-8 text-white">
       <Column>
+        <a href="/alerts" className="mb-6 inline-flex items-center">
+          <ChevronIcon className="mr-1.5 inline h-1.5 rotate-90" /> Back
+        </a>
         <div className="flex items-center">
           <ul className="mb-2">
             {uniqueSortedRoutes.map((route) => (
@@ -58,7 +62,6 @@ export default function PageHeader({ routes, title, badgeSize = "lg" }: Props) {
                   color={route.routeColor}
                   textColor={route.routeTextColor}
                   size={badgeSize}
-                  href={`/lines/${getLineSlug(route.routeId)}`}
                 />
               </li>
             ))}
