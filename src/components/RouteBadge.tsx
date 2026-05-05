@@ -39,6 +39,7 @@ const sizes = {
     pxAlert: "pr-1.5",
     text: "text-base",
     alert: "h-4",
+    minW: "min-w-12",
   },
   md: {
     h: "h-8",
@@ -47,6 +48,7 @@ const sizes = {
     pxAlert: "pr-2",
     text: "text-xl",
     alert: "h-5",
+    minW: "min-w-16",
   },
   lg: {
     h: "h-10",
@@ -55,6 +57,7 @@ const sizes = {
     pxAlert: "pr-2.5",
     text: "text-2xl",
     alert: "h-6",
+    minW: "min-w-20",
   },
   xl: {
     h: "h-14",
@@ -63,6 +66,7 @@ const sizes = {
     pxAlert: "pr-3",
     text: "text-4xl",
     alert: "h-8",
+    minW: "min-w-28",
   },
 } as const;
 
@@ -89,10 +93,10 @@ export default function RouteBadge({
 
   const shapeClass =
     mode === "bus"
-      ? `${s.px} ${busAlertBadge && s.pxAlert} rounded-lg`
+      ? `${s.minW} ${s.px} ${busAlertBadge && s.pxAlert} rounded-lg`
       : `${s.w} ${mode === "rail" ? "rounded-full" : ""}`;
   const busColorClass = altBusColors
-    ? "bg-background-gray text-metro-text border-metro-text border"
+    ? "bg-background-gray text-metro-text border-gray-300 border"
     : "bg-bus-local text-background-white";
   const colorClass = mode === "bus" ? busColorClass : "";
   const colorStyle =
