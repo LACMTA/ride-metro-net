@@ -11,6 +11,7 @@ import BusIcon from "../../components/BusIcon";
 import BusAlertBadgeList from "../../components/BusAlertBadgeList";
 import ElevatorIcon from "../../components/ElevatorIcon";
 import AccessibilityAlertStopList from "../../components/AccessibilityAlertStopList";
+import AccessibilityIcon from "../../components/AccessibilityIcon";
 
 export const prerender = true;
 
@@ -43,21 +44,23 @@ const busRoutes = await getAllBusRoutes();
       <Column>
         <Card>
           <CardHeader
-            ><RailIcon className="inline-block h-10" /> Rail & Busway</CardHeader
+            ><RailIcon className="mr-4 inline-block h-10" /> Rail & Busway</CardHeader
           >
           <CardBody margin={false}>
             <LineAlertStatusList routes={routes} client:load />
           </CardBody>
         </Card>
         <Card>
-          <CardHeader><BusIcon className="inline-block h-10" /> Bus</CardHeader>
+          <CardHeader
+            ><BusIcon className="mr-4 inline-block h-10" /> Bus</CardHeader
+          >
           <CardBody margin={false}>
             <BusAlertBadgeList routes={busRoutes} client:load />
           </CardBody>
         </Card>
         <Card>
           <CardHeader
-            ><ElevatorIcon className="inline-block h-10" /> Accessibility</CardHeader
+            ><AccessibilityIcon className="mr-4 inline-block h-10" /> Accessibility</CardHeader
           >
           <CardBody margin={false}>
             <AccessibilityAlertStopList client:load />
