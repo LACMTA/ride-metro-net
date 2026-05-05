@@ -28,21 +28,10 @@ export default function LineOverview({
           className="mr-3 inline h-6 w-6 shrink-0"
         />
         <p>
-          {pluralVehicleName} run between{" "}
-          <a
-            href={`/stops/${routeOverview.firstStopId}`}
-            className="text-blue underline"
-          >
-            {routeOverview.firstStopName}
-          </a>
+          {pluralVehicleName} run between <b>{routeOverview.firstStopName}</b>
           {" and "}
-          <a
-            href={`/stops/${routeOverview.lastStopId}`}
-            className="text-blue underline"
-          >
-            {routeOverview.lastStopName}
-          </a>{" "}
-          with {routeOverview.stopCount} stops between.
+          <b>{routeOverview.lastStopName}</b> with {routeOverview.stopCount}{" "}
+          stops between.
         </p>
       </div>
       {routeOverview.weekday.first &&
