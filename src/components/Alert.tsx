@@ -24,9 +24,9 @@ export default function Alert({
     >
       {showAlertIcon && <AlertIconColumn />}
       <div>
-        <h4 className="font-bold capitalize">
+        <p className="font-bold capitalize">
           {String(alert.effect).toLowerCase().replace("_", " ")}
-        </h4>
+        </p>
         <p>{alert.descriptionText}</p>
         <p className="mt-2 flex items-center text-gray-700">
           <CalendarIcon className="mr-1.5 inline h-4" />
