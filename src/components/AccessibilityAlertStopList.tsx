@@ -1,11 +1,14 @@
+import { Disclosure } from "@headlessui/react";
 import { useStore } from "@nanostores/react";
 import { accessibilityAlertStops } from "../lib/alertStatusStore";
-import { CardLinkListItem } from "./Card";
+import { CardDiscolsureButton, CardDisclosurePanel } from "./Card";
 import AlertIcon from "./AlertIcon";
+import Alert from "./Alert";
 
 /**
  * Renders a list of rail/busway stops that currently have an active
- * accessibility alert, each linking to the corresponding stop page.
+ * accessibility alert. Each stop is an expandable disclosure that reveals
+ * the full list of Alert components for that stop.
  */
 export default function AccessibilityAlertStopList() {
   const stops = useStore(accessibilityAlertStops);
@@ -17,18 +20,31 @@ export default function AccessibilityAlertStopList() {
   return (
     <>
       {stops.map((stop) => (
-        <CardLinkListItem
-          key={stop.stopId}
-          href={`/stops/${stop.stopId}#alerts`}
-        >
-          <span className="flex">
-            <AlertIcon
-              className="text-yellow mr-3 inline h-5 shrink"
-              markClassName="text-metro-text"
-            />
-            {stop.stopName}
-          </span>
-        </CardLinkListItem>
+        <Disclosure key={stop.stopId}>
+          {({ open }) => (
+            <>
+              <CardDiscolsureButton open={open}>
+                <span className="flex">
+                  <AlertIcon
+                    className="text-yellow mr-3 inline h-5 shrink"
+                    markClassName="text-metro-text"
+                  />
+                  {stop.stopName}
+                </span>
+              </CardDiscolsureButton>
+              <CardDisclosurePanel className="bg-gray-100">
+                {stop.alerts.map((alert, index) => (
+                  <Alert
+                    key={index}
+                    alert={alert}
+                    fullWidth={true}
+                    showAlertIcon={false}
+                  />
+                ))}
+              </CardDisclosurePanel>
+            </>
+          )}
+        </Disclosure>
       ))}
     </>
   );

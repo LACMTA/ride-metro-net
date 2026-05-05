@@ -4,6 +4,7 @@ import {
   type SwiftlyAlert,
 } from "../../lib/fetchSwiftlyAlerts";
 import stopLookup from "../../generated/railBuswayStopLookup.json";
+import type { ConciseAlert } from "./alerts";
 
 export const prerender = false;
 
@@ -16,6 +17,8 @@ export interface AccessibilityAlertStop {
   stopId: string;
   /** Human-readable station / stop name. */
   stopName: string;
+  /** All currently active accessibility alerts affecting this stop. */
+  alerts: ConciseAlert[];
 }
 
 /** Full shape returned by GET /api/alert-status. */
@@ -28,6 +31,21 @@ export interface AlertStatusResponse {
    * ID and human-readable name via the build-time GTFS lookup.
    */
   accessibilityAlertStops: AccessibilityAlertStop[];
+}
+
+function makeConciseAlert(alert: SwiftlyAlert): ConciseAlert {
+  const raw = alert.activePeriods[0];
+  return {
+    activePeriod: {
+      start: Math.floor(new Date(raw.start).getTime() / 1000),
+      end: Math.floor(new Date(raw.end).getTime() / 1000),
+    },
+    headerText: alert.headerText,
+    descriptionText: alert.descriptionText,
+    effect: alert.effect,
+    cause: alert.cause,
+    informedEntities: alert.informedEntities,
+  };
 }
 
 /**
@@ -93,6 +111,7 @@ export async function GET() {
 
   // Deduplicate accessibility stops by their resolved stationId so the same
   // station doesn't appear twice when Swiftly tags both a parent and child.
+  // Each entry collects all active alerts for that station.
   const accessibilityStopMap = new Map<string, AccessibilityAlertStop>();
 
   for (const alert of allAlerts) {
@@ -111,16 +130,24 @@ export async function GET() {
       }
     }
 
-    // Collect stop IDs from accessibility alerts, resolved to station names.
+    // Collect stop IDs from accessibility alerts, resolved to station names,
+    // and attach the full ConciseAlert to each affected station.
     if (alert.effect === "ACCESSIBILITY_ISSUE") {
+      const conciseAlert = makeConciseAlert(alert);
       for (const entity of alert.informedEntities) {
         if (entity.stopId) {
           const entry = stops[entity.stopId];
-          if (entry && !accessibilityStopMap.has(entry.stationId)) {
-            accessibilityStopMap.set(entry.stationId, {
-              stopId: entry.stationId,
-              stopName: entry.stopName,
-            });
+          if (entry) {
+            const existing = accessibilityStopMap.get(entry.stationId);
+            if (existing) {
+              existing.alerts.push(conciseAlert);
+            } else {
+              accessibilityStopMap.set(entry.stationId, {
+                stopId: entry.stationId,
+                stopName: entry.stopName,
+                alerts: [conciseAlert],
+              });
+            }
           }
         }
       }

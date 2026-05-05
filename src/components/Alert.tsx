@@ -28,7 +28,7 @@ export default function Alert({
           {String(alert.effect).toLowerCase().replace("_", " ")}
         </h4>
         <p>{alert.descriptionText}</p>
-        <p className="mt-2 flex items-center text-gray-600">
+        <p className="mt-2 flex items-center text-gray-700">
           <CalendarIcon className="mr-1.5 inline h-4" />
           {/* The alert is active */}
           {Date.now() / 1000 >= alert.activePeriod.start ? (
