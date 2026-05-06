@@ -140,7 +140,9 @@ export async function GET() {
           if (entry) {
             const existing = accessibilityStopMap.get(entry.stationId);
             if (existing) {
-              existing.alerts.push(conciseAlert);
+              if (!existing.alerts.includes(conciseAlert)) {
+                existing.alerts.push(conciseAlert);
+              }
             } else {
               accessibilityStopMap.set(entry.stationId, {
                 stopId: entry.stationId,
