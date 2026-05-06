@@ -24,10 +24,7 @@ export default function AccessibilityAlertStopList() {
           {({ open }) => (
             <>
               <CardDiscolsureButton open={open} className="">
-                <span
-                  className="flex items-center text-left text-lg"
-                  items-center
-                >
+                <span className="flex items-center text-left text-lg">
                   <AlertIcon
                     className="text-yellow mr-3 inline h-5 shrink-0"
                     markClassName="text-metro-text"
