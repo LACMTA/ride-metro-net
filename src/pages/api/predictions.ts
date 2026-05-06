@@ -101,5 +101,10 @@ export async function GET(context: import("astro").APIContext) {
     })),
   }));
 
-  return new Response(JSON.stringify(sanitizedPredictions));
+  return new Response(JSON.stringify(sanitizedPredictions), {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=60",
+    },
+  });
 }
