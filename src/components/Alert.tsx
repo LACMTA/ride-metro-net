@@ -35,7 +35,7 @@ export default function Alert({
           {isCurrent(alert) ? (
             // end is null → ongoing with no scheduled end
             alert.activePeriod.end === null ? (
-              <>No scheduled end</>
+              <>Ongoing</>
             ) : (
               <>Ends {formatTimestamp(alert.activePeriod.end)}.</>
             )
