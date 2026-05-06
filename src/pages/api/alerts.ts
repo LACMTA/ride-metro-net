@@ -1,8 +1,7 @@
-import {
-  fetchSwiftlyAlerts,
-  type SwiftlyAlert,
-} from "../../lib/fetchSwiftlyAlerts";
+import { fetchSwiftlyAlerts } from "../../lib/fetchSwiftlyAlerts";
+import { makeConciseAlert } from "../../lib/makeConciseAlert";
 import stopLookup from "../../generated/railBuswayStopLookup.json";
+import type { SwiftlyAlert } from "../../lib/fetchSwiftlyAlerts";
 
 export const prerender = false;
 
@@ -11,7 +10,7 @@ export type ConciseAlert = Pick<
   SwiftlyAlert,
   "headerText" | "descriptionText" | "effect" | "cause" | "informedEntities"
 > & {
-  activePeriod: { start: number; end: number };
+  activePeriod: { start: number; end: number | null };
 };
 
 /**
@@ -65,22 +64,6 @@ export async function GET(context: import("astro").APIContext) {
     ...(lametroResult.ok ? lametroResult.alerts : []),
     ...(railResult.ok ? railResult.alerts : []),
   ];
-
-  const makeConciseAlert = (fullAlert: SwiftlyAlert): ConciseAlert => {
-    const rawPeriod = fullAlert.activePeriods[0];
-    return {
-      // Convert Swiftly's JS datetime strings to POSIX timestamps (seconds) as the GTFS spec requires.
-      activePeriod: {
-        start: Math.floor(new Date(rawPeriod.start).getTime() / 1000),
-        end: Math.floor(new Date(rawPeriod.end).getTime() / 1000),
-      },
-      headerText: fullAlert.headerText,
-      descriptionText: fullAlert.descriptionText,
-      effect: fullAlert.effect,
-      cause: fullAlert.cause,
-      informedEntities: fullAlert.informedEntities,
-    };
-  };
 
   // Route IDs in informedEntities are already normalised to prefix-only form
   // by fetchSwiftlyAlerts, so simple equality checks work here.

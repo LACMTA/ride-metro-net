@@ -1,8 +1,6 @@
 import { isCurrent } from "../../lib/isCurrent";
-import {
-  fetchSwiftlyAlerts,
-  type SwiftlyAlert,
-} from "../../lib/fetchSwiftlyAlerts";
+import { fetchSwiftlyAlerts } from "../../lib/fetchSwiftlyAlerts";
+import { makeConciseAlert } from "../../lib/makeConciseAlert";
 import stopLookup from "../../generated/railBuswayStopLookup.json";
 import type { ConciseAlert } from "./alerts";
 
@@ -31,39 +29,6 @@ export interface AlertStatusResponse {
    * ID and human-readable name via the build-time GTFS lookup.
    */
   accessibilityAlertStops: AccessibilityAlertStop[];
-}
-
-function makeConciseAlert(alert: SwiftlyAlert): ConciseAlert {
-  const raw = alert.activePeriods[0];
-  return {
-    activePeriod: {
-      start: Math.floor(new Date(raw.start).getTime() / 1000),
-      end: Math.floor(new Date(raw.end).getTime() / 1000),
-    },
-    headerText: alert.headerText,
-    descriptionText: alert.descriptionText,
-    effect: alert.effect,
-    cause: alert.cause,
-    informedEntities: alert.informedEntities,
-  };
-}
-
-/**
- * Convert a normalised SwiftlyAlert into the `{ activePeriod }` shape that the
- * shared `isCurrent` helper expects (POSIX seconds).
- */
-function toActivePeriod(alert: SwiftlyAlert) {
-  const raw = alert.activePeriods?.[0];
-  if (!raw)
-    return {
-      activePeriod: undefined as unknown as { start: number; end: number },
-    };
-  return {
-    activePeriod: {
-      start: Math.floor(new Date(raw.start).getTime() / 1000),
-      end: Math.floor(new Date(raw.end).getTime() / 1000),
-    },
-  };
 }
 
 const stops = stopLookup.stops as Record<
@@ -115,7 +80,8 @@ export async function GET() {
   const accessibilityStopMap = new Map<string, AccessibilityAlertStop>();
 
   for (const alert of allAlerts) {
-    if (!isCurrent(toActivePeriod(alert))) continue;
+    const conciseAlert = makeConciseAlert(alert);
+    if (!isCurrent(conciseAlert)) continue;
 
     // Deduplicate so a single alert is only counted once per route prefix,
     // even if the route appears multiple times in informedEntities.
@@ -133,7 +99,6 @@ export async function GET() {
     // Collect stop IDs from accessibility alerts, resolved to station names,
     // and attach the full ConciseAlert to each affected station.
     if (alert.effect === "ACCESSIBILITY_ISSUE") {
-      const conciseAlert = makeConciseAlert(alert);
       for (const entity of alert.informedEntities) {
         if (entity.stopId) {
           const entry = stops[entity.stopId];

@@ -24,7 +24,7 @@ export function isCurrent(
   const { start, end } = activePeriod;
 
   if (start !== undefined && nowSeconds < start) return false;
-  if (end !== undefined && nowSeconds > end) return false;
+  if (end != null && nowSeconds > end) return false;
 
   return true;
 }

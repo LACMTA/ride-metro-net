@@ -5,6 +5,7 @@ import {
   formatTimeOnly,
   getDateInPT,
 } from "../lib/formatTimestamp";
+import { isCurrent } from "../lib/isCurrent";
 import CalendarIcon from "./CalendarIcon";
 
 interface Props {
@@ -31,21 +32,27 @@ export default function Alert({
         <p className="mt-2 flex items-center text-gray-700">
           <CalendarIcon className="mr-1.5 inline h-4" />
           {/* The alert is active */}
-          {Date.now() / 1000 >= alert.activePeriod.start ? (
-            <>Ends {formatTimestamp(alert.activePeriod.end)}.</>
+          {isCurrent(alert) ? (
+            // end is null → ongoing with no scheduled end
+            alert.activePeriod.end === null ? (
+              <>No scheduled end</>
+            ) : (
+              <>Ends {formatTimestamp(alert.activePeriod.end)}.</>
+            )
           ) : getDateInPT(alert.activePeriod.start) ===
-            getDateInPT(alert.activePeriod.end) ? (
+            getDateInPT(alert.activePeriod.end!) ? (
             // Alert starts and ends on the same day
+            // (end cannot be null here: isCurrent would have returned true)
             <>
               {getDateInPT(alert.activePeriod.start)} from{" "}
               {formatTimeOnly(alert.activePeriod.start)} to{" "}
-              {formatTimeOnly(alert.activePeriod.end)}.
+              {formatTimeOnly(alert.activePeriod.end!)}.
             </>
           ) : (
             // Alert starts and ends on different days
             <>
               {formatTimestamp(alert.activePeriod.start)} to{" "}
-              {formatTimestamp(alert.activePeriod.end)}.
+              {formatTimestamp(alert.activePeriod.end!)}.
             </>
           )}
         </p>

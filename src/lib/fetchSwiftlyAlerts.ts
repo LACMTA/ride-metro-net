@@ -30,7 +30,7 @@ export interface SwiftlyAlertEntity {
 /**  Shape of a single alert coming back from the Swiftly JSON endpoint. */
 export interface SwiftlyAlert {
   informedEntities: SwiftlyAlertEntity[];
-  activePeriods: { start: string; end: string }[];
+  activePeriods: { start: string; end: string | null }[];
   headerText: string;
   descriptionText: string;
   effect: string;
