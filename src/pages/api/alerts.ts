@@ -98,5 +98,10 @@ export async function GET(context: import("astro").APIContext) {
     return acc;
   }, []);
 
-  return new Response(JSON.stringify(filteredAlerts));
+  return new Response(JSON.stringify(filteredAlerts), {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=900",
+    },
+  });
 }

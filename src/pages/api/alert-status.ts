@@ -127,6 +127,9 @@ export async function GET() {
   };
 
   return new Response(JSON.stringify(body), {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=900",
+    },
   });
 }

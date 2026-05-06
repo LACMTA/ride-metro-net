@@ -14,8 +14,8 @@ async function fetchAlertStatus(): Promise<void> {
 }
 
 export default function watchAlertStatus(
-  /** Polling interval in ms (default 5 minutes). */
-  pollInterval: number = 300_000,
+  /** Polling interval in ms (default 15 minutes). */
+  pollInterval: number = 900_000,
 ) {
   fetchAlertStatus();
   return setInterval(fetchAlertStatus, pollInterval);

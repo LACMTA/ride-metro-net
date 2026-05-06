@@ -28,8 +28,8 @@ async function getAllAlerts(queries: AlertsQuery[]) {
 
 export default async function watchAlerts(
   queries: AlertsQuery[] = [{ stopIds: [], routeIds: [] }],
-  // 5 minutes
-  pollInterval: number = 300000,
+  // 15 minutes
+  pollInterval: number = 900000,
 ) {
   getAllAlerts(queries);
   return setInterval(getAllAlerts, pollInterval, queries);
