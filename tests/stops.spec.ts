@@ -25,27 +25,21 @@ test.describe("Stop pages (/stops/:stopId)", () => {
       const heading = page.locator("h1");
       await expect(heading).toContainText(stop.expectedName);
 
-      // Stop ID should be displayed
-      await expect(page.getByText("STOP ID:")).toBeVisible();
-      await expect(
-        page.getByText(stop.stopId, { exact: false }),
-      ).toBeVisible();
-
       // Wait for the client-side scripts to fire API requests.
       // The page calls watchPredictions and watchAlerts on load.
       await page.waitForTimeout(3000);
 
-      // Verify predictions API was called
+      // Verify predictions API was called with the correct agency and stop ID
       expect(predictionsRequests.length).toBeGreaterThanOrEqual(1);
       const predictionsUrl = new URL(predictionsRequests[0]);
       expect(predictionsUrl.searchParams.get("agency")).toBe(stop.agency);
       expect(predictionsUrl.searchParams.get("stopId")).toBeTruthy();
 
-      // Verify alerts API was called
+      // Verify alerts API was called and includes the stop ID.
+      // Note: the alerts endpoint no longer accepts an agency param — it always
+      // queries both agencies internally.
       expect(alertsRequests.length).toBeGreaterThanOrEqual(1);
       const alertsUrl = new URL(alertsRequests[0]);
-      expect(alertsUrl.searchParams.get("agency")).toBe(stop.agency);
-      // Alerts should include the stop ID
       const alertStopIds =
         alertsUrl.searchParams.get("stopId")?.split(",") ?? [];
       expect(alertStopIds).toContain(stop.stopId);

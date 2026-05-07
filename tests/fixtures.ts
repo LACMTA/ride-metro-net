@@ -17,17 +17,53 @@ export interface RouteFixture {
   numericId: string;
   /** 0 = light-rail, 1 = subway, 3 = bus */
   routeType: number;
+  /**
+   * Full title string shown in the <h1> on the route page.
+   * Rail and busway routes: "Metro X Line"
+   * Regular bus routes:     "Line X Bus"
+   */
+  expectedTitle: string;
 }
 
 export const routes: RouteFixture[] = [
   // Rail lines — use letter slugs via ROUTE_SHORT_NAME_OVERRIDES
-  { slug: "a", expectedShortName: "A", numericId: "801", routeType: 0 },
-  { slug: "b", expectedShortName: "B", numericId: "802", routeType: 1 },
-  // Rapid bus — uses letter slug
-  { slug: "g", expectedShortName: "G", numericId: "901", routeType: 3 },
-  // Regular bus — numeric slug
-  { slug: "720", expectedShortName: "720", numericId: "720", routeType: 3 },
-  { slug: "10", expectedShortName: "10/48", numericId: "10", routeType: 3 },
+  {
+    slug: "a",
+    expectedShortName: "A",
+    numericId: "801",
+    routeType: 0,
+    expectedTitle: "Metro A Line",
+  },
+  {
+    slug: "b",
+    expectedShortName: "B",
+    numericId: "802",
+    routeType: 1,
+    expectedTitle: "Metro B Line",
+  },
+  // Rapid busway — uses letter slug; rendered as rail-style "Metro X Line"
+  {
+    slug: "g",
+    expectedShortName: "G",
+    numericId: "901",
+    routeType: 3,
+    expectedTitle: "Metro G Line",
+  },
+  // Regular bus — numeric slug; rendered as "Line X Bus"
+  {
+    slug: "720",
+    expectedShortName: "720",
+    numericId: "720",
+    routeType: 3,
+    expectedTitle: "Line 720 Bus",
+  },
+  {
+    slug: "10",
+    expectedShortName: "10/48",
+    numericId: "10",
+    routeType: 3,
+    expectedTitle: "Line 10/48 Bus",
+  },
 ];
 
 // ─── Stop fixtures ──────────────────────────────────────────────────────────
@@ -37,7 +73,11 @@ export interface StopFixture {
   expectedName: string;
   /** Whether this stop is a parent station (has child stops in GTFS) */
   isParentStation: boolean;
-  /** Swiftly agency key expected for prediction/alert requests */
+  /**
+   * Swiftly agency key expected for prediction requests.
+   * Note: the alerts API always queries both agencies internally and no longer
+   * accepts an agency parameter — this field is predictions-only.
+   */
   agency: string;
 }
 

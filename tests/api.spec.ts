@@ -75,7 +75,6 @@ test.describe("API endpoints", () => {
         params: {
           stopId: "11010",
           routeId: "222",
-          agency: "lametro",
         },
       });
 
@@ -93,12 +92,11 @@ test.describe("API endpoints", () => {
       }
     });
 
-    test("returns alerts for rail agency", async ({ request }) => {
+    test("returns alerts for a rail stop", async ({ request }) => {
       const res = await request.get("/api/alerts", {
         params: {
           stopId: "80214S",
           routeId: "801",
-          agency: "lametro-rail",
         },
       });
 
@@ -107,27 +105,33 @@ test.describe("API endpoints", () => {
       expect(Array.isArray(body)).toBe(true);
     });
 
-    test("returns empty array when no filters match", async ({ request }) => {
+    test("returns an array when given a nonexistent stop ID", async ({
+      request,
+    }) => {
+      // The endpoint always queries both agencies, so system-wide alerts
+      // (those with agencyId set on an informedEntity) may appear even when
+      // no stop-specific alerts match. We only assert the response is an array.
       const res = await request.get("/api/alerts", {
         params: {
           stopId: "NONEXISTENT",
-          agency: "lametro",
         },
       });
 
       expect(res.status()).toBe(200);
       const body = await res.json();
       expect(Array.isArray(body)).toBe(true);
-      // Unlikely any alerts match a nonexistent stop
-      expect(body.length).toBe(0);
     });
 
-    test("returns 400 when agency is missing", async ({ request }) => {
+    test("does not require an agency parameter", async ({ request }) => {
+      // The alerts API always fetches from both lametro and lametro-rail
+      // internally — an agency query param is not needed and not validated.
       const res = await request.get("/api/alerts", {
         params: { stopId: "11010" },
       });
 
-      expect(res.status()).toBe(400);
+      expect(res.status()).toBe(200);
+      const body = await res.json();
+      expect(Array.isArray(body)).toBe(true);
     });
   });
 });
