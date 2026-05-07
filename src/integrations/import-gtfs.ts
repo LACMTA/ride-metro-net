@@ -151,6 +151,9 @@ export default function importGTFS() {
           console.log(
             `Importing GTFS to ${isDev ? "file-based" : "in-memory"} SQLite database...`,
           );
+          if (isDev) {
+            mkdirSync(dirname(resolve(DB_PATH)), { recursive: true });
+          }
           await importGtfs(GTFSconfig);
         }
         generateStopLookup(GTFSconfig);
