@@ -39,9 +39,7 @@ export default function LineAlertStatus({ route }: Props) {
               className="text-yellow h-5 shrink-0"
               markClassName="text-metro-text"
             />
-            <span className="font-bold">
-              {alertCount} {alertCount === 1 ? "Alert" : "Alerts"}
-            </span>
+            <span className="font-bold">Active Alerts</span>
           </>
         ) : (
           <span className="font-bold">Normal Service</span>
