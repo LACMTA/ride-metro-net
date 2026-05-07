@@ -4,20 +4,40 @@ import Layout from "../../layouts/Layout.astro";
 import { GTFSconfig } from "../../integrations/import-gtfs";
 import DataInjector from "../../components/DataInjector.astro";
 import getStopWithRoutes from "../../lib/getStopWithRoutes";
-import StopRoutePrediction from "../../components/StopRoutePrediction";
-import AlertList from "../../components/AlertList";
-import BusIcon from "../../components/BusIcon";
-import Column from "../../components/Column";
-import BusPill from "../../components/BusPill";
-import ContactBlock from "../../components/ContactBlock";
+import StopTabs from "../../components/StopTabs";
+import PageHeader from "../../components/PageHeader";
 
 export const prerender = true;
 
 export async function getStaticPaths() {
   const db = openDb(GTFSconfig);
-  // TODO: this will currently build all pages. Consider building only pages for pilot.
+  // Build pages for:
+  //   1. Stops that have scheduled arrivals (stop_times) and are NOT a child stop (no parent_station).
+  //   2. Stops that ARE a parent_station for at least one child stop that has scheduled arrivals.
+  // Do NOT build pages for child stops (those that have a parent_station value),
+  // or for parent stations whose children have no stop_times yet (not yet in service).
   const allStops = (await db
-    .prepare("SELECT DISTINCT stop_id FROM stops")
+    .prepare(
+      `
+      SELECT DISTINCT st.stop_id
+      FROM stop_times st
+      JOIN stops s ON s.stop_id = st.stop_id
+      JOIN trips t ON t.trip_id = st.trip_id
+      JOIN routes r ON r.route_id = t.route_id
+      WHERE (s.parent_station IS NULL OR s.parent_station = '')
+        AND r.route_long_name IS NOT NULL AND r.route_long_name != ''
+
+      UNION
+
+      SELECT DISTINCT s.parent_station AS stop_id
+      FROM stops s
+      INNER JOIN stop_times st ON st.stop_id = s.stop_id
+      JOIN trips t ON t.trip_id = st.trip_id
+      JOIN routes r ON r.route_id = t.route_id
+      WHERE s.parent_station IS NOT NULL AND s.parent_station != ''
+        AND r.route_long_name IS NOT NULL AND r.route_long_name != ''
+      `,
+    )
     .all()) as { stop_id: string }[];
 
   return allStops.map((stop) => ({
@@ -28,9 +48,11 @@ export async function getStaticPaths() {
 const { stopId } = Astro.params;
 
 const stop = await getStopWithRoutes(stopId);
+const allStopIds = [stop.stopId, ...stop.childStopIds];
 ---
 
 <DataInjector data={stop} id="data-stop" />
+<DataInjector data={allStopIds} id="all-stop-ids" />
 <script>
   import { getData } from "../../lib/getData";
   import type { StopWithRoutes } from "../../lib/getStopWithRoutes";
@@ -38,46 +60,30 @@ const stop = await getStopWithRoutes(stopId);
   import watchPredictions from "../../lib/watchPredictions";
 
   const stop = getData("data-stop") as StopWithRoutes;
+  const allStopIds = getData("all-stop-ids") as string[];
 
   console.log("Pre-build GTFS data:", stop);
-  watchAlerts(
-    [stop.stopId],
-    stop.routes.map((route) => route.routeId),
-  );
-  watchPredictions(stop.stopId);
+
+  watchAlerts([
+    {
+      stopIds: allStopIds,
+      routeIds: stop.routes.map((route) => route.routeId),
+      agency: stop.swiftlyAgencyId,
+    },
+  ]);
+  watchPredictions(allStopIds, stop.swiftlyAgencyId);
 </script>
 
 <Layout title={stop.stopName}>
-  <Column>
-    <div class="mt-6 mb-4 flex items-center">
-      <BusIcon className="text-metro-text mr-4 h-8 shrink-0" />
-      <ul>
-        {
-          stop.routes.map((route) => (
-            <li class="my-1 mr-1.5 inline-block">
-              <BusPill name={route.routeShortName} />
-            </li>
-          ))
-        }
-      </ul>
-    </div>
-  </Column>
   <main>
+    <PageHeader routes={stop.routes} title={stop.stopName} />
     <section>
-      <Column>
-        <h1 class="text-4xl font-bold">{stop.stopName}</h1>
-        <small class="mt-0.5 mb-4 block">STOP ID: <b>{stop.stopId}</b></small>
-        <AlertList stopIds={[stop.stopId]} alertEntityType="Stop" client:load />
-      </Column>
-      <div class="mt-6 bg-gray-200 py-6">
-        <Column>
-          {
-            stop.routes.map((route) => (
-              <StopRoutePrediction route={route} client:load />
-            ))
-          }
-        </Column>
-      </div>
+      <StopTabs
+        routes={stop.routes}
+        stopId={stop.stopId}
+        allStopIds={allStopIds}
+        client:load
+      />
     </section>
   </main>
 </Layout>

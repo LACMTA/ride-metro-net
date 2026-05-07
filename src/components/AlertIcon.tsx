@@ -1,8 +1,12 @@
 interface Props {
   className?: string;
+  markClassName?: string;
 }
 
-export default function ArrowIcon({ className = "text-metro-text" }: Props) {
+export default function AlertIcon({
+  className = "text-metro-text",
+  markClassName,
+}: Props) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -11,9 +15,11 @@ export default function ArrowIcon({ className = "text-metro-text" }: Props) {
       className={className}
       preserveAspectRatio="xMinYMin"
     >
+      <path fill="currentColor" d="M0 22h24L12 1 0 22Z" />
       <path
         fill="currentColor"
-        d="M0 22h24L12 1 0 22Zm13.0909-3.3158h-2.1818v-2.2105h2.1818v2.2105Zm0-4.421h-2.1818V9.8421h2.1818v4.4211Z"
+        className={markClassName || "text-white"}
+        d="M13.0909 18.6842h-2.1818v-2.2105h2.1818v2.2105Zm0-4.421h-2.1818V9.8421h2.1818v4.4211Z"
       />
     </svg>
   );

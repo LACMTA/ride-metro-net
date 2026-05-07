@@ -1,0 +1,72 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Column from "../../components/Column";
+import AlertIcon from "../../components/AlertIcon";
+import RailIcon from "../../components/RailIcon";
+import { Card, CardBody, CardHeader } from "../../components/Card";
+import getAllRailBuswayRoutes from "../../lib/getAllRailBuswayRoutes";
+import getAllBusRoutes from "../../lib/getAllBusRoutes";
+import LineAlertStatusList from "../../components/LineAlertStatusList";
+import BusIcon from "../../components/BusIcon";
+import BusAlertBadgeList from "../../components/BusAlertBadgeList";
+import ElevatorIcon from "../../components/ElevatorIcon";
+import AccessibilityAlertStopList from "../../components/AccessibilityAlertStopList";
+import AccessibilityIcon from "../../components/AccessibilityIcon";
+
+export const prerender = true;
+
+const routes = await getAllRailBuswayRoutes();
+const busRoutes = await getAllBusRoutes();
+---
+
+<script>
+  import watchAlertStatus from "../../lib/watchAlertStatus";
+  import watchAlerts from "../../lib/watchAlerts";
+
+  watchAlertStatus();
+  watchAlerts();
+</script>
+
+<Layout title="Alerts">
+  <main>
+    <Column>
+      <div class="mt-6 mb-4">
+        <div class="flex items-center gap-3">
+          <AlertIcon
+            className="text-yellow h-8 shrink-0"
+            markClassName="text-metro-text"
+          />
+          <h1 class="text-4xl font-bold">Alerts</h1>
+        </div>
+      </div>
+    </Column>
+    <div class="bg-background-gray mt-6 py-6">
+      <Column>
+        <Card>
+          <CardHeader
+            ><RailIcon className="mr-4 inline-block h-10" /> Rail & Busway</CardHeader
+          >
+          <CardBody margin={false}>
+            <LineAlertStatusList routes={routes} client:load />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader
+            ><BusIcon className="mr-4 inline-block h-10" /> Bus</CardHeader
+          >
+          <CardBody margin={false}>
+            <BusAlertBadgeList routes={busRoutes} client:load />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader
+            ><AccessibilityIcon className="mr-4 inline-block h-10" /> Accessibility</CardHeader
+          >
+          <CardBody margin={false}>
+            <AccessibilityAlertStopList client:load />
+          </CardBody>
+        </Card>
+      </Column>
+    </div>
+  </main>
+</Layout>

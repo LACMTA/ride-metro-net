@@ -1,19 +1,61 @@
 import type { ConciseAlert } from "../pages/api/alerts";
 import AlertIconColumn from "./AlertIconColumn";
+import {
+  formatTimestamp,
+  formatTimeOnly,
+  getDateInPT,
+} from "../lib/formatTimestamp";
+import { isCurrent } from "../lib/isCurrent";
+import CalendarIcon from "./CalendarIcon";
 
 interface Props {
   alert: ConciseAlert;
+  fullWidth?: boolean;
+  showAlertIcon?: boolean;
 }
 
-export default function Alert({ alert }: Props) {
+export default function Alert({
+  alert,
+  fullWidth = false,
+  showAlertIcon = true,
+}: Props) {
   return (
-    <div className="flex px-4 py-5 not-last:border-b not-last:border-b-gray-800">
-      <AlertIconColumn />
+    <div
+      className={`flex ${fullWidth ? "" : "px-4"} not-last:border-b-divider-line py-5 not-last:border-b`}
+    >
+      {showAlertIcon && <AlertIconColumn />}
       <div>
-        <h4 className="font-bold capitalize">
-          {String(alert.cause).toLowerCase().replace("_", " ")}
-        </h4>
+        <p className="font-bold capitalize">
+          {String(alert.effect).toLowerCase().replace("_", " ")}
+        </p>
         <p>{alert.descriptionText}</p>
+        <p className="mt-2 flex items-center text-gray-700">
+          <CalendarIcon className="mr-1.5 inline h-4" />
+          {/* The alert is active */}
+          {isCurrent(alert) ? (
+            // end is null → ongoing with no scheduled end
+            alert.activePeriod.end === null ? (
+              <>Ongoing</>
+            ) : (
+              <>Ends {formatTimestamp(alert.activePeriod.end)}.</>
+            )
+          ) : getDateInPT(alert.activePeriod.start) ===
+            getDateInPT(alert.activePeriod.end!) ? (
+            // Alert starts and ends on the same day
+            // (end cannot be null here: isCurrent would have returned true)
+            <>
+              {getDateInPT(alert.activePeriod.start)} from{" "}
+              {formatTimeOnly(alert.activePeriod.start)} to{" "}
+              {formatTimeOnly(alert.activePeriod.end!)}.
+            </>
+          ) : (
+            // Alert starts and ends on different days
+            <>
+              {formatTimestamp(alert.activePeriod.start)} to{" "}
+              {formatTimestamp(alert.activePeriod.end!)}.
+            </>
+          )}
+        </p>
       </div>
     </div>
   );

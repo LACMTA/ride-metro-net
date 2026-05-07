@@ -4,6 +4,9 @@ dist/
 # generated types
 .astro/
 
+# build-time generated lookup data
+src/generated/
+
 # dependencies
 node_modules/
 
@@ -31,6 +34,12 @@ pnpm-debug.log*
 !.env.example
 
 
-data
+/data
 # Local Netlify folder
 .netlify
+
+AGENTS.md
+
+# Playwright
+test-results/
+playwright-report/

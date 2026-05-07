@@ -3,8 +3,8 @@
 
 @theme {
   --font-sans:
-    "Open Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
   --color-*: initial;
   --color-black: #121212;
@@ -41,7 +41,7 @@
   --color-light-green: #a8dc9a;
   --color-xlight-green: #dff1e0;
   --color-dark-blue: #003078;
-  --color-blue: #0072bc;
+  --color-blue: #1e6be6;
   --color-sky-blue: #9bd3f8;
   --color-light-blue: #ccebff;
   --color-xlight-blue: #e2eff8;
@@ -71,6 +71,8 @@
   --color-warning: var(--color-yellow);
   --color-warning-xlight: var(--color-xlight-yellow);
 
+  --color-alert: var(--color-yellow);
+
   /* Active/Info colors */
   --color-highlight: var(--color-light-blue);
   --color-highlight-light: var(--color-sky-blue);
@@ -84,9 +86,10 @@
   --color-border-light: var(--color-gray-200);
   --color-border-xlight: var(--color-gray-100);
   --color-border-black: var(--color-black);
+  --color-divider-line: var(--color-gray-400);
 
   /* Background colors */
-  --color-background-gray: var(--color-gray-100);
+  --color-background-gray: var(--color-gray-200);
   --color-background-white: var(--color-white);
 
   /* Focus colors */

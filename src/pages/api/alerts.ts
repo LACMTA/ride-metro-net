@@ -1,37 +1,25 @@
-import type { Alert } from "gtfs-types";
-import type { CamelCasedPropertiesDeep } from "type-fest";
+import { fetchSwiftlyAlerts } from "../../lib/fetchSwiftlyAlerts";
+import { makeConciseAlert } from "../../lib/makeConciseAlert";
+import stopLookup from "../../generated/railBuswayStopLookup.json";
+import type { SwiftlyAlert } from "../../lib/fetchSwiftlyAlerts";
 
 export const prerender = false;
 
-type CamelCaseAlert = CamelCasedPropertiesDeep<Alert>;
-
-// Swiftly uses `informedEntities` instead of `informedEntity` as in the spec (their docs have it right; the API does not)
-// and also has a number of non-spec fields in the response, many of which we want to scrub before passing on.
-type SwiftlyAlert = CamelCaseAlert & {
-  informedEntities: CamelCaseAlert["informedEntity"];
-  agencyId: string;
-  createdAt: string;
-  userEmail: string;
-  userFullname: string;
-  // In the spec, this is an object with translations. Swiftly just provides text.
-  descriptionText: string;
-  deletedAt?: string;
-  deletedBy?: string;
-};
-type AlertsApiResponse = SwiftlyAlert[];
-
+// activePeriod matches the GTFS spec: a single object with POSIX timestamps.
 export type ConciseAlert = Pick<
   SwiftlyAlert,
-  | "activePeriod"
-  | "headerText"
-  | "descriptionText"
-  | "effect"
-  | "cause"
-  | "informedEntities"
->;
+  "headerText" | "descriptionText" | "effect" | "cause" | "informedEntities"
+> & {
+  activePeriod: { start: number; end: number | null };
+};
 
 /**
  * GET /api/alerts
+ *
+ * Always fetches alerts from both `lametro` and `lametro-rail` agencies in
+ * parallel so system-wide alerts (those with `agencyId` set) from either
+ * agency are always included in the response.
+ *
  * @param {string} [stopId] - Comma-separated list of stop IDs to filter by
  * @param {string} [routeId] - Comma-separated list of route IDs to filter by
  * @returns {ConciseAlert[]} Array of alerts
@@ -39,43 +27,30 @@ export type ConciseAlert = Pick<
 export async function GET(context: import("astro").APIContext) {
   const API_KEY = import.meta.env.API_KEY;
 
-  const stopIds = context.url.searchParams.get("stopId")?.split(",") || [];
+  const rawStopIds = context.url.searchParams.get("stopId")?.split(",") || [];
+
+  // Expand each requested stop ID to also include its child stop IDs
+  // (from the build-time GTFS lookup) so alerts tagged on child stops are
+  // matched from the parent
+  const children = stopLookup.children as Record<string, string[]>;
+  const stopIds = rawStopIds.flatMap((id) => [id, ...(children[id] ?? [])]);
+
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
 
-  // TODO: generalize for trains
-  const AGENCY_KEY = "lametro";
+  // Always fetch from both agencies in parallel — system-wide alerts can be
+  // published under either agency, and route/stop data merges cleanly across
+  // the two GTFS feeds.
+  const [lametroResult, railResult] = await Promise.all([
+    fetchSwiftlyAlerts("lametro", API_KEY as string),
+    fetchSwiftlyAlerts("lametro-rail", API_KEY as string),
+  ]);
 
-  const alertsUrl = new URL(
-    `https://api.goswift.ly/real-time/${AGENCY_KEY}/gtfs-rt-alerts/v2`,
-  );
-  // TODO: consider using protocol buffer for network performance
-  // it's possible the response will actually match the GTFS spec in this case
-  alertsUrl.searchParams.append("format", "json");
-
-  // TODO: consider caching alerts
-  console.log(`Fetching alerts from: ${alertsUrl.toString()}`);
-
-  const alertsResponse = await fetch(alertsUrl.toString(), {
-    method: "GET",
-    headers: {
-      Accept:
-        "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
-      Authorization: API_KEY as string,
-    },
-    // Add timeout for better cold start handling
-    signal: AbortSignal.timeout(25000), // 25 second timeout
-  });
-
-  if (!alertsResponse.ok) {
-    const errorText = await alertsResponse.text();
-    console.error(
-      `Swiftly alerts API error (${alertsResponse.status}):`,
-      errorText,
-    );
+  // Only treat it as a hard failure when both agencies are unavailable.
+  if (!lametroResult.ok && !railResult.ok) {
     return new Response(
       JSON.stringify({
         error: "External API request failed",
-        status: alertsResponse.status,
+        status: lametroResult.status,
         timestamp: new Date().toISOString(),
       }),
       {
@@ -85,43 +60,48 @@ export async function GET(context: import("astro").APIContext) {
     );
   }
 
-  const alertsData: AlertsApiResponse = await alertsResponse.json();
+  const allAlerts = [
+    ...(lametroResult.ok ? lametroResult.alerts : []),
+    ...(railResult.ok ? railResult.alerts : []),
+  ];
 
-  const makeConciseAlert = (fullAlert: SwiftlyAlert) => {
-    const conciseAlert: ConciseAlert = {
-      activePeriod: fullAlert.activePeriod,
-      headerText: fullAlert.headerText,
-      descriptionText: fullAlert.descriptionText,
-      effect: fullAlert.effect,
-      cause: fullAlert.cause,
-      informedEntities: fullAlert.informedEntities,
-    };
-    return conciseAlert;
-  };
+  // Route IDs in informedEntities are already normalised to prefix-only form
+  // by fetchSwiftlyAlerts, so simple equality checks work here.
+  const filteredAlerts = allAlerts.reduce<ConciseAlert[]>((acc, alert) => {
+    // Always include alerts that have an agencyId set on any informed entity.
+    // These are system-wide alerts.
+    const matchesAgency = alert.informedEntities.some(
+      (entity) => entity.agencyId != null && entity.agencyId !== "",
+    );
 
-  const filteredAlerts = alertsData.reduce<ConciseAlert[]>(
-    (result, alert, index) => {
-      const matchesStop = stopIds.some((stopId) =>
-        alert.informedEntities.some((entity) => entity.stopId === stopId),
-      );
+    if (matchesAgency) {
+      acc.push(makeConciseAlert(alert));
+      return acc;
+    }
 
-      if (matchesStop) {
-        result.push(makeConciseAlert(alert));
-        return result;
-      }
+    const matchesStop = stopIds.some((stopId) =>
+      alert.informedEntities.some((entity) => entity.stopId === stopId),
+    );
 
-      // Same pattern for routes
-      const matchesRoute = routeIds.some((routeId) =>
-        alert.informedEntities.some((entity) => entity.routeId === routeId),
-      );
+    if (matchesStop) {
+      acc.push(makeConciseAlert(alert));
+      return acc;
+    }
 
-      if (matchesRoute) {
-        result.push(makeConciseAlert(alert));
-      }
-      return result;
+    const matchesRoute = routeIds.some((routeId) =>
+      alert.informedEntities.some((entity) => entity.routeId === routeId),
+    );
+
+    if (matchesRoute) {
+      acc.push(makeConciseAlert(alert));
+    }
+    return acc;
+  }, []);
+
+  return new Response(JSON.stringify(filteredAlerts), {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=900",
     },
-    [],
-  );
-
-  return new Response(JSON.stringify(filteredAlerts));
+  });
 }

@@ -1,24 +1,36 @@
 import type { ConciseAlert } from "../pages/api/alerts";
 import { alerts } from "./alertsStore";
 
-async function getAlerts(stopIds: string[], routeIds: string[]) {
+export interface AlertsQuery {
+  stopIds: string[];
+  routeIds: string[];
+  /** @deprecated The API now always queries both agencies internally. */
+  agency?: string;
+}
+
+async function fetchAlerts(query: AlertsQuery): Promise<ConciseAlert[]> {
   const res = await fetch(
-    `/api/alerts?stopId=${stopIds.join(",")}&routeId=${routeIds.join(",")}`,
+    `/api/alerts?stopId=${query.stopIds.join(",")}&routeId=${query.routeIds.join(",")}`,
   );
   if (!res.ok) {
-    return console.error(await res.text());
+    console.error(await res.text());
+    return [];
   }
   const data = (await res.json()) as ConciseAlert[];
   console.log("Received alerts:", data);
-  alerts.set(data);
+  return data;
+}
+
+async function getAllAlerts(queries: AlertsQuery[]) {
+  const results = await Promise.all(queries.map(fetchAlerts));
+  alerts.set(results.flat());
 }
 
 export default async function watchAlerts(
-  stopIds: string[],
-  routeIds: string[],
-  // 5 minutes
-  pollInterval: number = 300000,
+  queries: AlertsQuery[] = [{ stopIds: [], routeIds: [] }],
+  // 15 minutes
+  pollInterval: number = 900000,
 ) {
-  getAlerts(stopIds, routeIds);
-  return setInterval(getAlerts, pollInterval, stopIds, routeIds);
+  getAllAlerts(queries);
+  return setInterval(getAllAlerts, pollInterval, queries);
 }
