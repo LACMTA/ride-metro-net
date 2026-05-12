@@ -2,6 +2,7 @@ import MapPinIcon from "./MapPinIcon";
 import ClockIcon from "./ClockIcon";
 import DownloadIcon from "./DownloadIcon";
 import Button from "./Button";
+import LineMap from "./LineMap";
 import { formatGTFSTime } from "../lib/formatGTFSTime";
 import type { RouteOverview } from "../lib/getRouteOverview";
 
@@ -21,6 +22,7 @@ export default function LineOverview({
   const pluralVehicleName = routeType === 3 ? "Buses" : "Trains";
   return (
     <div className="pt-5 pb-50">
+      <LineMap />
       <h2 className="mb-6 text-2xl font-bold">{lineTitle} Overview</h2>
       <div className="flex">
         <MapPinIcon
