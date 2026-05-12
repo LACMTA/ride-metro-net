@@ -25,6 +25,20 @@ interface Props {
   routeColor: string;
 }
 
+/** Returns a pixel radius for stop circle markers that grows with zoom level. */
+function stopRadiusForZoom(zoom: number): number {
+  // At the default zoom (11) this returns 5, matching the previous hard-coded value.
+  // Each zoom step adds ~1.5 px, clamped between 3 and 14.
+  return Math.max(3, Math.min(14, 5 + (zoom - 11) * 1.5));
+}
+
+/** Returns a stroke weight for stop circle markers that grows with zoom level. */
+function stopWeightForZoom(zoom: number): number {
+  // At the default zoom (11) this returns 2, matching the previous hard-coded value.
+  // Each zoom step adds 0.5 px, clamped between 1 and 5.
+  return Math.max(1, Math.min(5, 2 + (zoom - 11) * 0.5));
+}
+
 function shapeOptionLabel(feature: RouteShapeFeature, index: number): string {
   const dirs = feature.properties.directionIds
     .map((d) => (d === null ? "—" : String(d)))
@@ -126,7 +140,7 @@ export default function LineMap({ routeId, routeColor }: Props) {
     const shapeLayer = L.geoJSON(feature, {
       style: {
         color: lineColor,
-        weight: 4,
+        weight: 6,
         opacity: 0.9,
       },
     }).addTo(map);
@@ -141,17 +155,36 @@ export default function LineMap({ routeId, routeColor }: Props) {
     const stopsGroup = L.layerGroup().addTo(map);
     stopsLayerRef.current = stopsGroup;
 
+    const stopMarkers: import("leaflet").CircleMarker[] = [];
+
     for (const stop of feature.properties.stops) {
-      L.circleMarker([stop.lat, stop.lon], {
-        radius: 5,
+      const marker = L.circleMarker([stop.lat, stop.lon], {
+        radius: stopRadiusForZoom(map.getZoom()),
         color: lineColor,
-        weight: 2,
+        weight: stopWeightForZoom(map.getZoom()),
         fillColor: "#fff",
         fillOpacity: 1,
       })
         .bindPopup(`<strong>${stop.stopName}</strong>`)
         .addTo(stopsGroup);
+      stopMarkers.push(marker);
     }
+
+    // Update marker size and stroke weight whenever the zoom level changes.
+    const handleZoom = () => {
+      const zoom = map.getZoom();
+      const r = stopRadiusForZoom(zoom);
+      const w = stopWeightForZoom(zoom);
+      stopMarkers.forEach((m) => {
+        m.setRadius(r);
+        m.setStyle({ weight: w });
+      });
+    };
+    map.on("zoomend", handleZoom);
+
+    return () => {
+      map.off("zoomend", handleZoom);
+    };
   }, [geojson, selectedIndex, routeColor]);
 
   const options = useMemo(() => {
