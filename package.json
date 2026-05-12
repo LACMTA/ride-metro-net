@@ -7,10 +7,14 @@
     "build": "astro build",
     "import-gtfs": "npx tsx scripts/import-gtfs.ts",
     "test": "npx playwright test",
-    "astro": "astro"
+    "astro": "astro",
+    "deploy": "npm run build && wrangler deploy",
+    "preview": "npm run build && wrangler dev",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.6",
+    "@astrojs/cloudflare": "12",
     "@astrojs/netlify": "^6.6.3",
     "@astrojs/react": "^4.1.3",
     "@headlessui/react": "^2.2.9",
@@ -38,6 +42,7 @@
     "netlify-cli": "^23.13.1",
     "prettier": "^3.7.4",
     "prettier-plugin-astro": "^0.14.1",
-    "prettier-plugin-tailwindcss": "^0.7.2"
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "wrangler": "^4.90.0"
   }
 }
