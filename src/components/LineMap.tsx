@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import "leaflet/dist/leaflet.css";
+import { getLineSlug } from "../lib/routeShortNameOverrides";
+import type { RouteShapesGeoJSON } from "../lib/getRouteShapes";
 
 // TODO: get key for this project
 // const ESRI_KEY =
@@ -13,7 +15,14 @@ const DEFAULT_CENTER: [number, number] = [
 ];
 const DEFAULT_ZOOM = 11;
 
-export default function LineMap() {
+interface Props {
+  /** Stable numeric (or lettered) route slug, e.g. "a" or "720". */
+  routeId: string;
+  /** GTFS `route_color` hex without the leading `#`, e.g. `"E47525"`. */
+  routeColor: string;
+}
+
+export default function LineMap({ routeId, routeColor }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,13 +30,16 @@ export default function LineMap() {
 
     // Dynamic imports keep Leaflet (and its DOM requirements) out of SSR.
     let map: import("leaflet").Map | null = null;
+    let cancelled = false;
 
     (async () => {
-      const L = (await import("leaflet")).default;
-      const { vectorBasemapLayer } = await import("esri-leaflet-vector");
+      const [{ default: L }] = await Promise.all([
+        import("leaflet"),
+        import("esri-leaflet-vector"),
+      ]);
 
       // Guard: container may have been removed while awaiting
-      if (!containerRef.current) return;
+      if (cancelled || !containerRef.current) return;
 
       map = L.map(containerRef.current, { minZoom: 2 }).setView(
         DEFAULT_CENTER,
@@ -42,12 +54,44 @@ export default function LineMap() {
 
       // TODO: Metro Branded Basemap
       // vectorBasemapLayer(BASEMAP_ENUM, { apiKey: ESRI_KEY }).addTo(map);
+
+      // Fetch and render the line's GeoJSON shape. The endpoint is prerendered
+      // at build time from the static GTFS — see /src/pages/data/lines/[routeId].json.ts.
+      // The URL uses the same slug as the page (e.g. "a" for the A Line, "720"
+      // for a numeric bus route), so resolve it from the numeric route_id.
+      const slug = getLineSlug(routeId);
+      try {
+        const res = await fetch(`/data/route-shape/${slug}.json`);
+        if (!res.ok) {
+          throw new Error(`Shape fetch failed: ${res.status}`);
+        }
+        const geojson = (await res.json()) as RouteShapesGeoJSON;
+        if (cancelled || !map) return;
+        if (!geojson.features || geojson.features.length === 0) return;
+
+        const shapeLayer = L.geoJSON(geojson, {
+          style: {
+            color: routeColor ? `#${routeColor}` : "#000",
+            weight: 4,
+            opacity: 0.9,
+          },
+        }).addTo(map);
+
+        const bounds = shapeLayer.getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [20, 20] });
+        }
+      } catch (err) {
+        // Non-fatal: leave the map on its default LA-wide view.
+        console.error("Failed to load route shape:", err);
+      }
     })();
 
     return () => {
+      cancelled = true;
       map?.remove();
     };
-  }, []);
+  }, [routeId, routeColor]);
 
   return (
     <div className="mb-8">

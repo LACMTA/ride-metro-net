@@ -10,6 +10,7 @@ import type { RouteOverview } from "../lib/getRouteOverview";
 
 interface Props {
   routeId: string;
+  routeColor: string;
   lineTitle: string;
   routeOverview: RouteOverview;
   pdfUrl: string;
@@ -18,6 +19,7 @@ interface Props {
 
 export default function LineTabs({
   routeId,
+  routeColor,
   lineTitle,
   pdfUrl,
   routeOverview,
@@ -67,7 +69,14 @@ export default function LineTabs({
         <Column>
           <TabPanels>
             <TabPanel>
-              <LineOverview lineTitle={lineTitle} routeOverview={routeOverview} pdfUrl={pdfUrl} routeType={routeType} />
+              <LineOverview
+                routeId={routeId}
+                routeColor={routeColor}
+                lineTitle={lineTitle}
+                routeOverview={routeOverview}
+                pdfUrl={pdfUrl}
+                routeType={routeType}
+              />
             </TabPanel>
             <TabPanel>
               <AlertsSection routeId={routeId} />
