@@ -1,6 +1,9 @@
 import { Disclosure } from "@headlessui/react";
 import { useStore } from "@nanostores/react";
-import { accessibilityAlertStops } from "../lib/alertStatusStore";
+import {
+  accessibilityAlertStops,
+  alertStatusRequestStatus,
+} from "../lib/alertStatusStore";
 import { CardDiscolsureButton, CardDisclosurePanel } from "./Card";
 import AlertIcon from "./AlertIcon";
 import Alert from "./Alert";
@@ -12,6 +15,15 @@ import Alert from "./Alert";
  */
 export default function AccessibilityAlertStopList() {
   const stops = useStore(accessibilityAlertStops);
+  const $requestStatus = useStore(alertStatusRequestStatus);
+
+  if ($requestStatus === "loading") {
+    return <p className="p-4">Loading accessibility alerts...</p>;
+  }
+
+  if ($requestStatus === "error") {
+    return <p className="p-4">Could not load accessibility alerts</p>;
+  }
 
   if (stops.length === 0) {
     return <p className="p-4">No active accessibility alerts.</p>;

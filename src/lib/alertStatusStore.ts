@@ -12,3 +12,8 @@ export const alertStatus = atom<AlertStatusMap>({});
  * `effect === "ACCESSIBILITY_ISSUE"`, resolved to station ID + name.
  */
 export const accessibilityAlertStops = atom<AccessibilityAlertStop[]>([]);
+
+/** Tracks the loading/error state of the alert-status API request. */
+export const alertStatusRequestStatus = atom<"loading" | "success" | "error">(
+  "loading",
+);
