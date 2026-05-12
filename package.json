@@ -37,6 +37,7 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/esri-leaflet": "^3.0.4",
     "@types/node": "^24.10.1",
     "@types/pluralize": "^0.0.33",
     "netlify-cli": "^23.13.1",
