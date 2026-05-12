@@ -1,5 +1,5 @@
 import type { RoutePredictions } from "../pages/api/predictions";
-import { routePredictions } from "./routePredictionsStore";
+import { routePredictions, predictionsRequestStatus } from "./routePredictionsStore";
 
 let adjustmentIntervalId: NodeJS.Timeout | null;
 
@@ -11,20 +11,30 @@ async function getPredictions(
   if (adjustmentIntervalId) {
     clearInterval(adjustmentIntervalId);
   }
-  const res = await fetch(
-    `/api/predictions?stopId=${stopIds.join(",")}&agency=${agency}`,
-  );
-  if (!res.ok) {
-    return console.error(await res.text());
+  // Only show the loading state on the first request (when not yet succeeded).
+  if (predictionsRequestStatus.get() !== "success") {
+    predictionsRequestStatus.set("loading");
   }
-  const data = (await res.json()) as RoutePredictions[];
-  console.log("Received predictions:", data);
-  routePredictions.set(data);
-  adjustmentIntervalId = setInterval(
-    adjustPredictions,
-    adjustmentInterval,
-    adjustmentInterval / 1000,
-  );
+  try {
+    const res = await fetch(
+      `/api/predictions?stopId=${stopIds.join(",")}&agency=${agency}`,
+    );
+    if (!res.ok) {
+      throw new Error(await res.text());
+    }
+    const data = (await res.json()) as RoutePredictions[];
+    console.log("Received predictions:", data);
+    routePredictions.set(data);
+    predictionsRequestStatus.set("success");
+    adjustmentIntervalId = setInterval(
+      adjustPredictions,
+      adjustmentInterval,
+      adjustmentInterval / 1000,
+    );
+  } catch (err) {
+    console.error("Failed to fetch predictions:", err);
+    predictionsRequestStatus.set("error");
+  }
 }
 
 // automatically decrement the predictions on some interval.
