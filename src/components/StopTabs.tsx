@@ -6,7 +6,7 @@ import { StyledTab, StyledTabList, StyledTabPanelWrapper } from "./StyledTabs";
 import StopRoutePrediction from "./StopRoutePrediction";
 import type { StopRoute } from "../lib/getStopWithRoutes";
 import AlertsSection from "./AlertsSection";
-import { alerts } from "../lib/alertsStore";
+import { alerts, alertsRequestStatus } from "../lib/alertsStore";
 
 interface Props {
   routes: StopRoute[];
@@ -17,6 +17,7 @@ interface Props {
 export default function StopTabs({ routes, stopId, allStopIds }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const $alerts = useStore(alerts);
+  const $alertsRequestStatus = useStore(alertsRequestStatus);
   const stopIdSet = new Set(allStopIds ?? [stopId]);
   const alertCount = $alerts.filter((alert) =>
     alert.informedEntities.some((e) => e.stopId && stopIdSet.has(e.stopId)),
@@ -63,7 +64,10 @@ export default function StopTabs({ routes, stopId, allStopIds }: Props) {
         <Column>
           <StyledTabList>
             <StyledTab>Arrivals</StyledTab>
-            <StyledTab badge={alertCount} badgeAlert={alertCount > 0}>
+            <StyledTab
+              badge={$alertsRequestStatus === "success" ? alertCount : undefined}
+              badgeAlert={$alertsRequestStatus === "success" && alertCount > 0}
+            >
               {hasRail ? "Station Alerts" : "Stop Alerts"}
             </StyledTab>
           </StyledTabList>

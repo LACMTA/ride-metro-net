@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react";
-import { alertStatus } from "../lib/alertStatusStore";
+import { alertStatus, alertStatusRequestStatus } from "../lib/alertStatusStore";
 import type { RouteWithInfo } from "../lib/getRouteById";
 import { getLineSlug } from "../lib/routeShortNameOverrides";
 import { CardLinkListItem } from "./Card";
@@ -18,6 +18,7 @@ interface Props {
  */
 export default function LineAlertStatus({ route }: Props) {
   const $alertStatus = useStore(alertStatus);
+  const $requestStatus = useStore(alertStatusRequestStatus);
 
   const alertCount = $alertStatus[route.routeId] ?? 0;
 
@@ -33,7 +34,11 @@ export default function LineAlertStatus({ route }: Props) {
           color={route.routeColor}
           textColor={route.routeTextColor}
         />
-        {alertCount > 0 ? (
+        {$requestStatus === "loading" ? (
+          <span className="text-gray-500">Loading status...</span>
+        ) : $requestStatus === "error" ? (
+          <span className="text-gray-500">Could not load status</span>
+        ) : alertCount > 0 ? (
           <>
             <AlertIcon
               className="text-yellow h-5 shrink-0"

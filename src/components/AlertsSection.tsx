@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react";
-import { alerts } from "../lib/alertsStore";
+import { alerts, alertsRequestStatus } from "../lib/alertsStore";
 import { isCurrent } from "../lib/isCurrent";
 import Alert from "./Alert";
 import AlertIcon from "./AlertIcon";
@@ -13,6 +13,7 @@ interface Props {
 
 export default function AlertsSection({ routeId, stopId, stopIds }: Props) {
   const $alerts = useStore(alerts);
+  const $requestStatus = useStore(alertsRequestStatus);
   const stopIdSet = new Set(stopIds ?? (stopId ? [stopId] : []));
 
   const filteredAlerts = $alerts.filter(
@@ -42,7 +43,11 @@ export default function AlertsSection({ routeId, stopId, stopIds }: Props) {
           Active Alerts
         </CardHeader>
         <CardBody margin={false}>
-          {activeAlerts.length > 0 ? (
+          {$requestStatus === "loading" ? (
+            <p className="p-4 text-gray-500">Loading alerts...</p>
+          ) : $requestStatus === "error" ? (
+            <p className="p-4 text-gray-500">Could not load alerts</p>
+          ) : activeAlerts.length > 0 ? (
             activeAlerts.map((alert, index) => (
               <Alert key={index} alert={alert} showAlertIcon={false} />
             ))
@@ -60,7 +65,11 @@ export default function AlertsSection({ routeId, stopId, stopIds }: Props) {
           Upcoming Alerts
         </CardHeader>
         <CardBody margin={false}>
-          {upcomingAlerts.length > 0 ? (
+          {$requestStatus === "loading" ? (
+            <p className="p-4 text-gray-500">Loading alerts...</p>
+          ) : $requestStatus === "error" ? (
+            <p className="p-4 text-gray-500">Could not load alerts</p>
+          ) : upcomingAlerts.length > 0 ? (
             upcomingAlerts.map((alert, index) => (
               <Alert key={index} alert={alert} showAlertIcon={false} />
             ))

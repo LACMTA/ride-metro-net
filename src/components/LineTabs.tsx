@@ -5,7 +5,7 @@ import Column from "./Column";
 import { StyledTab, StyledTabList, StyledTabPanelWrapper } from "./StyledTabs";
 import AlertsSection from "./AlertsSection";
 import LineOverview from "./LineOverview";
-import { alerts } from "../lib/alertsStore";
+import { alerts, alertsRequestStatus } from "../lib/alertsStore";
 import type { RouteOverview } from "../lib/getRouteOverview";
 
 interface Props {
@@ -25,6 +25,7 @@ export default function LineTabs({
 }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const $alerts = useStore(alerts);
+  const $alertsRequestStatus = useStore(alertsRequestStatus);
   const alertCount = $alerts.filter(
     (alert) =>
       alert.effect !== "ACCESSIBILITY_ISSUE" &&
@@ -53,7 +54,10 @@ export default function LineTabs({
         <Column>
           <StyledTabList>
             <StyledTab>Maps &amp; Schedules</StyledTab>
-            <StyledTab badge={alertCount} badgeAlert={alertCount > 0}>
+            <StyledTab
+              badge={$alertsRequestStatus === "success" ? alertCount : undefined}
+              badgeAlert={$alertsRequestStatus === "success" && alertCount > 0}
+            >
               Alerts
             </StyledTab>
           </StyledTabList>

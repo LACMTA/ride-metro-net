@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react";
-import { routePredictions } from "../lib/routePredictionsStore";
+import { routePredictions, predictionsRequestStatus } from "../lib/routePredictionsStore";
 import type { StopRoute } from "../lib/getStopWithRoutes";
 import type { Prediction } from "../pages/api/predictions";
 import AlertList from "./AlertList";
@@ -29,9 +29,11 @@ interface DestinationPrediction extends Prediction {
 function DirectionTable({
   routes,
   $routePredictions,
+  $predictionsRequestStatus,
 }: {
   routes: StopRoute[];
   $routePredictions: ReturnType<typeof useStore<typeof routePredictions>>;
+  $predictionsRequestStatus: ReturnType<typeof useStore<typeof predictionsRequestStatus>>;
 }) {
   const directionId = routes[0].directionId;
   const isRailOrBusway =
@@ -39,14 +41,11 @@ function DirectionTable({
 
   // Gather predictions from every route in this direction and interleave.
   const allPredictions: DestinationPrediction[] = [];
-  let anyRouteFound = false;
 
   for (const route of routes) {
     const predictionsRoute = $routePredictions.find(
       (r) => r.routeId.split("-")[0] === route.routeId,
     );
-
-    if (predictionsRoute) anyRouteFound = true;
 
     const destinations = predictionsRoute?.destinations.filter(
       (d) => Number(d.directionId) === Number(route.directionId),
@@ -96,15 +95,7 @@ function DirectionTable({
     );
   }
 
-  const predictionsNotAvailable =
-    allPredictions.length === 0 &&
-    $routePredictions.length > 0 &&
-    (anyRouteFound ||
-      !routes.some((route) =>
-        $routePredictions.some(
-          (r) => r.routeId.split("-")[0] === route.routeId,
-        ),
-      ));
+  const predictionsNotAvailable = $predictionsRequestStatus === "error";
 
   const predictionsTable = allPredictions.map((prediction, index) => (
     <tr key={index}>
@@ -173,6 +164,7 @@ function DirectionTable({
 
 export default function StopRoutePrediction({ routes }: Props) {
   const $routePredictions = useStore(routePredictions);
+  const $predictionsRequestStatus = useStore(predictionsRequestStatus);
 
   // Group the incoming routes by directionId so each direction gets one table.
   const byDirection: StopRoute[][] = routes.reduce((acc, route) => {
@@ -211,6 +203,7 @@ export default function StopRoutePrediction({ routes }: Props) {
             key={dirRoutes[0].directionId}
             routes={dirRoutes}
             $routePredictions={$routePredictions}
+            $predictionsRequestStatus={$predictionsRequestStatus}
           />
         ))}
       </CardBody>
