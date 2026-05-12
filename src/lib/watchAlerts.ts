@@ -1,5 +1,5 @@
 import type { ConciseAlert } from "../pages/api/alerts";
-import { alerts } from "./alertsStore";
+import { alerts, alertsRequestStatus } from "./alertsStore";
 
 export interface AlertsQuery {
   stopIds: string[];
@@ -14,7 +14,7 @@ async function fetchAlerts(query: AlertsQuery): Promise<ConciseAlert[]> {
   );
   if (!res.ok) {
     console.error(await res.text());
-    return [];
+    throw new Error(`Failed to fetch alerts: ${res.status}`);
   }
   const data = (await res.json()) as ConciseAlert[];
   console.log("Received alerts:", data);
@@ -22,8 +22,18 @@ async function fetchAlerts(query: AlertsQuery): Promise<ConciseAlert[]> {
 }
 
 async function getAllAlerts(queries: AlertsQuery[]) {
-  const results = await Promise.all(queries.map(fetchAlerts));
-  alerts.set(results.flat());
+  // Only show the loading state on the first request (when not yet succeeded).
+  if (alertsRequestStatus.get() !== "success") {
+    alertsRequestStatus.set("loading");
+  }
+  try {
+    const results = await Promise.all(queries.map(fetchAlerts));
+    alerts.set(results.flat());
+    alertsRequestStatus.set("success");
+  } catch (err) {
+    console.error("Failed to fetch alerts:", err);
+    alertsRequestStatus.set("error");
+  }
 }
 
 export default async function watchAlerts(
