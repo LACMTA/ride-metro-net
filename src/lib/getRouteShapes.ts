@@ -3,14 +3,8 @@ import { GTFSconfig } from "../integrations/import-gtfs";
 import type Database from "better-sqlite3";
 
 /**
- * GeoJSON `FeatureCollection` of `LineString`s describing every distinct
- * geometry referenced by trips of a given route.
- *
- * Multiple GTFS `shape_id`s often resolve to the exact same ordered list of
- * coordinates, so features here are deduplicated by geometry. Each feature
- * carries the full set of source `shapeIds` and the unique `directionIds`
- * observed for that geometry, so downstream consumers can style or filter by
- * direction / pattern if they wish.
+ * GeoJSON `FeatureCollection` of `LineString`s — one per `direction_id` —
+ * for the most-travelled shape of a given route.
  */
 export interface RouteShapesGeoJSON {
   type: "FeatureCollection";
@@ -25,9 +19,9 @@ export interface RouteShapeFeature {
     coordinates: [number, number][];
   };
   properties: {
-    /** All source `shape_id`s that produced this exact geometry. */
+    /** The `shape_id` for this direction's representative shape. */
     shapeIds: string[];
-    /** Unique `direction_id` values observed for this geometry. */
+    /** The `direction_id` for this shape (wrapped in an array for compatibility). */
     directionIds: (number | null)[];
   };
 }
@@ -35,6 +29,7 @@ export interface RouteShapeFeature {
 interface ShapeIdRow {
   shape_id: string;
   direction_id: number | null;
+  trip_count: number;
 }
 
 interface ShapePointRow {
@@ -58,9 +53,9 @@ function getDb() {
 }
 
 /**
- * Selects distinct `(shape_id, direction_id)` pairs for trips of a given
- * route whose `service_id` is currently in service according to GTFS's
- * `calendar` and `calendar_dates` tables.
+ * For each `direction_id` found among trips of a given route that are
+ * currently in service, selects the single `shape_id` used by the most trips
+ * (ties broken by `MIN(shape_id)` for determinism).
  *
  * A `service_id` is considered "currently in service" on `@today` when
  * either:
@@ -85,13 +80,28 @@ function getShapeIdsQuery() {
         SELECT cd.service_id
         FROM calendar_dates cd
         WHERE cd.date = @today AND cd.exception_type = 1
+      ),
+      shape_counts AS (
+        SELECT t.direction_id,
+               t.shape_id,
+               COUNT(*) AS trip_count
+        FROM trips t
+        WHERE (t.route_id = @routeId OR t.route_id LIKE @routeId || '-%')
+          AND t.shape_id IS NOT NULL
+          AND t.shape_id != ''
+          AND t.service_id IN (SELECT service_id FROM active_services)
+        GROUP BY t.direction_id, t.shape_id
       )
-      SELECT DISTINCT t.shape_id, t.direction_id
-      FROM trips t
-      WHERE (t.route_id = @routeId OR t.route_id LIKE @routeId || '-%')
-        AND t.shape_id IS NOT NULL
-        AND t.shape_id != ''
-        AND t.service_id IN (SELECT service_id FROM active_services)
+      SELECT sc.direction_id,
+             MIN(sc.shape_id) AS shape_id,
+             sc.trip_count
+      FROM shape_counts sc
+      WHERE sc.trip_count = (
+        SELECT MAX(sc2.trip_count)
+        FROM shape_counts sc2
+        WHERE sc2.direction_id IS sc.direction_id
+      )
+      GROUP BY sc.direction_id, sc.trip_count
     `);
   }
   return shapeIdsQuery;
@@ -113,19 +123,6 @@ function getShapePointsQuery() {
  *  filter naturally refreshes when the service day changes (e.g. on a
  *  long-running dev server). */
 const cache = new Map<string, RouteShapesGeoJSON>();
-
-/** Builds a stable string key from a coordinate list for dedupe purposes. */
-function geometryKey(coords: [number, number][]): string {
-  // Round to ~1cm precision; identical GTFS shapes will match exactly anyway,
-  // but this guards against any float noise from the DB driver.
-  let out = "";
-  for (let i = 0; i < coords.length; i++) {
-    const [lon, lat] = coords[i];
-    if (i > 0) out += "|";
-    out += lon.toFixed(6) + "," + lat.toFixed(6);
-  }
-  return out;
-}
 
 /**
  * Returns today's date in the agency's local time zone
@@ -152,16 +149,11 @@ function getServiceDate(now: Date = new Date()): string {
 }
 
 /**
- * Returns a {@link RouteShapesGeoJSON} containing every unique geometry used
- * by trips of the given `routeId` (matching either the exact id or any
- * `routeId-<version>` variant) whose `service_id` is **currently in service**
- * per the GTFS `calendar` and `calendar_dates` tables for today's
- * agency-local date. One `LineString` feature is emitted per distinct
- * geometry, with coordinates ordered by `shape_pt_sequence`.
- *
- * Many GTFS `shape_id`s resolve to identical geometries; those are merged
- * into a single feature whose `properties.shapeIds` lists all source ids and
- * whose `properties.directionIds` lists the unique direction ids observed.
+ * Returns a {@link RouteShapesGeoJSON} with one `LineString` feature per
+ * `direction_id` found among currently-active trips of the given `routeId`
+ * (matching either the exact id or any `routeId-<version>` variant). The
+ * shape chosen for each direction is the one associated with the most trips
+ * on today's service date (ties broken by `shape_id` lexicographic order).
  *
  * Results are cached in-memory keyed by `routeId` + today's service date, so
  * the cache rolls over automatically at midnight (Pacific) without needing
@@ -178,8 +170,8 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
     today,
   }) as ShapeIdRow[];
 
-  const featuresByGeometry = new Map<string, RouteShapeFeature>();
   const pointsStmt = getShapePointsQuery();
+  const features: RouteShapeFeature[] = [];
 
   for (const { shape_id, direction_id } of shapeRows) {
     const points = pointsStmt.all(shape_id) as ShapePointRow[];
@@ -188,20 +180,8 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
     const coordinates = points.map(
       (p) => [p.shape_pt_lon, p.shape_pt_lat] as [number, number],
     );
-    const key = geometryKey(coordinates);
 
-    const existing = featuresByGeometry.get(key);
-    if (existing) {
-      if (!existing.properties.shapeIds.includes(shape_id)) {
-        existing.properties.shapeIds.push(shape_id);
-      }
-      if (!existing.properties.directionIds.includes(direction_id)) {
-        existing.properties.directionIds.push(direction_id);
-      }
-      continue;
-    }
-
-    featuresByGeometry.set(key, {
+    features.push({
       type: "Feature",
       geometry: {
         type: "LineString",
@@ -216,7 +196,7 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
 
   const result: RouteShapesGeoJSON = {
     type: "FeatureCollection",
-    features: Array.from(featuresByGeometry.values()),
+    features,
   };
 
   cache.set(cacheKey, result);
