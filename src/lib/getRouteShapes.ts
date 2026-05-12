@@ -11,6 +11,13 @@ export interface RouteShapesGeoJSON {
   features: RouteShapeFeature[];
 }
 
+export interface RouteStop {
+  stopId: string;
+  stopName: string;
+  lat: number;
+  lon: number;
+}
+
 export interface RouteShapeFeature {
   type: "Feature";
   geometry: {
@@ -23,6 +30,8 @@ export interface RouteShapeFeature {
     shapeIds: string[];
     /** The `direction_id` for this shape (wrapped in an array for compatibility). */
     directionIds: (number | null)[];
+    /** Ordered list of stops served by this shape's representative trip. */
+    stops: RouteStop[];
   };
 }
 
@@ -37,9 +46,17 @@ interface ShapePointRow {
   shape_pt_lon: number;
 }
 
+interface StopRow {
+  stop_id: string;
+  stop_name: string;
+  stop_lat: number;
+  stop_lon: number;
+}
+
 let dbInstance: Database.Database | null = null;
 let shapeIdsQuery: Database.Statement | null = null;
 let shapePointsQuery: Database.Statement | null = null;
+let shapeStopsQuery: Database.Statement | null = null;
 
 function getDb() {
   if (!dbInstance) {
@@ -119,6 +136,28 @@ function getShapePointsQuery() {
   return shapePointsQuery;
 }
 
+/**
+ * Returns the ordered stops for a given `shape_id` by selecting the stops
+ * from one representative trip (the lexicographically smallest `trip_id`
+ * that uses this shape), in stop-sequence order.
+ */
+function getShapeStopsQuery() {
+  if (!shapeStopsQuery) {
+    shapeStopsQuery = getDb().prepare(`
+      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+      FROM stop_times st
+      JOIN stops s ON s.stop_id = st.stop_id
+      WHERE st.trip_id = (
+        SELECT MIN(t.trip_id)
+        FROM trips t
+        WHERE t.shape_id = ?
+      )
+      ORDER BY st.stop_sequence ASC
+    `);
+  }
+  return shapeStopsQuery;
+}
+
 /** In-memory cache — keyed by `routeId|YYYYMMDD` so the active-services
  *  filter naturally refreshes when the service day changes (e.g. on a
  *  long-running dev server). */
@@ -173,6 +212,8 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
   const pointsStmt = getShapePointsQuery();
   const features: RouteShapeFeature[] = [];
 
+  const stopsStmt = getShapeStopsQuery();
+
   for (const { shape_id, direction_id } of shapeRows) {
     const points = pointsStmt.all(shape_id) as ShapePointRow[];
     if (points.length < 2) continue;
@@ -180,6 +221,14 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
     const coordinates = points.map(
       (p) => [p.shape_pt_lon, p.shape_pt_lat] as [number, number],
     );
+
+    const stopRows = stopsStmt.all(shape_id) as StopRow[];
+    const stops: RouteStop[] = stopRows.map((s) => ({
+      stopId: s.stop_id,
+      stopName: s.stop_name,
+      lat: s.stop_lat,
+      lon: s.stop_lon,
+    }));
 
     features.push({
       type: "Feature",
@@ -190,6 +239,7 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
       properties: {
         shapeIds: [shape_id],
         directionIds: [direction_id],
+        stops,
       },
     });
   }

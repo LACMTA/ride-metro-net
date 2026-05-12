@@ -37,6 +37,7 @@ export default function LineMap({ routeId, routeColor }: Props) {
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const shapeLayerRef = useRef<import("leaflet").GeoJSON | null>(null);
+  const stopsLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
 
   const [geojson, setGeojson] = useState<RouteShapesGeoJSON | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -95,6 +96,7 @@ export default function LineMap({ routeId, routeColor }: Props) {
     return () => {
       cancelled = true;
       shapeLayerRef.current = null;
+      stopsLayerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
       leafletRef.current = null;
@@ -114,10 +116,16 @@ export default function LineMap({ routeId, routeColor }: Props) {
       shapeLayerRef.current.remove();
       shapeLayerRef.current = null;
     }
+    if (stopsLayerRef.current) {
+      stopsLayerRef.current.remove();
+      stopsLayerRef.current = null;
+    }
+
+    const lineColor = routeColor ? `#${routeColor}` : "#000";
 
     const shapeLayer = L.geoJSON(feature, {
       style: {
-        color: routeColor ? `#${routeColor}` : "#000",
+        color: lineColor,
         weight: 4,
         opacity: 0.9,
       },
@@ -127,6 +135,22 @@ export default function LineMap({ routeId, routeColor }: Props) {
     const bounds = shapeLayer.getBounds();
     if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [20, 20] });
+    }
+
+    // Render a circle marker for each stop served by this shape.
+    const stopsGroup = L.layerGroup().addTo(map);
+    stopsLayerRef.current = stopsGroup;
+
+    for (const stop of feature.properties.stops) {
+      L.circleMarker([stop.lat, stop.lon], {
+        radius: 5,
+        color: lineColor,
+        weight: 2,
+        fillColor: "#fff",
+        fillOpacity: 1,
+      })
+        .bindPopup(`<strong>${stop.stopName}</strong>`)
+        .addTo(stopsGroup);
     }
   }, [geojson, selectedIndex, routeColor]);
 
