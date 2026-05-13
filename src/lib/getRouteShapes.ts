@@ -374,7 +374,7 @@ function buildFeature(
   const points = getShapePointsQuery().all(shape_id) as ShapePointRow[];
   if (points.length < 2) return null;
 
-  const coordinates = points.map(
+  let coordinates = points.map(
     (p) => [p.shape_pt_lon, p.shape_pt_lat] as [number, number],
   );
 
@@ -384,6 +384,47 @@ function buildFeature(
     lat: s.stop_lat,
     lon: s.stop_lon,
   }));
+
+  // Trim the polyline so it doesn't extend beyond the first and last stops.
+  if (stops.length >= 2) {
+    const firstStop = stops[0];
+    const lastStop = stops[stops.length - 1];
+
+    // Squared Euclidean distance in lat/lon space — sufficient for finding
+    // the nearest shape point within the bounds of a single route.
+    const dist2 = (
+      [lon, lat]: [number, number],
+      stopLon: number,
+      stopLat: number,
+    ) => (lon - stopLon) ** 2 + (lat - stopLat) ** 2;
+
+    // Nearest shape point to the first stop (scanning forward).
+    let startIdx = 0;
+    let startDist = Infinity;
+    for (let i = 0; i < coordinates.length; i++) {
+      const d = dist2(coordinates[i], firstStop.lon, firstStop.lat);
+      if (d < startDist) {
+        startDist = d;
+        startIdx = i;
+      }
+    }
+
+    // Nearest shape point to the last stop (scanning backward).
+    let endIdx = coordinates.length - 1;
+    let endDist = Infinity;
+    for (let i = coordinates.length - 1; i >= 0; i--) {
+      const d = dist2(coordinates[i], lastStop.lon, lastStop.lat);
+      if (d < endDist) {
+        endDist = d;
+        endIdx = i;
+      }
+    }
+
+    // Only apply the trim when the result is a valid segment.
+    if (startIdx < endIdx) {
+      coordinates = coordinates.slice(startIdx, endIdx + 1);
+    }
+  }
 
   return {
     type: "Feature",
