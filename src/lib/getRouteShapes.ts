@@ -17,6 +17,14 @@ export interface RouteShapesGeoJSON {
    * `features`.
    */
   hasOwlService: boolean;
+  /**
+   * `true` when this route is a "split line" — a route whose
+   * `route_short_name` is of the form `N/M`, indicating that two
+   * complementary services share the same `route_id`. Each feature in
+   * `features` will carry a `splitLineNumber` property identifying which
+   * sub-line it belongs to.
+   */
+  isSplitline: boolean;
   features: RouteShapeFeature[];
 }
 
@@ -51,6 +59,11 @@ export interface RouteShapeFeature {
      *   stop not on the core routing).
      */
     serviceType: "core" | "owl";
+    /**
+     * For split-line routes only: the line number (e.g. `"105"` or `"205"`)
+     * that this feature belongs to. Absent for non-split-line routes.
+     */
+    splitLineNumber?: string;
   };
 }
 
@@ -123,6 +136,8 @@ const _stmts: Partial<{
   owlVisitsNonCore: Database.Statement;
   owlShapeIds: Database.Statement;
   owlShapeStops: Database.Statement;
+  splitLineTrips: Database.Statement;
+  owlTripsFromTripIds: Database.Statement;
 }> = {};
 
 /**
@@ -189,10 +204,10 @@ function getShapeStopsQuery() {
   `));
 }
 
-/** `route_type` for a given route id (matching exact id or `-version` variant). */
+/** `route_type` and `route_short_name` for a given route id (matching exact id or `-version` variant). */
 function getRouteTypeQuery() {
   return (_stmts.routeType ??= getDb().prepare(`
-    SELECT route_type
+    SELECT route_type, route_short_name
     FROM routes
     WHERE route_id = @routeId OR route_id LIKE @routeId || '-%'
     LIMIT 1
@@ -258,7 +273,7 @@ function getOwlVisitsNonCoreQuery() {
 /**
  * Same selection logic as {@link getShapeIdsQuery} (most-used `shape_id`
  * per `direction_id`, ties broken by `MIN(shape_id)`), but restricted to
- * the supplied set of owl trip_ids.
+ * the supplied set of trip_ids.
  */
 function getOwlShapeIdsQuery() {
   return (_stmts.owlShapeIds ??= getDb().prepare(`
@@ -307,6 +322,65 @@ function getOwlShapeStopsQuery() {
     )
       AND (st.pickup_type = 0 OR st.drop_off_type = 0)
     ORDER BY st.stop_sequence ASC
+  `));
+}
+
+/**
+ * For a split-line route, returns `{trip_id, headsign}` for every active
+ * trip whose *every* `stop_time` carries exactly the same `stop_headsign`
+ * (i.e. `COUNT(DISTINCT stop_headsign) = 1`). Trips with mixed headsigns or
+ * with no headsign values at all are excluded.
+ *
+ * The headsign value may be a fuller string such as `"105 - Chatsworth"`;
+ * callers are responsible for matching the relevant line number against the
+ * returned headsign.
+ */
+function getSplitLineTripsQuery() {
+  return (_stmts.splitLineTrips ??= getDb().prepare(`
+    WITH ${ACTIVE_SERVICES_CTE},
+    route_trips AS (
+      SELECT t.trip_id
+      FROM trips t
+      WHERE (t.route_id = @routeId OR t.route_id LIKE @routeId || '-%')
+        AND t.service_id IN (SELECT service_id FROM active_services)
+    )
+    SELECT rt.trip_id, MAX(st.stop_headsign) AS headsign
+    FROM route_trips rt
+    JOIN stop_times st ON st.trip_id = rt.trip_id
+    WHERE st.stop_headsign IS NOT NULL AND st.stop_headsign != ''
+    GROUP BY rt.trip_id
+    HAVING COUNT(DISTINCT st.stop_headsign) = 1
+  `));
+}
+
+/**
+ * Returns the distinct `trip_id`s of "owl trips" from a pre-filtered set of
+ * trip IDs: trips whose *every* `stop_time` falls in the late-night window
+ * `[23:00, 05:00)` of the service day. The hour is taken modulo 24 to handle
+ * GTFS extended-hour times (e.g. `25:30:00`).
+ *
+ * Unlike {@link getOwlTripsQuery}, this variant accepts trip IDs via a JSON
+ * array (`@tripIdsJson`), making it suitable for split-line sub-groups that
+ * were already filtered to active services.
+ */
+function getOwlTripsFromTripIdsQuery() {
+  return (_stmts.owlTripsFromTripIds ??= getDb().prepare(`
+    SELECT ct.trip_id
+    FROM (SELECT value AS trip_id FROM json_each(@tripIdsJson)) ct
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM stop_times st
+      WHERE st.trip_id = ct.trip_id
+        AND (
+          (CAST(
+            substr(
+              COALESCE(NULLIF(st.departure_time, ''), st.arrival_time),
+              1,
+              instr(COALESCE(NULLIF(st.departure_time, ''), st.arrival_time), ':') - 1
+            ) AS INTEGER
+          ) % 24) BETWEEN 5 AND 22
+        )
+    )
   `));
 }
 
@@ -377,18 +451,35 @@ function nearestIndex(
 }
 
 /**
+ * Returns `true` when `headsign` contains `lineNumber` as a standalone
+ * number — i.e. not immediately preceded or followed by another digit.
+ * For example, `"105 - Chatsworth"` matches `"105"` but not `"1051"` or
+ * `"2105"`.
+ */
+function headsignMatchesLineNumber(
+  headsign: string,
+  lineNumber: string,
+): boolean {
+  return new RegExp(`(?<!\\d)${lineNumber}(?!\\d)`).test(headsign);
+}
+
+/**
  * Builds a `RouteShapeFeature` from a `(shape_id, direction_id)` pair.
  * Returns `null` if the shape has fewer than 2 geometry points (and thus
  * can't form a `LineString`).
  *
- * `getStops` is provided so we can swap in the owl-specific
- * representative-trip selection when building owl features.
+ * `getStops` is provided so we can swap in the owl-specific (or
+ * split-line-specific) representative-trip selection when building features.
+ *
+ * `splitLineNumber` is forwarded to `feature.properties.splitLineNumber` and
+ * is only present for features belonging to a split-line sub-group.
  */
 function buildFeature(
   shape_id: string,
   direction_id: number | null,
   serviceType: "core" | "owl",
   getStops: (shapeId: string) => StopRow[],
+  splitLineNumber?: string,
 ): RouteShapeFeature | null {
   const points = getShapePointsQuery().all(shape_id) as ShapePointRow[];
   if (points.length < 2) return null;
@@ -436,8 +527,110 @@ function buildFeature(
       directionIds: [direction_id],
       stops,
       serviceType,
+      ...(splitLineNumber !== undefined && { splitLineNumber }),
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Split-line helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Processes a pre-filtered group of trip IDs through the same core + owl
+ * shape-selection pipeline used for non-split routes, attaching
+ * `splitLineNumber` to every produced feature.
+ *
+ * Core shapes are selected via {@link getOwlShapeIdsQuery} (which accepts a
+ * trip-IDs JSON array), and owl detection is done with
+ * {@link getOwlTripsFromTripIdsQuery}.
+ *
+ * @param tripIdsJson  JSON-serialised array of trip IDs in this sub-group.
+ *                     These trips must already be filtered to the active
+ *                     service date.
+ * @param splitLineNumber  The line-number label (e.g. `"105"`) to attach to
+ *                         every feature produced by this group.
+ * @param isBusRoute  Whether the parent route is `route_type = 3` (required
+ *                    to gate owl-service detection).
+ */
+function processTripGroup(
+  tripIdsJson: string,
+  splitLineNumber: string,
+  isBusRoute: boolean,
+): { features: RouteShapeFeature[]; hasOwlService: boolean } {
+  const features: RouteShapeFeature[] = [];
+  const coreStopIds = new Set<string>();
+  const stopsStmt = getOwlShapeStopsQuery();
+
+  // Core: most-used shape per direction within this trip group.
+  // getOwlShapeIdsQuery accepts a JSON trip-IDs array — reused here for the
+  // split-line core selection since the logic is identical.
+  const shapeRows = getOwlShapeIdsQuery().all({
+    owlTripIdsJson: tripIdsJson,
+  }) as ShapeIdRow[];
+
+  for (const { shape_id, direction_id } of shapeRows) {
+    const feature = buildFeature(
+      shape_id,
+      direction_id,
+      "core",
+      (sid) =>
+        stopsStmt.all({
+          shapeId: sid,
+          owlTripIdsJson: tripIdsJson,
+        }) as StopRow[],
+      splitLineNumber,
+    );
+    if (!feature) continue;
+    for (const s of feature.properties.stops) coreStopIds.add(s.stopId);
+    features.push(feature);
+  }
+
+  // Owl detection (bus routes only).
+  let hasOwlService = false;
+
+  if (isBusRoute && coreStopIds.size > 0) {
+    const owlTripRows = getOwlTripsFromTripIdsQuery().all({
+      tripIdsJson,
+    }) as { trip_id: string }[];
+
+    if (owlTripRows.length > 0) {
+      const owlTripIds = owlTripRows.map((r) => r.trip_id);
+      const owlTripIdsJson = JSON.stringify(owlTripIds);
+      const coreStopIdsJson = JSON.stringify([...coreStopIds]);
+
+      const visitsRow = getOwlVisitsNonCoreQuery().get({
+        owlTripIdsJson,
+        coreStopIdsJson,
+      }) as { visits_non_core: number } | undefined;
+
+      if (visitsRow?.visits_non_core === 1) {
+        const owlShapeRows = getOwlShapeIdsQuery().all({
+          owlTripIdsJson,
+        }) as ShapeIdRow[];
+
+        const owlStopsStmt = getOwlShapeStopsQuery();
+        for (const { shape_id, direction_id } of owlShapeRows) {
+          const feature = buildFeature(
+            shape_id,
+            direction_id,
+            "owl",
+            (sid) =>
+              owlStopsStmt.all({
+                shapeId: sid,
+                owlTripIdsJson,
+              }) as StopRow[],
+            splitLineNumber,
+          );
+          if (!feature) continue;
+          features.push(feature);
+          hasOwlService = true;
+        }
+      }
+    }
+  }
+
+  return { features, hasOwlService };
 }
 
 // ---------------------------------------------------------------------------
@@ -466,6 +659,14 @@ function buildFeature(
  * "most-used shape per direction (ties → `MIN(shape_id)`)" rule, but only
  * over the owl trips, and `hasOwlService` is set to `true`.
  *
+ * **Split lines** — routes whose `route_short_name` matches the pattern
+ * `N/M` (e.g. `"105/205"`) — run two complementary services under a single
+ * `route_id`, distinguished by `stop_headsign`. For these routes,
+ * `isSplitline` is set to `true` and the full pipeline (core + owl) is run
+ * independently for each sub-line's trips. Each resulting feature carries a
+ * `splitLineNumber` property (e.g. `"105"` or `"205"`) identifying its
+ * sub-line.
+ *
  * Results are cached in-memory keyed by `routeId` + today's service date, so
  * the cache rolls over automatically at midnight (Pacific) without needing
  * an explicit invalidation.
@@ -476,7 +677,67 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  // ---- Core service: most-used shape per direction. ----
+  const routeTypeRow = getRouteTypeQuery().get({ routeId }) as
+    | { route_type: number; route_short_name: string }
+    | undefined;
+
+  const isBusRoute = routeTypeRow?.route_type === 3;
+  const routeShortName = routeTypeRow?.route_short_name ?? "";
+
+  // ---- Split-line detection ----
+  // A split line has a route_short_name of the form "N/M" (e.g. "105/205").
+  const splitMatch = /^(\d+)\/(\d+)$/.exec(routeShortName);
+
+  if (splitMatch) {
+    const [lineA, lineB] = [splitMatch[1], splitMatch[2]];
+
+    // Fetch all active trips whose every stop_time shares a single headsign.
+    const tripRows = getSplitLineTripsQuery().all({ routeId, today }) as {
+      trip_id: string;
+      headsign: string;
+    }[];
+
+    // Partition trips into the two sub-line groups. Trips whose headsign
+    // doesn't contain either line number (e.g. mixed or unrecognised) are
+    // intentionally ignored.
+    const groupA: string[] = [];
+    const groupB: string[] = [];
+
+    for (const { trip_id, headsign } of tripRows) {
+      if (headsignMatchesLineNumber(headsign, lineA)) {
+        groupA.push(trip_id);
+      } else if (headsignMatchesLineNumber(headsign, lineB)) {
+        groupB.push(trip_id);
+      }
+    }
+
+    const features: RouteShapeFeature[] = [];
+    let hasOwlService = false;
+
+    for (const [lineNumber, group] of [
+      [lineA, groupA],
+      [lineB, groupB],
+    ] as [string, string[]][]) {
+      if (group.length === 0) continue;
+      const { features: groupFeatures, hasOwlService: groupOwl } =
+        processTripGroup(JSON.stringify(group), lineNumber, isBusRoute);
+      features.push(...groupFeatures);
+      if (groupOwl) hasOwlService = true;
+    }
+
+    const result: RouteShapesGeoJSON = {
+      type: "FeatureCollection",
+      hasOwlService,
+      isSplitline: true,
+      features,
+    };
+    cache.set(cacheKey, result);
+    return result;
+  }
+
+  // ---- Non-split route: original pipeline ----
+
+  // Core service: most-used shape per direction.
   const shapeRows = getShapeIdsQuery().all({ routeId, today }) as ShapeIdRow[];
 
   const features: RouteShapeFeature[] = [];
@@ -498,11 +759,7 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
   // ---- Owl service detection (bus routes only). ----
   let hasOwlService = false;
 
-  const routeTypeRow = getRouteTypeQuery().get({ routeId }) as
-    | { route_type: number }
-    | undefined;
-
-  if (routeTypeRow?.route_type === 3 && coreStopIds.size > 0) {
+  if (isBusRoute && coreStopIds.size > 0) {
     // 1) Find owl trips: trips whose every stop_time is in [23:00, 05:00).
     const owlTripRows = getOwlTripsQuery().all({
       routeId,
@@ -550,6 +807,7 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
   const result: RouteShapesGeoJSON = {
     type: "FeatureCollection",
     hasOwlService,
+    isSplitline: false,
     features,
   };
 

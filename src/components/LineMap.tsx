@@ -25,20 +25,6 @@ interface Props {
   routeColor: string;
 }
 
-/** Returns a pixel radius for stop circle markers that grows with zoom level. */
-function stopRadiusForZoom(zoom: number): number {
-  // At the default zoom (11) this returns 5, matching the previous hard-coded value.
-  // Each zoom step adds ~1.5 px, clamped between 3 and 14.
-  return Math.max(3, Math.min(14, 5 + (zoom - 11) * 1.5));
-}
-
-/** Returns a stroke weight for stop circle markers that grows with zoom level. */
-function stopWeightForZoom(zoom: number): number {
-  // At the default zoom (11) this returns 2, matching the previous hard-coded value.
-  // Each zoom step adds 0.5 px, clamped between 1 and 5.
-  return Math.max(1, Math.min(5, 2 + (zoom - 11) * 0.5));
-}
-
 function shapeOptionLabel(feature: RouteShapeFeature): string {
   const stops = feature.properties.stops;
   const terminal = stops.at(-1);
@@ -55,6 +41,7 @@ export default function LineMap({ routeId, routeColor }: Props) {
   const [geojson, setGeojson] = useState<RouteShapesGeoJSON | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [serviceType, setServiceType] = useState<"core" | "owl">("core");
+  const [splitLineNumber, setSplitLineNumber] = useState<string | null>(null);
 
   // Mount: create the map + base layer and fetch the route shape GeoJSON.
   useEffect(() => {
@@ -101,6 +88,15 @@ export default function LineMap({ routeId, routeColor }: Props) {
         if (cancelled) return;
         setGeojson(data);
         setSelectedIndex(0);
+        // Initialise split-line selection to the first sub-line number found.
+        if (data.isSplitline) {
+          const firstNumber = data.features.find(
+            (f) => f.properties.splitLineNumber !== undefined,
+          )?.properties.splitLineNumber;
+          setSplitLineNumber(firstNumber ?? null);
+        } else {
+          setSplitLineNumber(null);
+        }
       } catch (err) {
         // Non-fatal: leave the map on its default LA-wide view.
         console.error("Failed to load route shape:", err);
@@ -116,6 +112,36 @@ export default function LineMap({ routeId, routeColor }: Props) {
       leafletRef.current = null;
     };
   }, [routeId]);
+
+  // Derive the sorted unique split-line numbers from the GeoJSON features.
+  const splitLineNumbers = useMemo(() => {
+    if (!geojson?.isSplitline) return [];
+    const seen = new Set<string>();
+    for (const f of geojson.features) {
+      if (f.properties.splitLineNumber !== undefined) {
+        seen.add(f.properties.splitLineNumber);
+      }
+    }
+    return [...seen].sort();
+  }, [geojson]);
+
+  // When the split-line number changes, reset service type and direction.
+  useEffect(() => {
+    setServiceType("core");
+  }, [splitLineNumber]);
+
+  // When switching service type, reset the direction selection to the first
+  // feature matching the new service type (and split-line number, if applicable).
+  useEffect(() => {
+    if (!geojson) return;
+    const firstMatch = geojson.features.findIndex(
+      (f) =>
+        f.properties.serviceType === serviceType &&
+        (splitLineNumber === null ||
+          f.properties.splitLineNumber === splitLineNumber),
+    );
+    setSelectedIndex(firstMatch === -1 ? 0 : firstMatch);
+  }, [serviceType, splitLineNumber, geojson]);
 
   // Selection: render only the currently selected shape feature, swapping
   // layers in place when the selection (or color) changes.
@@ -159,9 +185,9 @@ export default function LineMap({ routeId, routeColor }: Props) {
 
     for (const stop of feature.properties.stops) {
       const marker = L.circleMarker([stop.lat, stop.lon], {
-        radius: stopRadiusForZoom(map.getZoom()),
+        radius: 5,
         color: lineColor,
-        weight: stopWeightForZoom(map.getZoom()),
+        weight: 3,
         fillColor: "#fff",
         fillOpacity: 1,
       })
@@ -169,45 +195,62 @@ export default function LineMap({ routeId, routeColor }: Props) {
         .addTo(stopsGroup);
       stopMarkers.push(marker);
     }
-
-    // Update marker size and stroke weight whenever the zoom level changes.
-    const handleZoom = () => {
-      const zoom = map.getZoom();
-      const r = stopRadiusForZoom(zoom);
-      const w = stopWeightForZoom(zoom);
-      stopMarkers.forEach((m) => {
-        m.setRadius(r);
-        m.setStyle({ weight: w });
-      });
-    };
-    map.on("zoomend", handleZoom);
-
-    return () => {
-      map.off("zoomend", handleZoom);
-    };
   }, [geojson, selectedIndex, routeColor]);
 
-  // When switching service type, reset the direction selection to the first
-  // feature matching the new service type.
-  useEffect(() => {
-    if (!geojson) return;
-    const firstMatch = geojson.features.findIndex(
-      (f) => f.properties.serviceType === serviceType,
-    );
-    setSelectedIndex(firstMatch === -1 ? 0 : firstMatch);
-  }, [serviceType, geojson]);
-
+  // Filtered direction options — respects both service type and split-line number.
   const filteredOptions = useMemo(() => {
     if (!geojson) return [];
     return geojson.features
-      .map((f, i) => ({ value: i, label: shapeOptionLabel(f), serviceType: f.properties.serviceType }))
-      .filter((opt) => opt.serviceType === serviceType);
-  }, [geojson, serviceType]);
+      .map((f, i) => ({
+        value: i,
+        label: shapeOptionLabel(f),
+        serviceType: f.properties.serviceType,
+        splitLineNumber: f.properties.splitLineNumber,
+      }))
+      .filter(
+        (opt) =>
+          opt.serviceType === serviceType &&
+          (splitLineNumber === null ||
+            opt.splitLineNumber === splitLineNumber),
+      );
+  }, [geojson, serviceType, splitLineNumber]);
+
+  // Whether this route has owl service for the currently selected sub-line.
+  const hasOwlServiceForSelection = useMemo(() => {
+    if (!geojson?.hasOwlService) return false;
+    if (!geojson.isSplitline || splitLineNumber === null) {
+      return geojson.hasOwlService;
+    }
+    return geojson.features.some(
+      (f) =>
+        f.properties.serviceType === "owl" &&
+        f.properties.splitLineNumber === splitLineNumber,
+    );
+  }, [geojson, splitLineNumber]);
 
   return (
     <div className="bg-background-white mb-8 rounded-lg">
       <div className="mb-2 flex flex-wrap items-center gap-3 px-3 pt-3 pb-1">
-        {geojson?.hasOwlService && (
+        {geojson?.isSplitline && splitLineNumbers.length > 0 && (
+          <div>
+            <label className="mr-2 font-medium" htmlFor="split-line-select">
+              Line:
+            </label>
+            <select
+              id="split-line-select"
+              className="border-divider-line rounded border px-2 py-1"
+              value={splitLineNumber ?? ""}
+              onChange={(e) => setSplitLineNumber(e.target.value || null)}
+            >
+              {splitLineNumbers.map((num) => (
+                <option key={num} value={num}>
+                  {num}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {hasOwlServiceForSelection && (
           <div>
             <label className="mr-2 font-medium" htmlFor="service-type-select">
               Service:
