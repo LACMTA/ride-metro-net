@@ -72,15 +72,11 @@ interface StopRow {
   stop_lon: number;
 }
 
+// ---------------------------------------------------------------------------
+// Database singleton + prepared statements
+// ---------------------------------------------------------------------------
+
 let dbInstance: Database.Database | null = null;
-let shapeIdsQuery: Database.Statement | null = null;
-let shapePointsQuery: Database.Statement | null = null;
-let shapeStopsQuery: Database.Statement | null = null;
-let routeTypeQuery: Database.Statement | null = null;
-let owlTripsQuery: Database.Statement | null = null;
-let owlVisitsNonCoreQuery: Database.Statement | null = null;
-let owlShapeIdsQuery: Database.Statement | null = null;
-let owlShapeStopsQuery: Database.Statement | null = null;
 
 function getDb() {
   if (!dbInstance) {
@@ -94,70 +90,83 @@ function getDb() {
 }
 
 /**
+ * Shared `active_services` CTE used by any query that must filter to trips
+ * running on today's service date (`@today`, a `YYYYMMDD` string).
+ *
+ * A `service_id` qualifies when it either:
+ *  - Has a `calendar` row with `start_date <= @today <= end_date`, or
+ *  - Has an additive `calendar_dates` row (`exception_type = 1`) for `@today`
+ *    (covers services defined exclusively via `calendar_dates`, e.g. holidays).
+ */
+const ACTIVE_SERVICES_CTE = `
+  active_services AS (
+    SELECT c.service_id
+    FROM calendar c
+    WHERE c.start_date <= @today
+      AND c.end_date >= @today
+    UNION
+    SELECT cd.service_id
+    FROM calendar_dates cd
+    WHERE cd.date = @today AND cd.exception_type = 1
+  )`;
+
+/**
+ * Lazily-initialised prepared statements. Each entry is populated on first
+ * use so the db handle is guaranteed to exist by the time `.prepare()` runs.
+ */
+const _stmts: Partial<{
+  shapeIds: Database.Statement;
+  shapePoints: Database.Statement;
+  shapeStops: Database.Statement;
+  routeType: Database.Statement;
+  owlTrips: Database.Statement;
+  owlVisitsNonCore: Database.Statement;
+  owlShapeIds: Database.Statement;
+  owlShapeStops: Database.Statement;
+}> = {};
+
+/**
  * For each `direction_id` found among trips of a given route that are
  * currently in service, selects the single `shape_id` used by the most trips
  * (ties broken by `MIN(shape_id)` for determinism).
- *
- * A `service_id` is considered "currently in service" on `@today` when
- * either:
- *
- *  - It has a `calendar` row with `start_date <= @today <= end_date`, or
- *  - It has an additive `calendar_dates` row (`exception_type = 1`) for
- *    `@today` (covering services defined exclusively in `calendar_dates`,
- *    e.g. for holidays).
  *
  * `@today` is a `YYYYMMDD` string matching the format used by
  * `calendar.start_date` / `end_date` and `calendar_dates.date`.
  */
 function getShapeIdsQuery() {
-  if (!shapeIdsQuery) {
-    shapeIdsQuery = getDb().prepare(`
-      WITH active_services AS (
-        SELECT c.service_id
-        FROM calendar c
-        WHERE c.start_date <= @today
-          AND c.end_date >= @today
-        UNION
-        SELECT cd.service_id
-        FROM calendar_dates cd
-        WHERE cd.date = @today AND cd.exception_type = 1
-      ),
-      shape_counts AS (
-        SELECT t.direction_id,
-               t.shape_id,
-               COUNT(*) AS trip_count
-        FROM trips t
-        WHERE (t.route_id = @routeId OR t.route_id LIKE @routeId || '-%')
-          AND t.shape_id IS NOT NULL
-          AND t.shape_id != ''
-          AND t.service_id IN (SELECT service_id FROM active_services)
-        GROUP BY t.direction_id, t.shape_id
-      )
-      SELECT sc.direction_id,
-             MIN(sc.shape_id) AS shape_id,
-             sc.trip_count
-      FROM shape_counts sc
-      WHERE sc.trip_count = (
-        SELECT MAX(sc2.trip_count)
-        FROM shape_counts sc2
-        WHERE sc2.direction_id IS sc.direction_id
-      )
-      GROUP BY sc.direction_id, sc.trip_count
-    `);
-  }
-  return shapeIdsQuery;
+  return (_stmts.shapeIds ??= getDb().prepare(`
+    WITH ${ACTIVE_SERVICES_CTE},
+    shape_counts AS (
+      SELECT t.direction_id,
+             t.shape_id,
+             COUNT(*) AS trip_count
+      FROM trips t
+      WHERE (t.route_id = @routeId OR t.route_id LIKE @routeId || '-%')
+        AND t.shape_id IS NOT NULL
+        AND t.shape_id != ''
+        AND t.service_id IN (SELECT service_id FROM active_services)
+      GROUP BY t.direction_id, t.shape_id
+    )
+    SELECT sc.direction_id,
+           MIN(sc.shape_id) AS shape_id,
+           sc.trip_count
+    FROM shape_counts sc
+    WHERE sc.trip_count = (
+      SELECT MAX(sc2.trip_count)
+      FROM shape_counts sc2
+      WHERE sc2.direction_id IS sc.direction_id
+    )
+    GROUP BY sc.direction_id, sc.trip_count
+  `));
 }
 
 function getShapePointsQuery() {
-  if (!shapePointsQuery) {
-    shapePointsQuery = getDb().prepare(`
-      SELECT shape_pt_lat, shape_pt_lon
-      FROM shapes
-      WHERE shape_id = ?
-      ORDER BY shape_pt_sequence ASC
-    `);
-  }
-  return shapePointsQuery;
+  return (_stmts.shapePoints ??= getDb().prepare(`
+    SELECT shape_pt_lat, shape_pt_lon
+    FROM shapes
+    WHERE shape_id = ?
+    ORDER BY shape_pt_sequence ASC
+  `));
 }
 
 /**
@@ -166,34 +175,28 @@ function getShapePointsQuery() {
  * that uses this shape), in stop-sequence order.
  */
 function getShapeStopsQuery() {
-  if (!shapeStopsQuery) {
-    shapeStopsQuery = getDb().prepare(`
-      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
-      FROM stop_times st
-      JOIN stops s ON s.stop_id = st.stop_id
-      WHERE st.trip_id = (
-        SELECT MIN(t.trip_id)
-        FROM trips t
-        WHERE t.shape_id = ?
-      )
-        AND (st.pickup_type = 0 OR st.drop_off_type = 0)
-      ORDER BY st.stop_sequence ASC
-    `);
-  }
-  return shapeStopsQuery;
+  return (_stmts.shapeStops ??= getDb().prepare(`
+    SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+    FROM stop_times st
+    JOIN stops s ON s.stop_id = st.stop_id
+    WHERE st.trip_id = (
+      SELECT MIN(t.trip_id)
+      FROM trips t
+      WHERE t.shape_id = ?
+    )
+      AND (st.pickup_type = 0 OR st.drop_off_type = 0)
+    ORDER BY st.stop_sequence ASC
+  `));
 }
 
 /** `route_type` for a given route id (matching exact id or `-version` variant). */
 function getRouteTypeQuery() {
-  if (!routeTypeQuery) {
-    routeTypeQuery = getDb().prepare(`
-      SELECT route_type
-      FROM routes
-      WHERE route_id = @routeId OR route_id LIKE @routeId || '-%'
-      LIMIT 1
-    `);
-  }
-  return routeTypeQuery;
+  return (_stmts.routeType ??= getDb().prepare(`
+    SELECT route_type
+    FROM routes
+    WHERE route_id = @routeId OR route_id LIKE @routeId || '-%'
+    LIMIT 1
+  `));
 }
 
 /**
@@ -206,44 +209,32 @@ function getRouteTypeQuery() {
  * when departure is missing/empty.
  */
 function getOwlTripsQuery() {
-  if (!owlTripsQuery) {
-    owlTripsQuery = getDb().prepare(`
-      WITH active_services AS (
-        SELECT c.service_id
-        FROM calendar c
-        WHERE c.start_date <= @today
-          AND c.end_date >= @today
-        UNION
-        SELECT cd.service_id
-        FROM calendar_dates cd
-        WHERE cd.date = @today AND cd.exception_type = 1
-      ),
-      route_trips AS (
-        SELECT t.trip_id
-        FROM trips t
-        WHERE (t.route_id = @routeId OR t.route_id LIKE @routeId || '-%')
-          AND t.service_id IN (SELECT service_id FROM active_services)
-      )
-      SELECT rt.trip_id
-      FROM route_trips rt
-      WHERE NOT EXISTS (
-        SELECT 1
-        FROM stop_times st
-        WHERE st.trip_id = rt.trip_id
-          AND (
-            -- A stop_time outside [23:00, 05:00) disqualifies the trip.
-            (CAST(
-              substr(
-                COALESCE(NULLIF(st.departure_time, ''), st.arrival_time),
-                1,
-                instr(COALESCE(NULLIF(st.departure_time, ''), st.arrival_time), ':') - 1
-              ) AS INTEGER
-            ) % 24) BETWEEN 5 AND 22
-          )
-      )
-    `);
-  }
-  return owlTripsQuery;
+  return (_stmts.owlTrips ??= getDb().prepare(`
+    WITH ${ACTIVE_SERVICES_CTE},
+    route_trips AS (
+      SELECT t.trip_id
+      FROM trips t
+      WHERE (t.route_id = @routeId OR t.route_id LIKE @routeId || '-%')
+        AND t.service_id IN (SELECT service_id FROM active_services)
+    )
+    SELECT rt.trip_id
+    FROM route_trips rt
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM stop_times st
+      WHERE st.trip_id = rt.trip_id
+        AND (
+          -- A stop_time outside [23:00, 05:00) disqualifies the trip.
+          (CAST(
+            substr(
+              COALESCE(NULLIF(st.departure_time, ''), st.arrival_time),
+              1,
+              instr(COALESCE(NULLIF(st.departure_time, ''), st.arrival_time), ':') - 1
+            ) AS INTEGER
+          ) % 24) BETWEEN 5 AND 22
+        )
+    )
+  `));
 }
 
 /**
@@ -253,18 +244,15 @@ function getOwlTripsQuery() {
  * Returns `0` otherwise.
  */
 function getOwlVisitsNonCoreQuery() {
-  if (!owlVisitsNonCoreQuery) {
-    owlVisitsNonCoreQuery = getDb().prepare(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM stop_times st
-        WHERE st.trip_id IN (SELECT value FROM json_each(@owlTripIdsJson))
-          AND (st.pickup_type = 0 OR st.drop_off_type = 0)
-          AND st.stop_id NOT IN (SELECT value FROM json_each(@coreStopIdsJson))
-      ) AS visits_non_core
-    `);
-  }
-  return owlVisitsNonCoreQuery;
+  return (_stmts.owlVisitsNonCore ??= getDb().prepare(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM stop_times st
+      WHERE st.trip_id IN (SELECT value FROM json_each(@owlTripIdsJson))
+        AND (st.pickup_type = 0 OR st.drop_off_type = 0)
+        AND st.stop_id NOT IN (SELECT value FROM json_each(@coreStopIdsJson))
+    ) AS visits_non_core
+  `));
 }
 
 /**
@@ -273,34 +261,31 @@ function getOwlVisitsNonCoreQuery() {
  * the supplied set of owl trip_ids.
  */
 function getOwlShapeIdsQuery() {
-  if (!owlShapeIdsQuery) {
-    owlShapeIdsQuery = getDb().prepare(`
-      WITH owl_trip_ids AS (
-        SELECT value AS trip_id FROM json_each(@owlTripIdsJson)
-      ),
-      shape_counts AS (
-        SELECT t.direction_id,
-               t.shape_id,
-               COUNT(*) AS trip_count
-        FROM trips t
-        WHERE t.trip_id IN (SELECT trip_id FROM owl_trip_ids)
-          AND t.shape_id IS NOT NULL
-          AND t.shape_id != ''
-        GROUP BY t.direction_id, t.shape_id
-      )
-      SELECT sc.direction_id,
-             MIN(sc.shape_id) AS shape_id,
-             sc.trip_count
-      FROM shape_counts sc
-      WHERE sc.trip_count = (
-        SELECT MAX(sc2.trip_count)
-        FROM shape_counts sc2
-        WHERE sc2.direction_id IS sc.direction_id
-      )
-      GROUP BY sc.direction_id, sc.trip_count
-    `);
-  }
-  return owlShapeIdsQuery;
+  return (_stmts.owlShapeIds ??= getDb().prepare(`
+    WITH owl_trip_ids AS (
+      SELECT value AS trip_id FROM json_each(@owlTripIdsJson)
+    ),
+    shape_counts AS (
+      SELECT t.direction_id,
+             t.shape_id,
+             COUNT(*) AS trip_count
+      FROM trips t
+      WHERE t.trip_id IN (SELECT trip_id FROM owl_trip_ids)
+        AND t.shape_id IS NOT NULL
+        AND t.shape_id != ''
+      GROUP BY t.direction_id, t.shape_id
+    )
+    SELECT sc.direction_id,
+           MIN(sc.shape_id) AS shape_id,
+           sc.trip_count
+    FROM shape_counts sc
+    WHERE sc.trip_count = (
+      SELECT MAX(sc2.trip_count)
+      FROM shape_counts sc2
+      WHERE sc2.direction_id IS sc.direction_id
+    )
+    GROUP BY sc.direction_id, sc.trip_count
+  `));
 }
 
 /**
@@ -310,51 +295,85 @@ function getOwlShapeIdsQuery() {
  * service-stop filter as {@link getShapeStopsQuery}.
  */
 function getOwlShapeStopsQuery() {
-  if (!owlShapeStopsQuery) {
-    owlShapeStopsQuery = getDb().prepare(`
-      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
-      FROM stop_times st
-      JOIN stops s ON s.stop_id = st.stop_id
-      WHERE st.trip_id = (
-        SELECT MIN(t.trip_id)
-        FROM trips t
-        WHERE t.shape_id = @shapeId
-          AND t.trip_id IN (SELECT value FROM json_each(@owlTripIdsJson))
-      )
-        AND (st.pickup_type = 0 OR st.drop_off_type = 0)
-      ORDER BY st.stop_sequence ASC
-    `);
-  }
-  return owlShapeStopsQuery;
+  return (_stmts.owlShapeStops ??= getDb().prepare(`
+    SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+    FROM stop_times st
+    JOIN stops s ON s.stop_id = st.stop_id
+    WHERE st.trip_id = (
+      SELECT MIN(t.trip_id)
+      FROM trips t
+      WHERE t.shape_id = @shapeId
+        AND t.trip_id IN (SELECT value FROM json_each(@owlTripIdsJson))
+    )
+      AND (st.pickup_type = 0 OR st.drop_off_type = 0)
+    ORDER BY st.stop_sequence ASC
+  `));
 }
+
+// ---------------------------------------------------------------------------
+// Cache
+// ---------------------------------------------------------------------------
 
 /** In-memory cache — keyed by `routeId|YYYYMMDD` so the active-services
  *  filter naturally refreshes when the service day changes (e.g. on a
  *  long-running dev server). */
 const cache = new Map<string, RouteShapesGeoJSON>();
 
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
 /**
  * Returns today's date in the agency's local time zone
  * (`America/Los_Angeles`) as a `YYYYMMDD` string, matching the format used
  * by `calendar.start_date`, `calendar.end_date`, and `calendar_dates.date`.
+ *
+ * The `"en-CA"` locale formats dates as `YYYY-MM-DD`; stripping hyphens
+ * yields the required `YYYYMMDD` in one step.
  */
 function getServiceDate(now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
+  })
+    .format(now)
+    .replace(/-/g, "");
+}
 
-  let year = "";
-  let month = "";
-  let day = "";
-  for (const p of parts) {
-    if (p.type === "year") year = p.value;
-    else if (p.type === "month") month = p.value;
-    else if (p.type === "day") day = p.value;
+/**
+ * Squared Euclidean distance in lon/lat space — sufficient for finding the
+ * nearest shape point within the bounds of a single route.
+ */
+function dist2(
+  [lon, lat]: [number, number],
+  targetLon: number,
+  targetLat: number,
+): number {
+  return (lon - targetLon) ** 2 + (lat - targetLat) ** 2;
+}
+
+/**
+ * Returns the index of the coordinate in `coords` that is closest to
+ * `[targetLon, targetLat]`, scanning from `startAt` toward `endAt`
+ * (inclusive, direction determined by sign of `endAt - startAt`).
+ */
+function nearestIndex(
+  coords: [number, number][],
+  targetLon: number,
+  targetLat: number,
+  startAt: number,
+  endAt: number,
+): number {
+  const step = endAt >= startAt ? 1 : -1;
+  let bestIdx = startAt;
+  let bestDist = Infinity;
+  for (let i = startAt; step > 0 ? i <= endAt : i >= endAt; i += step) {
+    const d = dist2(coords[i], targetLon, targetLat);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i;
+    }
   }
-  return `${year}${month}${day}`;
+  return bestIdx;
 }
 
 /**
@@ -374,7 +393,7 @@ function buildFeature(
   const points = getShapePointsQuery().all(shape_id) as ShapePointRow[];
   if (points.length < 2) return null;
 
-  let coordinates = points.map(
+  const allCoords = points.map(
     (p) => [p.shape_pt_lon, p.shape_pt_lat] as [number, number],
   );
 
@@ -386,52 +405,32 @@ function buildFeature(
   }));
 
   // Trim the polyline so it doesn't extend beyond the first and last stops.
-  if (stops.length >= 2) {
+  const coordinates = (() => {
+    if (stops.length < 2) return allCoords;
     const firstStop = stops[0];
     const lastStop = stops[stops.length - 1];
-
-    // Squared Euclidean distance in lat/lon space — sufficient for finding
-    // the nearest shape point within the bounds of a single route.
-    const dist2 = (
-      [lon, lat]: [number, number],
-      stopLon: number,
-      stopLat: number,
-    ) => (lon - stopLon) ** 2 + (lat - stopLat) ** 2;
-
-    // Nearest shape point to the first stop (scanning forward).
-    let startIdx = 0;
-    let startDist = Infinity;
-    for (let i = 0; i < coordinates.length; i++) {
-      const d = dist2(coordinates[i], firstStop.lon, firstStop.lat);
-      if (d < startDist) {
-        startDist = d;
-        startIdx = i;
-      }
-    }
-
-    // Nearest shape point to the last stop (scanning backward).
-    let endIdx = coordinates.length - 1;
-    let endDist = Infinity;
-    for (let i = coordinates.length - 1; i >= 0; i--) {
-      const d = dist2(coordinates[i], lastStop.lon, lastStop.lat);
-      if (d < endDist) {
-        endDist = d;
-        endIdx = i;
-      }
-    }
-
-    // Only apply the trim when the result is a valid segment.
-    if (startIdx < endIdx) {
-      coordinates = coordinates.slice(startIdx, endIdx + 1);
-    }
-  }
+    const startIdx = nearestIndex(
+      allCoords,
+      firstStop.lon,
+      firstStop.lat,
+      0,
+      allCoords.length - 1,
+    );
+    const endIdx = nearestIndex(
+      allCoords,
+      lastStop.lon,
+      lastStop.lat,
+      allCoords.length - 1,
+      0,
+    );
+    return startIdx < endIdx
+      ? allCoords.slice(startIdx, endIdx + 1)
+      : allCoords;
+  })();
 
   return {
     type: "Feature",
-    geometry: {
-      type: "LineString",
-      coordinates,
-    },
+    geometry: { type: "LineString", coordinates },
     properties: {
       shapeIds: [shape_id],
       directionIds: [direction_id],
@@ -440,6 +439,10 @@ function buildFeature(
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 /**
  * Returns a {@link RouteShapesGeoJSON} with one `LineString` feature per
@@ -474,10 +477,7 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
   if (cached) return cached;
 
   // ---- Core service: most-used shape per direction. ----
-  const shapeRows = getShapeIdsQuery().all({
-    routeId,
-    today,
-  }) as ShapeIdRow[];
+  const shapeRows = getShapeIdsQuery().all({ routeId, today }) as ShapeIdRow[];
 
   const features: RouteShapeFeature[] = [];
   const coreStopIds = new Set<string>();
@@ -524,7 +524,7 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
         coreStopIdsJson,
       }) as { visits_non_core: number } | undefined;
 
-      if (visitsRow && visitsRow.visits_non_core === 1) {
+      if (visitsRow?.visits_non_core === 1) {
         // 3) Most-used owl shape per direction, restricted to owl trips.
         const owlShapeRows = getOwlShapeIdsQuery().all({
           owlTripIdsJson,
@@ -537,10 +537,7 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
             direction_id,
             "owl",
             (sid) =>
-              owlStopsStmt.all({
-                shapeId: sid,
-                owlTripIdsJson,
-              }) as StopRow[],
+              owlStopsStmt.all({ shapeId: sid, owlTripIdsJson }) as StopRow[],
           );
           if (!feature) continue;
           features.push(feature);
