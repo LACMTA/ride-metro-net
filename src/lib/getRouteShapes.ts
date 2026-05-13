@@ -152,6 +152,7 @@ function getShapeStopsQuery() {
         FROM trips t
         WHERE t.shape_id = ?
       )
+        AND (st.pickup_type = 0 OR st.drop_off_type = 0)
       ORDER BY st.stop_sequence ASC
     `);
   }
