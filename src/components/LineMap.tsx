@@ -196,29 +196,28 @@ export default function LineMap({ routeId, routeColor }: Props) {
   }, [geojson]);
 
   return (
-    <div className="mb-8">
-      {options.length > 1 && (
-        <div className="mb-2">
-          <label className="mr-2 text-sm font-medium" htmlFor="shape-select">
-            Shape:
-          </label>
-          <select
-            id="shape-select"
-            className="rounded border border-gray-300 px-2 py-1 text-sm"
-            value={selectedIndex}
-            onChange={(e) => setSelectedIndex(Number(e.target.value))}
-          >
-            {options.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+    <div className="bg-background-white mb-8 rounded-lg">
+      <div className="mb-2 px-3 pt-3 pb-1">
+        <label className="mr-2 text-sm font-medium" htmlFor="shape-select">
+          Direction:
+        </label>
+        <select
+          id="shape-select"
+          className="rounded border border-gray-300 px-2 py-1 text-sm"
+          value={selectedIndex}
+          onChange={(e) => setSelectedIndex(Number(e.target.value))}
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div
         ref={containerRef}
-        className="h-96 w-full overflow-hidden rounded-lg"
+        className="h-96 w-full overflow-hidden"
         aria-label="Map of Metro line route"
         role="img"
       />
