@@ -39,11 +39,10 @@ function stopWeightForZoom(zoom: number): number {
   return Math.max(1, Math.min(5, 2 + (zoom - 11) * 0.5));
 }
 
-function shapeOptionLabel(feature: RouteShapeFeature, index: number): string {
-  const dirs = feature.properties.directionIds
-    .map((d) => (d === null ? "—" : String(d)))
-    .join("/");
-  return `Variant ${index + 1} (direction ${dirs})`;
+function shapeOptionLabel(feature: RouteShapeFeature): string {
+  const stops = feature.properties.stops;
+  const terminal = stops.at(-1);
+  return terminal ? `${terminal.stopName}` : "Unknown direction";
 }
 
 export default function LineMap({ routeId, routeColor }: Props) {
@@ -191,19 +190,19 @@ export default function LineMap({ routeId, routeColor }: Props) {
     if (!geojson) return [];
     return geojson.features.map((f, i) => ({
       value: i,
-      label: shapeOptionLabel(f, i),
+      label: shapeOptionLabel(f),
     }));
   }, [geojson]);
 
   return (
     <div className="bg-background-white mb-8 rounded-lg">
       <div className="mb-2 px-3 pt-3 pb-1">
-        <label className="mr-2 text-sm font-medium" htmlFor="shape-select">
-          Direction:
+        <label className="mr-2 font-medium" htmlFor="shape-select">
+          To:
         </label>
         <select
           id="shape-select"
-          className="rounded border border-gray-300 px-2 py-1 text-sm"
+          className="border-divider-line rounded border px-2 py-1"
           value={selectedIndex}
           onChange={(e) => setSelectedIndex(Number(e.target.value))}
         >
