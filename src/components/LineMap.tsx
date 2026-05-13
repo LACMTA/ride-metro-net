@@ -54,6 +54,7 @@ export default function LineMap({ routeId, routeColor }: Props) {
 
   const [geojson, setGeojson] = useState<RouteShapesGeoJSON | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [serviceType, setServiceType] = useState<"core" | "owl">("core");
 
   // Mount: create the map + base layer and fetch the route shape GeoJSON.
   useEffect(() => {
@@ -186,32 +187,59 @@ export default function LineMap({ routeId, routeColor }: Props) {
     };
   }, [geojson, selectedIndex, routeColor]);
 
-  const options = useMemo(() => {
+  // When switching service type, reset the direction selection to the first
+  // feature matching the new service type.
+  useEffect(() => {
+    if (!geojson) return;
+    const firstMatch = geojson.features.findIndex(
+      (f) => f.properties.serviceType === serviceType,
+    );
+    setSelectedIndex(firstMatch === -1 ? 0 : firstMatch);
+  }, [serviceType, geojson]);
+
+  const filteredOptions = useMemo(() => {
     if (!geojson) return [];
-    return geojson.features.map((f, i) => ({
-      value: i,
-      label: shapeOptionLabel(f),
-    }));
-  }, [geojson]);
+    return geojson.features
+      .map((f, i) => ({ value: i, label: shapeOptionLabel(f), serviceType: f.properties.serviceType }))
+      .filter((opt) => opt.serviceType === serviceType);
+  }, [geojson, serviceType]);
 
   return (
     <div className="bg-background-white mb-8 rounded-lg">
-      <div className="mb-2 px-3 pt-3 pb-1">
-        <label className="mr-2 font-medium" htmlFor="shape-select">
-          To:
-        </label>
-        <select
-          id="shape-select"
-          className="border-divider-line rounded border px-2 py-1"
-          value={selectedIndex}
-          onChange={(e) => setSelectedIndex(Number(e.target.value))}
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+      <div className="mb-2 flex flex-wrap items-center gap-3 px-3 pt-3 pb-1">
+        {geojson?.hasOwlService && (
+          <div>
+            <label className="mr-2 font-medium" htmlFor="service-type-select">
+              Service:
+            </label>
+            <select
+              id="service-type-select"
+              className="border-divider-line rounded border px-2 py-1"
+              value={serviceType}
+              onChange={(e) => setServiceType(e.target.value as "core" | "owl")}
+            >
+              <option value="core">Core</option>
+              <option value="owl">Owl</option>
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="mr-2 font-medium" htmlFor="shape-select">
+            To:
+          </label>
+          <select
+            id="shape-select"
+            className="border-divider-line rounded border px-2 py-1"
+            value={selectedIndex}
+            onChange={(e) => setSelectedIndex(Number(e.target.value))}
+          >
+            {filteredOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div
