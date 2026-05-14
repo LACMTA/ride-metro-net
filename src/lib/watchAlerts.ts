@@ -23,18 +23,20 @@ async function fetchAlerts(query: AlertsQuery): Promise<ConciseAlert[]> {
 }
 
 async function getAllAlerts(queries: AlertsQuery[]) {
+  // Start all fetches immediately so they run in parallel with hydration.
+  const fetchPromise = Promise.all(queries.map(fetchAlerts));
+  // Wait for the app to hyrdrate before writing to any stores
+  await hydrationGate;
   // Only show the loading state on the first request (when not yet succeeded).
   if (alertsRequestStatus.get() !== "success") {
     alertsRequestStatus.set("loading");
   }
   try {
-    const results = await Promise.all(queries.map(fetchAlerts));
-    await hydrationGate;
+    const results = await fetchPromise;
     alerts.set(results.flat());
     alertsRequestStatus.set("success");
   } catch (err) {
     console.error("Failed to fetch alerts:", err);
-    await hydrationGate;
     alertsRequestStatus.set("error");
   }
 }

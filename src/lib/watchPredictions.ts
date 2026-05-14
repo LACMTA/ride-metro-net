@@ -1,5 +1,8 @@
 import type { RoutePredictions } from "../pages/api/predictions";
-import { routePredictions, predictionsRequestStatus } from "./routePredictionsStore";
+import {
+  routePredictions,
+  predictionsRequestStatus,
+} from "./routePredictionsStore";
 import { hydrationGate } from "./hydrationGate";
 
 let adjustmentIntervalId: NodeJS.Timeout | null;
@@ -12,20 +15,23 @@ async function getPredictions(
   if (adjustmentIntervalId) {
     clearInterval(adjustmentIntervalId);
   }
+  // Start the fetch immediately so it runs in parallel with hydration.
+  const fetchPromise = fetch(
+    `/api/predictions?stopId=${stopIds.join(",")}&agency=${agency}`,
+  );
+  // Wait for the app to hyrdrate before writing to any stores
+  await hydrationGate;
   // Only show the loading state on the first request (when not yet succeeded).
   if (predictionsRequestStatus.get() !== "success") {
     predictionsRequestStatus.set("loading");
   }
   try {
-    const res = await fetch(
-      `/api/predictions?stopId=${stopIds.join(",")}&agency=${agency}`,
-    );
+    const res = await fetchPromise;
     if (!res.ok) {
       throw new Error(await res.text());
     }
     const data = (await res.json()) as RoutePredictions[];
     console.log("Received predictions:", data);
-    await hydrationGate;
     routePredictions.set(data);
     predictionsRequestStatus.set("success");
     adjustmentIntervalId = setInterval(
@@ -35,7 +41,6 @@ async function getPredictions(
     );
   } catch (err) {
     console.error("Failed to fetch predictions:", err);
-    await hydrationGate;
     predictionsRequestStatus.set("error");
   }
 }
