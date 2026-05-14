@@ -19,10 +19,21 @@
  * is queued *before* the MutationObserver fires. Because MutationObserver
  * callbacks are microtasks, they (and all `await hydrationGate` continuations)
  * would otherwise run *before* React's reconciliation macrotask, letting store
- * writes race with React. Wrapping `_resolve()` in `setTimeout(..., 0)` pushes
- * the gate resolution to a new macrotask. Since the task queue is FIFO, React's
- * already-queued MessageChannel task runs first, completing reconciliation
- * before the gate ever opens.
+ * writes race with React.
+ *
+ * MULTI-CYCLE RECONCILIATION: React 18's concurrent scheduler works in 5 ms
+ * time slices. Complex component trees (e.g. Headless UI's TabGroup with its
+ * ARIA management, focus ring, and panel visibility logic) can exceed one slice,
+ * causing React to schedule *multiple* MessageChannel macrotasks to finish
+ * reconciliation. A single `setTimeout(0)` only guarantees we run after the
+ * *first* such task, leaving subsequent chunks racing with store writes.
+ *
+ * Using `requestAnimationFrame` as the outer defer solves this: rAF fires only
+ * after the browser has completed all pending rendering work for the current
+ * frame — including every React scheduler chunk — so by the time the rAF
+ * callback runs, React's full reconciliation is guaranteed to be done. The
+ * inner `setTimeout(0)` then drains any final microtask queues before
+ * `_resolve()` is called.
  *
  * If there are no SSR islands on the page the Promise resolves immediately.
  *
@@ -53,18 +64,19 @@ if (typeof window !== "undefined") {
     let remaining = pendingIslands.length;
     const onIslandHydrated = () => {
       if (--remaining === 0) {
-        // React 18 schedules its hydrateRoot reconciliation work via
-        // MessageChannel (a macrotask) synchronously inside hydrateRoot(),
-        // which Astro calls just before removing the `ssr` attribute.
-        // That MessageChannel task is therefore already in the task queue
-        // when this MutationObserver microtask fires. Deferring _resolve()
-        // with setTimeout(0) adds *our* resolution task after React's task
-        // in the FIFO queue, guaranteeing React finishes reconciling before
-        // any store writes occur.
-        setTimeout(() => {
-          console.log("[hydrationGate] all islands hydrated, gate resolved");
-          _resolve();
-        }, 0);
+        // React 18 schedules hydration work via MessageChannel macrotasks and
+        // may chunk complex trees across multiple scheduler cycles. rAF fires
+        // after the browser has finished all pending rendering work for the
+        // current frame (including every React scheduler chunk), so by the
+        // time our rAF callback runs, reconciliation is fully complete.
+        // The inner setTimeout(0) then drains any residual microtask queues
+        // before we open the gate.
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            console.log("[hydrationGate] all islands hydrated, gate resolved");
+            _resolve();
+          }, 0);
+        });
       }
     };
 
