@@ -140,6 +140,8 @@ const _stmts: Partial<{
   owlTripsFromTripIds: Database.Statement;
   tripsWithAnyMatchingHeadsign: Database.Statement;
   shapeStopsFilteredByHeadsign: Database.Statement;
+  owlVisitsNonCoreByHeadsign: Database.Statement;
+  owlTripsFromTripIdsByHeadsign: Database.Statement;
 }> = {};
 
 /**
@@ -442,6 +444,65 @@ function getShapeStopsFilteredByHeadsignQuery() {
   `));
 }
 
+/**
+ * Like {@link getOwlTripsFromTripIdsQuery}, but additionally requires that
+ * each qualifying owl trip has at least one `stop_time` whose `stop_headsign`
+ * contains `@lineNumber` as a substring.
+ *
+ * Used during owl detection on the split-line mixed-trip fallback path: the
+ * input `@tripIdsJson` contains trips that *touch* the focused sub-line at
+ * one or more stops but may be predominantly the sibling sub-line's trips,
+ * so we must restrict owl candidates to those actually running as the
+ * focused sub-line at some point.
+ */
+function getOwlTripsFromTripIdsByHeadsignQuery() {
+  return (_stmts.owlTripsFromTripIdsByHeadsign ??= getDb().prepare(`
+    SELECT ct.trip_id
+    FROM (SELECT value AS trip_id FROM json_each(@tripIdsJson)) ct
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM stop_times st
+      WHERE st.trip_id = ct.trip_id
+        AND (
+          (CAST(
+            substr(
+              COALESCE(NULLIF(st.departure_time, ''), st.arrival_time),
+              1,
+              instr(COALESCE(NULLIF(st.departure_time, ''), st.arrival_time), ':') - 1
+            ) AS INTEGER
+          ) % 24) BETWEEN 5 AND 22
+        )
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM stop_times st
+      WHERE st.trip_id = ct.trip_id
+        AND st.stop_headsign LIKE '%' || @lineNumber || '%'
+    )
+  `));
+}
+
+/**
+ * Like {@link getOwlVisitsNonCoreQuery}, but only counts stops whose
+ * `stop_headsign` contains `@lineNumber` as a substring. Used during owl
+ * detection on the split-line mixed-trip fallback path so that line-N
+ * owl-routing divergence is judged only by line-N-headsigned stops on those
+ * owl trips, ignoring the sibling sub-line's stops that the same trip may
+ * also visit.
+ */
+function getOwlVisitsNonCoreByHeadsignQuery() {
+  return (_stmts.owlVisitsNonCoreByHeadsign ??= getDb().prepare(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM stop_times st
+      WHERE st.trip_id IN (SELECT value FROM json_each(@owlTripIdsJson))
+        AND (st.pickup_type = 0 OR st.drop_off_type = 0)
+        AND st.stop_headsign LIKE '%' || @lineNumber || '%'
+        AND st.stop_id NOT IN (SELECT value FROM json_each(@coreStopIdsJson))
+    ) AS visits_non_core
+  `));
+}
+
 // ---------------------------------------------------------------------------
 // Cache
 // ---------------------------------------------------------------------------
@@ -610,14 +671,25 @@ function buildFeature(
  *                         every feature produced by this group.
  * @param isBusRoute  Whether the parent route is `route_type = 3` (required
  *                    to gate owl-service detection).
- * @param stopHeadsignFilter  When set, stops are fetched via
- *                            {@link getShapeStopsFilteredByHeadsignQuery}
- *                            and restricted to those whose `stop_headsign`
- *                            contains this value. Used for the mixed-trip
- *                            fallback: the trips cover both sub-lines, so
- *                            we must filter stops down to only those that
- *                            belong to the requested sub-line before the
- *                            polyline is trimmed.
+ * @param stopHeadsignFilter  When set, the entire pipeline is restricted to
+ *                            data belonging to this sub-line:
+ *                            - Core/owl stops are fetched via
+ *                              {@link getShapeStopsFilteredByHeadsignQuery},
+ *                              so only stops whose `stop_headsign` contains
+ *                              this value are included. The polyline is then
+ *                              trimmed to match this filtered stop list.
+ *                            - Owl candidate trips are narrowed via
+ *                              {@link getOwlTripsFromTripIdsByHeadsignQuery}
+ *                              to those that actually run as this sub-line
+ *                              at some `stop_time` — preventing the sibling
+ *                              sub-line's owl trips from being mistakenly
+ *                              attributed here.
+ *                            - The owl "diverges from core" check uses
+ *                              {@link getOwlVisitsNonCoreByHeadsignQuery},
+ *                              counting only this sub-line's stops on those
+ *                              owl trips.
+ *                            Used by the mixed-trip fallback path, where
+ *                            the input `tripIdsJson` covers both sub-lines.
  */
 function processTripGroup(
   tripIdsJson: string,
@@ -669,39 +741,73 @@ function processTripGroup(
   let hasOwlService = false;
 
   if (isBusRoute && coreStopIds.size > 0) {
-    const owlTripRows = getOwlTripsFromTripIdsQuery().all({
-      tripIdsJson,
-    }) as { trip_id: string }[];
+    // When stopHeadsignFilter is set (mixed-trip fallback), restrict owl
+    // candidates to trips that actually run as this sub-line at some stop.
+    // Otherwise every trip in tripIdsJson is already a single-headsign trip
+    // for this sub-line, so the unfiltered query is correct.
+    const owlTripRows = stopHeadsignFilter
+      ? (getOwlTripsFromTripIdsByHeadsignQuery().all({
+          tripIdsJson,
+          lineNumber: stopHeadsignFilter,
+        }) as { trip_id: string }[])
+      : (getOwlTripsFromTripIdsQuery().all({
+          tripIdsJson,
+        }) as { trip_id: string }[]);
 
     if (owlTripRows.length > 0) {
       const owlTripIds = owlTripRows.map((r) => r.trip_id);
       const owlTripIdsJson = JSON.stringify(owlTripIds);
       const coreStopIdsJson = JSON.stringify([...coreStopIds]);
 
-      const visitsRow = getOwlVisitsNonCoreQuery().get({
-        owlTripIdsJson,
-        coreStopIdsJson,
-      }) as { visits_non_core: number } | undefined;
+      // For mixed-trip fallback we must also restrict the divergence check
+      // to *this sub-line's* stops on those owl trips — otherwise the
+      // sibling sub-line's owl stops would always trip the "diverges from
+      // core" check (since the core stop set is limited to this sub-line).
+      const visitsRow = stopHeadsignFilter
+        ? (getOwlVisitsNonCoreByHeadsignQuery().get({
+            owlTripIdsJson,
+            coreStopIdsJson,
+            lineNumber: stopHeadsignFilter,
+          }) as { visits_non_core: number } | undefined)
+        : (getOwlVisitsNonCoreQuery().get({
+            owlTripIdsJson,
+            coreStopIdsJson,
+          }) as { visits_non_core: number } | undefined);
 
       if (visitsRow?.visits_non_core === 1) {
         const owlShapeRows = getOwlShapeIdsQuery().all({
           owlTripIdsJson,
         }) as ShapeIdRow[];
 
-        const owlStopsStmt = getOwlShapeStopsQuery();
+        // For mixed-trip fallback, use the headsign-filtered stops query so
+        // the owl feature's stop list contains only this sub-line's stops.
+        // buildFeature's path-trimming then clips the polyline accordingly.
+        const getOwlStops = stopHeadsignFilter
+          ? (sid: string) =>
+              getShapeStopsFilteredByHeadsignQuery().all({
+                shapeId: sid,
+                tripIdsJson: owlTripIdsJson,
+                lineNumber: stopHeadsignFilter,
+              }) as StopRow[]
+          : (sid: string) =>
+              getOwlShapeStopsQuery().all({
+                shapeId: sid,
+                owlTripIdsJson,
+              }) as StopRow[];
+
         for (const { shape_id, direction_id } of owlShapeRows) {
           const feature = buildFeature(
             shape_id,
             direction_id,
             "owl",
-            (sid) =>
-              owlStopsStmt.all({
-                shapeId: sid,
-                owlTripIdsJson,
-              }) as StopRow[],
+            getOwlStops,
             splitLineNumber,
           );
           if (!feature) continue;
+          // Skip empty/degenerate owl features (can happen on the mixed-trip
+          // fallback when the chosen shape's representative trip has no
+          // matching-headsign stops at all).
+          if (feature.properties.stops.length === 0) continue;
           features.push(feature);
           hasOwlService = true;
         }
