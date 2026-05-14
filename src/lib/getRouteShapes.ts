@@ -138,6 +138,8 @@ const _stmts: Partial<{
   owlShapeStops: Database.Statement;
   splitLineTrips: Database.Statement;
   owlTripsFromTripIds: Database.Statement;
+  tripsWithAnyMatchingHeadsign: Database.Statement;
+  shapeStopsFilteredByHeadsign: Database.Statement;
 }> = {};
 
 /**
@@ -384,6 +386,62 @@ function getOwlTripsFromTripIdsQuery() {
   `));
 }
 
+/**
+ * Returns all distinct `trip_id`s among currently-active trips of the given
+ * route that have **at least one** `stop_time` whose `stop_headsign` contains
+ * `@lineNumber` as a substring. This is intentionally broader than
+ * {@link getSplitLineTripsQuery}, which requires every stop_time on a trip to
+ * share the same headsign — here we also pick up "mixed" trips that serve
+ * both sub-lines, as long as they touch the requested line number at some
+ * stop.
+ *
+ * The `LIKE '%' || @lineNumber || '%'` predicate is used for performance; the
+ * caller is responsible for any stricter word-boundary validation at the stop
+ * level (see {@link getShapeStopsFilteredByHeadsignQuery}).
+ */
+function getTripsWithAnyMatchingHeadsignQuery() {
+  return (_stmts.tripsWithAnyMatchingHeadsign ??= getDb().prepare(`
+    WITH ${ACTIVE_SERVICES_CTE},
+    route_trips AS (
+      SELECT t.trip_id
+      FROM trips t
+      WHERE (t.route_id = @routeId OR t.route_id LIKE @routeId || '-%')
+        AND t.service_id IN (SELECT service_id FROM active_services)
+    )
+    SELECT DISTINCT rt.trip_id
+    FROM route_trips rt
+    JOIN stop_times st ON st.trip_id = rt.trip_id
+    WHERE st.stop_headsign LIKE '%' || @lineNumber || '%'
+  `));
+}
+
+/**
+ * Like {@link getOwlShapeStopsQuery}, but additionally filters to only those
+ * stops whose `stop_headsign` contains `@lineNumber` as a substring. Used
+ * when building features for a split-line sub-group whose trips are "mixed"
+ * (i.e. they carry multiple headsigns), so only the portion of each trip that
+ * belongs to the requested sub-line is included in the feature's stop list.
+ *
+ * The polyline is then trimmed by {@link buildFeature}'s existing path-
+ * trimming logic to match the first and last stops in this filtered list.
+ */
+function getShapeStopsFilteredByHeadsignQuery() {
+  return (_stmts.shapeStopsFilteredByHeadsign ??= getDb().prepare(`
+    SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+    FROM stop_times st
+    JOIN stops s ON s.stop_id = st.stop_id
+    WHERE st.trip_id = (
+      SELECT MIN(t.trip_id)
+      FROM trips t
+      WHERE t.shape_id = @shapeId
+        AND t.trip_id IN (SELECT value FROM json_each(@tripIdsJson))
+    )
+      AND (st.pickup_type = 0 OR st.drop_off_type = 0)
+      AND st.stop_headsign LIKE '%' || @lineNumber || '%'
+    ORDER BY st.stop_sequence ASC
+  `));
+}
+
 // ---------------------------------------------------------------------------
 // Cache
 // ---------------------------------------------------------------------------
@@ -552,15 +610,40 @@ function buildFeature(
  *                         every feature produced by this group.
  * @param isBusRoute  Whether the parent route is `route_type = 3` (required
  *                    to gate owl-service detection).
+ * @param stopHeadsignFilter  When set, stops are fetched via
+ *                            {@link getShapeStopsFilteredByHeadsignQuery}
+ *                            and restricted to those whose `stop_headsign`
+ *                            contains this value. Used for the mixed-trip
+ *                            fallback: the trips cover both sub-lines, so
+ *                            we must filter stops down to only those that
+ *                            belong to the requested sub-line before the
+ *                            polyline is trimmed.
  */
 function processTripGroup(
   tripIdsJson: string,
   splitLineNumber: string,
   isBusRoute: boolean,
+  stopHeadsignFilter?: string,
 ): { features: RouteShapeFeature[]; hasOwlService: boolean } {
   const features: RouteShapeFeature[] = [];
   const coreStopIds = new Set<string>();
-  const stopsStmt = getOwlShapeStopsQuery();
+
+  // Choose the stops statement based on whether we need headsign filtering.
+  // When stopHeadsignFilter is set (mixed-trip fallback), use the headsign-
+  // filtered query so only stops belonging to this sub-line are returned.
+  // Otherwise use the standard owl-shape-stops query.
+  const getStops = stopHeadsignFilter
+    ? (sid: string) =>
+        getShapeStopsFilteredByHeadsignQuery().all({
+          shapeId: sid,
+          tripIdsJson,
+          lineNumber: stopHeadsignFilter,
+        }) as StopRow[]
+    : (sid: string) =>
+        getOwlShapeStopsQuery().all({
+          shapeId: sid,
+          owlTripIdsJson: tripIdsJson,
+        }) as StopRow[];
 
   // Core: most-used shape per direction within this trip group.
   // getOwlShapeIdsQuery accepts a JSON trip-IDs array — reused here for the
@@ -574,11 +657,7 @@ function processTripGroup(
       shape_id,
       direction_id,
       "core",
-      (sid) =>
-        stopsStmt.all({
-          shapeId: sid,
-          owlTripIdsJson: tripIdsJson,
-        }) as StopRow[],
+      getStops,
       splitLineNumber,
     );
     if (!feature) continue;
@@ -667,6 +746,14 @@ function processTripGroup(
  * `splitLineNumber` property (e.g. `"105"` or `"205"`) identifying its
  * sub-line.
  *
+ * When one sub-line has no single-headsign trips of its own (e.g. on a
+ * reduced-service day), a **mixed-trip fallback** is used: any active trip
+ * that touches the missing line number in at least one `stop_headsign` is
+ * included, the most-used shape among those trips is selected, and the stop
+ * list is filtered to only those stops whose `stop_headsign` contains the
+ * missing line number. The existing polyline path-trimming then clips the
+ * geometry to that sub-line's segment.
+ *
  * Results are cached in-memory keyed by `routeId` + today's service date, so
  * the cache rolls over automatically at midnight (Pacific) without needing
  * an explicit invalidation.
@@ -718,9 +805,39 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON {
       [lineA, groupA],
       [lineB, groupB],
     ] as [string, string[]][]) {
-      if (group.length === 0) continue;
+      if (group.length > 0) {
+        // Normal path: trips whose every stop_time is labelled for this
+        // sub-line exclusively.
+        const { features: groupFeatures, hasOwlService: groupOwl } =
+          processTripGroup(JSON.stringify(group), lineNumber, isBusRoute);
+        features.push(...groupFeatures);
+        if (groupOwl) hasOwlService = true;
+        continue;
+      }
+
+      // Fallback: no single-headsign trips found for this sub-line. Look for
+      // "mixed" trips — trips whose stop_times carry headsigns for both
+      // sub-lines — that still serve this line number at some stops.
+      const fallbackRows = getTripsWithAnyMatchingHeadsignQuery().all({
+        routeId,
+        today,
+        lineNumber,
+      }) as { trip_id: string }[];
+
+      if (fallbackRows.length === 0) continue; // truly no service — skip.
+
+      // Use the most-used shape among the mixed trips, but filter the stop
+      // list to only those stops whose stop_headsign contains this line
+      // number. buildFeature's path-trimming then clips the polyline to
+      // match just that sub-line's segment.
+      const fallbackTripIds = fallbackRows.map((r) => r.trip_id);
       const { features: groupFeatures, hasOwlService: groupOwl } =
-        processTripGroup(JSON.stringify(group), lineNumber, isBusRoute);
+        processTripGroup(
+          JSON.stringify(fallbackTripIds),
+          lineNumber,
+          isBusRoute,
+          lineNumber, // stopHeadsignFilter — restrict stops to this sub-line
+        );
       features.push(...groupFeatures);
       if (groupOwl) hasOwlService = true;
     }
