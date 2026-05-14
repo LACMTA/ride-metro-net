@@ -35,7 +35,8 @@ export default function LineMap({ routeId, routeColor }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
-  const shapeLayerRef = useRef<import("leaflet").GeoJSON | null>(null);
+  // Tracks all shape layers (ghost + selected) so they can be removed together.
+  const shapeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const stopsLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
 
   const [geojson, setGeojson] = useState<RouteShapesGeoJSON | null>(null);
@@ -143,14 +144,30 @@ export default function LineMap({ routeId, routeColor }: Props) {
     setSelectedIndex(firstMatch === -1 ? 0 : firstMatch);
   }, [serviceType, splitLineNumber, geojson]);
 
-  // Selection: render only the currently selected shape feature, swapping
-  // layers in place when the selection (or color) changes.
+  // Selection: render the selected shape feature and, for split lines, a ghost
+  // path for the non-selected side at 65% opacity (stops not shown for ghost).
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
     if (!L || !map || !geojson || geojson.features.length === 0) return;
 
     const feature = geojson.features[selectedIndex] ?? geojson.features[0];
+
+    // Guard against a stale `selectedIndex` whose feature doesn't match the
+    // currently-selected filters. When the user picks a new split-line (or
+    // service type), `splitLineNumber` / `serviceType` change first; the
+    // effect that resets `selectedIndex` runs in a separate update, and we
+    // don't want this effect to draw — and fit bounds to — the wrong feature
+    // in between.
+    if (
+      feature.properties.serviceType !== serviceType ||
+      (splitLineNumber !== null &&
+        feature.properties.splitLineNumber !== splitLineNumber)
+    ) {
+      return;
+    }
+
+    // Remove previous shape and stop layers.
 
     if (shapeLayerRef.current) {
       shapeLayerRef.current.remove();
@@ -163,28 +180,40 @@ export default function LineMap({ routeId, routeColor }: Props) {
 
     const lineColor = routeColor ? `#${routeColor}` : "#000";
 
-    const shapeLayer = L.geoJSON(feature, {
-      style: {
-        color: lineColor,
-        weight: 6,
-        opacity: 0.9,
-      },
-    }).addTo(map);
-    shapeLayerRef.current = shapeLayer;
+    const shapeGroup = L.layerGroup().addTo(map);
+    shapeLayerRef.current = shapeGroup;
 
-    const bounds = shapeLayer.getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [20, 20] });
+    // Ghost layer: non-selected split-line side, same service type, 35% opacity, no stops.
+    if (geojson.isSplitline && splitLineNumber !== null) {
+      const ghostFeatures = geojson.features.filter(
+        (f) =>
+          f.properties.splitLineNumber !== splitLineNumber &&
+          f.properties.serviceType === serviceType,
+      );
+      if (ghostFeatures.length > 0) {
+        L.geoJSON(
+          {
+            type: "FeatureCollection",
+            features: ghostFeatures,
+          } as import("geojson").FeatureCollection,
+          {
+            style: { color: lineColor, weight: 6, opacity: 0.35 },
+          },
+        ).addTo(shapeGroup);
+      }
     }
 
-    // Render a circle marker for each stop served by this shape.
+    // Selected feature layer — rendered on top of the ghost.
+    L.geoJSON(feature, {
+      style: { color: lineColor, weight: 6, opacity: 0.9 },
+    }).addTo(shapeGroup);
+
+    // Render a circle marker for each stop served by the selected shape only.
     const stopsGroup = L.layerGroup().addTo(map);
     stopsLayerRef.current = stopsGroup;
 
-    const stopMarkers: import("leaflet").CircleMarker[] = [];
-
     for (const stop of feature.properties.stops) {
-      const marker = L.circleMarker([stop.lat, stop.lon], {
+      L.circleMarker([stop.lat, stop.lon], {
         radius: 5,
         color: lineColor,
         weight: 3,
@@ -193,9 +222,36 @@ export default function LineMap({ routeId, routeColor }: Props) {
       })
         .bindPopup(`<strong>${stop.stopName}</strong>`)
         .addTo(stopsGroup);
-      stopMarkers.push(marker);
     }
-  }, [geojson, selectedIndex, routeColor]);
+
+    // Fit the map to the selected feature AND the ghost (when present) so
+    // neither is clipped at the map edge. Collecting all coordinates first
+    // avoids an extra fitBounds call or a two-step extend pattern.
+    const allLatLngs: [number, number][] = [
+      ...feature.geometry.coordinates.map(
+        ([lon, lat]) => [lat, lon] as [number, number],
+      ),
+      ...feature.properties.stops.map(
+        (s) => [s.lat, s.lon] as [number, number],
+      ),
+    ];
+
+    if (geojson.isSplitline && splitLineNumber !== null) {
+      const ghostFeatures = geojson.features.filter(
+        (f) =>
+          f.properties.splitLineNumber !== splitLineNumber &&
+          f.properties.serviceType === serviceType,
+      );
+      for (const gf of ghostFeatures) {
+        for (const [lon, lat] of gf.geometry.coordinates) {
+          allLatLngs.push([lat, lon]);
+        }
+      }
+    }
+
+    map.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });
+
+  }, [geojson, selectedIndex, routeColor, splitLineNumber, serviceType]);
 
   // Filtered direction options — respects both service type and split-line number.
   const filteredOptions = useMemo(() => {
@@ -210,8 +266,7 @@ export default function LineMap({ routeId, routeColor }: Props) {
       .filter(
         (opt) =>
           opt.serviceType === serviceType &&
-          (splitLineNumber === null ||
-            opt.splitLineNumber === splitLineNumber),
+          (splitLineNumber === null || opt.splitLineNumber === splitLineNumber),
       );
   }, [geojson, serviceType, splitLineNumber]);
 
