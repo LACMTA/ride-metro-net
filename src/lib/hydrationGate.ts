@@ -57,5 +57,6 @@ if (typeof window !== "undefined") {
     }
   }
 } else {
+  console.log("App hyrdated");
   _resolve();
 }
