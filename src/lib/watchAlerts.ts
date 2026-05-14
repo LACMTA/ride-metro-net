@@ -1,5 +1,6 @@
 import type { ConciseAlert } from "../pages/api/alerts";
 import { alerts, alertsRequestStatus } from "./alertsStore";
+import { hydrationGate } from "./hydrationGate";
 
 export interface AlertsQuery {
   stopIds: string[];
@@ -28,10 +29,12 @@ async function getAllAlerts(queries: AlertsQuery[]) {
   }
   try {
     const results = await Promise.all(queries.map(fetchAlerts));
+    await hydrationGate;
     alerts.set(results.flat());
     alertsRequestStatus.set("success");
   } catch (err) {
     console.error("Failed to fetch alerts:", err);
+    await hydrationGate;
     alertsRequestStatus.set("error");
   }
 }

@@ -4,6 +4,7 @@ import {
   accessibilityAlertStops,
   alertStatusRequestStatus,
 } from "./alertStatusStore";
+import { hydrationGate } from "./hydrationGate";
 
 async function fetchAlertStatus(): Promise<void> {
   // Only show the loading state on the first request (when not yet succeeded).
@@ -13,11 +14,13 @@ async function fetchAlertStatus(): Promise<void> {
   const res = await fetch("/api/alert-status");
   if (!res.ok) {
     console.error("Failed to fetch alert status:", await res.text());
+    await hydrationGate;
     alertStatusRequestStatus.set("error");
     return;
   }
   const data = (await res.json()) as AlertStatusResponse;
   console.log("Received alerts status", data);
+  await hydrationGate;
   alertStatus.set(data.routeAlertCounts);
   accessibilityAlertStops.set(data.accessibilityAlertStops);
   alertStatusRequestStatus.set("success");

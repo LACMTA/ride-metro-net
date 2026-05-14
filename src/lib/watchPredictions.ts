@@ -1,5 +1,6 @@
 import type { RoutePredictions } from "../pages/api/predictions";
 import { routePredictions, predictionsRequestStatus } from "./routePredictionsStore";
+import { hydrationGate } from "./hydrationGate";
 
 let adjustmentIntervalId: NodeJS.Timeout | null;
 
@@ -24,6 +25,7 @@ async function getPredictions(
     }
     const data = (await res.json()) as RoutePredictions[];
     console.log("Received predictions:", data);
+    await hydrationGate;
     routePredictions.set(data);
     predictionsRequestStatus.set("success");
     adjustmentIntervalId = setInterval(
@@ -33,6 +35,7 @@ async function getPredictions(
     );
   } catch (err) {
     console.error("Failed to fetch predictions:", err);
+    await hydrationGate;
     predictionsRequestStatus.set("error");
   }
 }
