@@ -6,6 +6,8 @@ import netlify from "@astrojs/netlify";
 
 import tailwindcss from "@tailwindcss/vite";
 
+import cloudflare from "@astrojs/cloudflare";
+
 // https://astro.build/config
 export default defineConfig({
   build: {
@@ -30,5 +32,5 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   integrations: [importGTFS(), react()],
-  adapter: netlify(),
+  adapter: cloudflare(),
 });
