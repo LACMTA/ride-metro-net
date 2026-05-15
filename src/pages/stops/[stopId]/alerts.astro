@@ -1,0 +1,65 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import DataInjector from "../../../components/DataInjector.astro";
+import getStopWithRoutes from "../../../lib/getStopWithRoutes";
+import TabNav from "../../../components/TabNav.astro";
+import StopAlertsBadge from "../../../components/StopAlertsBadge";
+import AlertsSection from "../../../components/AlertsSection";
+import PageHeader from "../../../components/PageHeader";
+import Column from "../../../components/Column";
+import { getStopStaticPaths } from "../../../lib/getStopStaticPaths";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  return getStopStaticPaths();
+}
+
+const { stopId } = Astro.params;
+
+const stop = await getStopWithRoutes(stopId);
+const allStopIds = [stop.stopId, ...stop.childStopIds];
+
+const hasRail = stop.routes.some((route) => route.routeType !== 3);
+---
+
+<DataInjector data={stop} id="data-stop" />
+<DataInjector data={allStopIds} id="all-stop-ids" />
+<script>
+  import { getData } from "../../../lib/getData";
+  import type { StopWithRoutes } from "../../../lib/getStopWithRoutes";
+  import watchAlerts from "../../../lib/watchAlerts";
+
+  const stop = getData("data-stop") as StopWithRoutes;
+  const allStopIds = getData("all-stop-ids") as string[];
+
+  watchAlerts([
+    {
+      stopIds: allStopIds,
+      routeIds: stop.routes.map((route) => route.routeId),
+      agency: stop.swiftlyAgencyId,
+    },
+  ]);
+</script>
+
+<Layout title={`${stop.stopName} — ${hasRail ? "Station" : "Stop"} Alerts`}>
+  <main>
+    <PageHeader routes={stop.routes} title={stop.stopName} />
+    <section>
+      <TabNav
+        tabs={[
+          { href: `/stops/${stop.stopId}/`, label: "Arrivals", key: "arrivals" },
+          { href: `/stops/${stop.stopId}/alerts`, label: hasRail ? "Station Alerts" : "Stop Alerts", key: "alerts" },
+        ]}
+        activeTab="alerts"
+      >
+        <StopAlertsBadge slot="alerts" stopIds={allStopIds} client:load />
+      </TabNav>
+      <div class="bg-background-gray pt-3 pb-10">
+        <Column>
+          <AlertsSection stopIds={allStopIds} client:load />
+        </Column>
+      </div>
+    </section>
+  </main>
+</Layout>
