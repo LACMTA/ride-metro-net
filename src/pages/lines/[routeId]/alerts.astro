@@ -1,0 +1,66 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import getRouteById from "../../../lib/getRouteById";
+import { isBuswayRoute } from "../../../lib/routeShortNameOverrides";
+import DataInjector from "../../../components/DataInjector.astro";
+import TabNav from "../../../components/TabNav.astro";
+import LineAlertsBadge from "../../../components/LineAlertsBadge";
+import PageHeader from "../../../components/PageHeader";
+import AlertsSection from "../../../components/AlertsSection";
+import Column from "../../../components/Column";
+import { getLineStaticPaths } from "../../../lib/getLineStaticPaths";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  return getLineStaticPaths();
+}
+
+const { routeId } = Astro.params;
+const { numericId } = Astro.props as { numericId: string };
+
+const route = await getRouteById(numericId ?? routeId);
+const title =
+  route.routeType !== 3 || isBuswayRoute(route.routeId)
+    ? `Metro ${route.routeShortName} Line`
+    : `Line ${route.routeShortName} Bus`;
+---
+
+<DataInjector data={route} id="data-route" />
+<script>
+  import { getData } from "../../../lib/getData";
+  import type { RouteWithInfo } from "../../../lib/getRouteById";
+  import watchAlerts from "../../../lib/watchAlerts";
+
+  const route = getData("data-route") as RouteWithInfo;
+
+  watchAlerts([
+    {
+      stopIds: [],
+      routeIds: [route.routeId],
+      agency: route.swiftlyAgencyId,
+    },
+  ]);
+</script>
+
+<Layout title={`${title} — Alerts`}>
+  <main>
+    <PageHeader routes={[route]} title={title} badgeSize="xl" />
+    <section>
+      <TabNav
+        tabs={[
+          { href: `/lines/${routeId}/`, label: "Maps & Schedules", key: "schedules" },
+          { href: `/lines/${routeId}/alerts`, label: "Alerts", key: "alerts" },
+        ]}
+        activeTab="alerts"
+      >
+        <LineAlertsBadge slot="alerts" routeId={route.routeId} client:load />
+      </TabNav>
+      <div class="bg-background-gray pt-3 pb-10">
+        <Column>
+          <AlertsSection routeId={route.routeId} client:load />
+        </Column>
+      </div>
+    </section>
+  </main>
+</Layout>
