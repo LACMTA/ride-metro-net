@@ -25,7 +25,7 @@ export default function LineAlertStatus({ route }: Props) {
   const slug = getLineSlug(route.routeId);
 
   return (
-    <CardLinkListItem href={`/lines/${slug}#alerts`}>
+    <CardLinkListItem href={`/lines/${slug}/alerts`}>
       <span className="flex items-center gap-3 text-lg">
         <RouteBadge
           routeId={route.routeId}

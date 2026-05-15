@@ -7,8 +7,6 @@ import { formatGTFSTime } from "../lib/formatGTFSTime";
 import type { RouteOverview } from "../lib/getRouteOverview";
 
 interface Props {
-  routeId: string;
-  routeColor: string;
   lineTitle: string;
   routeOverview: RouteOverview;
   pdfUrl: string;
@@ -16,8 +14,6 @@ interface Props {
 }
 
 export default function LineOverview({
-  routeId,
-  routeColor,
   lineTitle,
   routeOverview,
   pdfUrl,
@@ -26,8 +22,6 @@ export default function LineOverview({
   const pluralVehicleName = routeType === 3 ? "Buses" : "Trains";
   return (
     <div className="pt-5 pb-50">
-      <h2 className="mb-6 text-2xl font-bold">{lineTitle} Map</h2>
-      <LineMap routeId={routeId} routeColor={routeColor} />
       <h2 className="mb-6 text-2xl font-bold">{lineTitle} Overview</h2>
       <div className="flex">
         <MapPinIcon

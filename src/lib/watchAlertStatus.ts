@@ -4,13 +4,18 @@ import {
   accessibilityAlertStops,
   alertStatusRequestStatus,
 } from "./alertStatusStore";
+import { hydrationGate } from "./hydrationGate";
 
 async function fetchAlertStatus(): Promise<void> {
+  // Start the fetch immediately so it runs in parallel with hydration.
+  const fetchPromise = fetch("/api/alert-status");
+  // Wait for the app to hyrdrate before writing to any stores
+  await hydrationGate;
   // Only show the loading state on the first request (when not yet succeeded).
   if (alertStatusRequestStatus.get() !== "success") {
     alertStatusRequestStatus.set("loading");
   }
-  const res = await fetch("/api/alert-status");
+  const res = await fetchPromise;
   if (!res.ok) {
     console.error("Failed to fetch alert status:", await res.text());
     alertStatusRequestStatus.set("error");

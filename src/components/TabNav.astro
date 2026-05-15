@@ -1,0 +1,54 @@
+---
+import Column from "./Column";
+
+interface Tab {
+  href: string;
+  label: string;
+  /**
+   * Matches the `activeTab` value that activates this tab.
+   * Also used as the slot name for any badge/extra content placed inside this tab.
+   */
+  key: string;
+}
+
+interface Props {
+  tabs: Tab[];
+  activeTab: string;
+}
+
+const { tabs, activeTab } = Astro.props;
+
+const renderedSlots = Object.fromEntries(
+  await Promise.all(
+    tabs.map(async (tab) => [tab.key, await Astro.slots.render(tab.key)])
+  )
+);
+
+const baseClass =
+  "cursor-pointer rounded-t-sm px-5 py-2 font-bold transition-colors no-underline";
+const activeClass = "bg-background-gray text-black";
+const inactiveClass = "bg-gray-500";
+---
+
+<div class="bg-metro-text">
+  <Column>
+    <nav class="flex gap-2" aria-label="Page sections">
+      {
+        tabs.map((tab) => (
+          <a
+            href={tab.href}
+            class:list={[
+              baseClass,
+              activeTab === tab.key ? activeClass : inactiveClass,
+              Astro.slots.has(tab.key) && "pr-4",
+            ]}
+            aria-current={activeTab === tab.key ? "page" : undefined}
+          >
+            {tab.label}
+            <Fragment set:html={renderedSlots[tab.key]} />
+          </a>
+        ))
+      }
+    </nav>
+  </Column>
+</div>
