@@ -2,6 +2,7 @@ import MapPinIcon from "./MapPinIcon";
 import ClockIcon from "./ClockIcon";
 import DownloadIcon from "./DownloadIcon";
 import Button from "./Button";
+import LineMap from "./LineMap";
 import { formatGTFSTime } from "../lib/formatGTFSTime";
 import type { RouteOverview } from "../lib/getRouteOverview";
 

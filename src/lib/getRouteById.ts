@@ -79,7 +79,7 @@ export default async function (routeId: string) {
     ),
     routeLongName: res.route_long_name,
     routeType: res.route_type,
-    routeColor: res.route_color,
+    routeColor: res.route_color || (res.route_type === 3 ? "e16710" : ""),
     routeTextColor: res.route_text_color,
     swiftlyAgencyId: res.route_type === 3 ? "lametro" : "lametro-rail",
   };
