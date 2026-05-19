@@ -8,7 +8,7 @@ export const prerender = false;
 // activePeriod matches the GTFS spec: a single object with POSIX timestamps.
 export type ConciseAlert = Pick<
   SwiftlyAlert,
-  "headerText" | "descriptionText" | "effect" | "cause" | "informedEntities"
+  "id" | "headerText" | "descriptionText" | "effect" | "cause" | "informedEntities"
 > & {
   activePeriod: { start: number; end: number | null };
 };

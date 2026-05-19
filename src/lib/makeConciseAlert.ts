@@ -9,6 +9,7 @@ import type { ConciseAlert } from "../pages/api/alerts";
 export function makeConciseAlert(fullAlert: SwiftlyAlert): ConciseAlert {
   const rawPeriod = fullAlert.activePeriods[0];
   return {
+    id: fullAlert.id,
     activePeriod: {
       start: Math.floor(new Date(rawPeriod.start).getTime() / 1000),
       end:
