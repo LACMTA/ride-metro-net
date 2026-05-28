@@ -1,37 +1,45 @@
-# Welcome!
+# ride-metro-net
 
-## Overview
+An in-development suite of rider-facing tools for [LA Metro](https://www.metro.net), built with [Astro](https://docs.astro.build).
 
-This project uses [Astro](https://docs.astro.build), and relies on the [`node-gtfs`](https://www.npmjs.com/package/gtfs) to import data to an in-memory SQLite database which is used to generate static pages. The project is set up for deployment on Cloudflare.
+## Architecture
 
-## Development
+Most pages are statically generated at build time from GTFS schedule data. Real-time data (predictions and service alerts) is served through SSR API routes (`/api/*`) deployed on Netlify, which proxy [Swiftly](https://goswift.ly)'s real-time API.
 
-This project relies on data from Swiftly, our realtime predictions provider, and as such you will need an Swiftly API key.
+## Data Sources
+
+- **GTFS** — LA Metro publishes GTFS feeds for [rail](https://gitlab.com/LACMTA/gtfs_rail) and [bus](https://gitlab.com/LACMTA/gtfs_bus) on GitLab. At build time, [`node-gtfs`](https://www.npmjs.com/package/gtfs) downloads and imports these into a SQLite database used to generate static pages. In dev mode this database is persisted to `./data/data.db` and reused on subsequent starts; in production builds it runs in-memory.
+- **Swiftly** — Real-time arrival predictions and service alerts are fetched at request time from Swiftly's API.
+
+## Development Setup
+
+You'll need a Swiftly API key to run the project locally.
 
 > [!WARNING]
 > Be sure not to check your API key into your repository on GitHub!
 
-Create a `.env` file in the root of the project defining your key as such:
+Create a `.env` file in the root of the project:
 
 ```
 API_KEY=[Your Swiftly API Key]
 ```
 
-The `.env` file is ignored by `.gitignore`, so you can safely keep the key here on your local device for development.
+The `.env` file is ignored by `.gitignore`, so you can safely keep the key here on your local device.
 
-## 🧞 Commands
+## Commands
 
-All commands are run from the root of the project, from a terminal:
+All commands are run from the root of the project:
 
-| Command                   | Action                                                                                                |
-| :------------------------ | :---------------------------------------------------------------------------------------------------- |
-| `npm install`             | Installs dependencies                                                                                 |
-| `npm run dev`             | Imports latest GTFS data to in-memory SQLite database and starts local dev server at `localhost:4321` |
-| `npm run build`           | Builds production site to `./dist/`                                                                   |
-| `npm run preview`         | Preview build locally, before deploying                                                               |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check`                                                      |
-| `npm run astro -- --help` | Get help using the Astro CLI                                                                          |
+| Command                   | Action                                                                                          |
+| :------------------------ | :---------------------------------------------------------------------------------------------- |
+| `npm install`             | Installs dependencies                                                                           |
+| `npm run dev`             | Starts local dev server at `localhost:4321` (reuses existing GTFS database if present)         |
+| `npm run import-gtfs`     | Force re-downloads and imports the latest GTFS data to `./data/data.db`                        |
+| `npm run build`           | Builds production site to `./dist/`                                                             |
+| `npm run preview`         | Preview build locally, before deploying                                                         |
+| `npm run test`            | Runs Playwright tests                                                                           |
+| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check`                                                |
 
-## Typing and Variable Naming
+## Conventions
 
-The GTFS spec uses snake_case naming, whereas JavaScript/TypeScript prefers camelCase as a convention. There's no obvious solution to this. This repo follows the convention of using camelCase for variable names, and converts data imported from GTFS using [`ts-case-convert`](https://www.npmjs.com/package/ts-case-convert).
+The GTFS spec uses `snake_case` naming, whereas JavaScript/TypeScript prefers `camelCase`. This repo uses `camelCase` for variable names throughout.
