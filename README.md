@@ -8,7 +8,7 @@ Most pages are statically generated at build time from GTFS schedule data. Real-
 
 ## Data Sources
 
-- **GTFS** — At build time, [`node-gtfs`](https://www.npmjs.com/package/gtfs) downloads and imports [Metro's static GTFS](https://developer.metro.net/gtfs-schedule-data/) into a SQLite database uses it to generate static pages. In dev mode this database is persisted locally to `./data/data.db` (a `.gitignore`'d working directory) and reused on subsequent starts; in production builds it runs in-memory.
+- **GTFS** — At build time, [`node-gtfs`](https://www.npmjs.com/package/gtfs) downloads and imports [Metro's static GTFS](https://developer.metro.net/gtfs-schedule-data/) into a SQLite database used to generate static pages. In dev mode this database is persisted locally to `./data/data.db` (a `.gitignore`'d working directory) and reused on subsequent starts; for production builds it runs in-memory.
 - **Swiftly** — Real-time arrival predictions and service alerts are fetched at request time from Swiftly's API.
 
 ## Development Setup
