@@ -1,7 +1,7 @@
 import { openDb } from "gtfs";
 import { GTFSconfig } from "../integrations/import-gtfs";
 import { objectToCamel } from "ts-case-convert";
-import type Database from "libsql";
+import type Database from "@tursodatabase/database";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "./routeShortNameOverrides";
 
 export interface StopWithRoutes {
