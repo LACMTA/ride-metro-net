@@ -9,8 +9,6 @@ import tailwindcss from "@tailwindcss/vite";
 // https://astro.build/config
 export default defineConfig({
   build: {
-    // Our latency is mostly from SQLite,
-    // which in-memory is only really hurt by higher concurrency.
     concurrency: 1,
   },
   env: {

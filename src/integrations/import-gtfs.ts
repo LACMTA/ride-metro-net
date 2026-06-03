@@ -24,9 +24,7 @@ export function buildGtfsConfig(sqlitePath: string): Config {
   };
 }
 
-const isDev = process.argv.includes("dev");
-
-export const GTFSconfig = buildGtfsConfig(isDev ? DB_PATH : ":memory:");
+export const GTFSconfig: Config = buildGtfsConfig(DB_PATH);
 
 /** Path to the generated stop-name lookup consumed by SSR API routes. */
 const STOP_LOOKUP_PATH = resolve("src/generated/railBuswayStopLookup.json");
@@ -145,15 +143,11 @@ export default function importGTFS() {
     name: "data-import",
     hooks: {
       "astro:config:done": async () => {
-        if (isDev && existsSync(DB_PATH)) {
+        if (existsSync(DB_PATH)) {
           console.log(`Using existing GTFS database at ${DB_PATH}`);
         } else {
-          console.log(
-            `Importing GTFS to ${isDev ? "file-based" : "in-memory"} SQLite database...`,
-          );
-          if (isDev) {
-            mkdirSync(dirname(resolve(DB_PATH)), { recursive: true });
-          }
+          console.log(`Importing GTFS to ${DB_PATH}...`);
+          mkdirSync(dirname(resolve(DB_PATH)), { recursive: true });
           await importGtfs(GTFSconfig);
         }
         generateStopLookup(GTFSconfig);

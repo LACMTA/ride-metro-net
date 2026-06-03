@@ -1,6 +1,6 @@
 import { openDb } from "gtfs";
 import { GTFSconfig } from "../integrations/import-gtfs";
-import type Database from "better-sqlite3";
+import type Database from "libsql";
 
 /** A pair of GTFS time strings (e.g. "05:30:00", "24:45:00") representing
  *  the first and last scheduled service on the line. Either value may be null
