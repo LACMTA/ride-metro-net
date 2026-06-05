@@ -191,10 +191,9 @@ export default function importGTFS() {
         if (isDev && existsSync(DB_PATH)) {
           console.log(`Using existing GTFS database at ${DB_PATH}`);
         } else {
+          // always rebuild the database in prod
           console.log(`Importing GTFS to SQLite database...`);
-          if (isDev) {
-            mkdirSync(dirname(resolve(DB_PATH)), { recursive: true });
-          }
+          mkdirSync(dirname(resolve(DB_PATH)), { recursive: true });
           await importGtfs(gtfsConfig);
         }
         generateStopLookup(gtfsConfig);
