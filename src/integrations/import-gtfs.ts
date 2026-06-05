@@ -3,7 +3,16 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 export const DB_PATH = "./data/data.db";
-const API_KEY = process.env.API_KEY;
+
+// Ensure .env is available
+try {
+  process.loadEnvFile();
+} catch {
+  // No `.env` file present — fall back to whatever is already in the
+  // environment (e.g. variables injected by the hosting platform).
+}
+
+const API_KEY = import.meta.env?.API_KEY || process.env.API_KEY;
 if (!API_KEY) throw new Error("Swiftly API_KEY not defined!");
 
 const agencies: Config["agencies"] = [

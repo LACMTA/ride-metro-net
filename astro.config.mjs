@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig, envField } from "astro/config";
 import importGTFS from "./src/integrations/import-gtfs";
+import gtfsRealtimeCron from "./src/integrations/gtfs-realtime-cron";
 import react from "@astrojs/react";
 import node from "@astrojs/node";
 
@@ -29,6 +30,6 @@ export default defineConfig({
 
     plugins: [tailwindcss()],
   },
-  integrations: [importGTFS(), react()],
-  adapter: node({ mode: "standalone" }),
+  integrations: [importGTFS(), gtfsRealtimeCron(), react()],
+  adapter: node({ mode: "middleware" }),
 });
