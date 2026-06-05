@@ -59,7 +59,7 @@
           "ecsStopTimeoutSecs": 90,
           "healthCheckTimeoutSecs": 4,
           "healthCheckIntervalSecs": 5,
-          "healthCheckPath": "/",
+          "healthCheckPath": "/alerts",
           "port": 8080,
           "stickySessionsEnabled": false,
           "stickySessionsDurationSecs": 86400,
