@@ -2,7 +2,7 @@
 import { defineConfig, envField } from "astro/config";
 import importGTFS from "./src/integrations/import-gtfs";
 import react from "@astrojs/react";
-import netlify from "@astrojs/netlify";
+import node from "@astrojs/node";
 
 import tailwindcss from "@tailwindcss/vite";
 
@@ -30,5 +30,5 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   integrations: [importGTFS(), react()],
-  adapter: netlify(),
+  adapter: node({ mode: "standalone" }),
 });
