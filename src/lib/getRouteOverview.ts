@@ -1,5 +1,5 @@
 import { openDb } from "gtfs";
-import { GTFSconfig } from "../integrations/import-gtfs";
+import { gtfsConfig } from "../integrations/import-gtfs";
 import type Database from "better-sqlite3";
 
 /** A pair of GTFS time strings (e.g. "05:30:00", "24:45:00") representing
@@ -46,7 +46,7 @@ let preparedQuery: Database.Statement | null = null;
 
 function getDb() {
   if (!dbInstance) {
-    dbInstance = openDb(GTFSconfig);
+    dbInstance = openDb(gtfsConfig);
     dbInstance.pragma("synchronous = OFF");
     dbInstance.pragma("cache_size = 10000");
     dbInstance.pragma("temp_store = MEMORY");

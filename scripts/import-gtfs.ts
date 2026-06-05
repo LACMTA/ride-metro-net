@@ -1,7 +1,7 @@
 import { importGtfs } from "gtfs";
-import { buildGtfsConfig, DB_PATH } from "../src/integrations/import-gtfs";
+import { gtfsConfig, DB_PATH } from "../src/integrations/import-gtfs";
 
-const config = buildGtfsConfig(DB_PATH);
+const config = gtfsConfig;
 
 console.log(`Importing GTFS data to ${DB_PATH}...`);
 await importGtfs(config);

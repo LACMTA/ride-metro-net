@@ -53,18 +53,14 @@ const agencies: Config["agencies"] = [
   },
 ];
 
-export function buildGtfsConfig(sqlitePath: string): Config {
-  return {
-    sqlitePath,
-    agencies,
-    verbose: true,
-    ignoreDuplicates: true,
-  };
-}
+export const gtfsConfig: Config = {
+  sqlitePath: DB_PATH,
+  agencies,
+  verbose: true,
+  ignoreDuplicates: true,
+};
 
 const isDev = process.argv.includes("dev");
-
-export const GTFSconfig = buildGtfsConfig(isDev ? DB_PATH : ":memory:");
 
 /** Path to the generated stop-name lookup consumed by SSR API routes. */
 const STOP_LOOKUP_PATH = resolve("src/generated/railBuswayStopLookup.json");
@@ -186,15 +182,13 @@ export default function importGTFS() {
         if (isDev && existsSync(DB_PATH)) {
           console.log(`Using existing GTFS database at ${DB_PATH}`);
         } else {
-          console.log(
-            `Importing GTFS to ${isDev ? "file-based" : "in-memory"} SQLite database...`,
-          );
+          console.log(`Importing GTFS to SQLite database...`);
           if (isDev) {
             mkdirSync(dirname(resolve(DB_PATH)), { recursive: true });
           }
-          await importGtfs(GTFSconfig);
+          await importGtfs(gtfsConfig);
         }
-        generateStopLookup(GTFSconfig);
+        generateStopLookup(gtfsConfig);
       },
     },
   };

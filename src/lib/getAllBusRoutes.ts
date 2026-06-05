@@ -1,5 +1,5 @@
 import { openDb } from "gtfs";
-import { GTFSconfig } from "../integrations/import-gtfs";
+import { gtfsConfig } from "../integrations/import-gtfs";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
 import type { RouteWithInfo } from "./getRouteById";
 
@@ -19,7 +19,7 @@ interface DbRow {
  * forward-slash characters (e.g. "4", "720", "2/302").
  */
 export default async function getAllBusRoutes(): Promise<RouteWithInfo[]> {
-  const db = openDb(GTFSconfig);
+  const db = openDb(gtfsConfig);
 
   const rows = db
     .prepare(
