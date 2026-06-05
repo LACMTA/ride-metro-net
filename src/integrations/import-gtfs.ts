@@ -3,15 +3,53 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 export const DB_PATH = "./data/data.db";
+const API_KEY = process.env.API_KEY;
+if (!API_KEY) throw new Error("Swiftly API_KEY not defined!");
 
 const agencies: Config["agencies"] = [
   {
     // train
     url: "https://gitlab.com/LACMTA/gtfs_rail/-/raw/master/gtfs_rail.zip?ref_type=heads&inline=false",
+    realtimeAlerts: {
+      url: "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-alerts/v2",
+      headers: {
+        Authorization: API_KEY,
+      },
+    },
+    realtimeTripUpdates: {
+      url: "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-trip-updates",
+      headers: {
+        Authorization: API_KEY,
+      },
+    },
+    realtimeVehiclePositions: {
+      url: "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-vehicle-positions",
+      headers: {
+        Authorization: API_KEY,
+      },
+    },
   },
   {
     // bus
     url: "https://gitlab.com/LACMTA/gtfs_bus/-/raw/master/gtfs_bus.zip?ref_type=heads&inline=false",
+    realtimeAlerts: {
+      url: "https://api.goswift.ly/real-time/lametro/gtfs-rt-alerts/v2",
+      headers: {
+        Authorization: API_KEY,
+      },
+    },
+    realtimeTripUpdates: {
+      url: "https://api.goswift.ly/real-time/lametro/gtfs-rt-trip-updates",
+      headers: {
+        Authorization: API_KEY,
+      },
+    },
+    realtimeVehiclePositions: {
+      url: "https://api.goswift.ly/real-time/lametro/gtfs-rt-vehicle-positions",
+      headers: {
+        Authorization: API_KEY,
+      },
+    },
   },
 ];
 

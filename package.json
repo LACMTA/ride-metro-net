@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "import-gtfs": "npx tsx scripts/import-gtfs.ts",
+    "import-gtfs": "npx tsx --env-file=.env scripts/import-gtfs.ts",
     "test": "npx playwright test",
     "astro": "astro",
     "start": "node ./dist/server/entry.mjs"
