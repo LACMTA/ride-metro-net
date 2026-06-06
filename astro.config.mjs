@@ -31,5 +31,5 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   integrations: [importGTFS(), gtfsRealtimeCron(), react()],
-  adapter: node({ mode: "middleware" }),
+  adapter: node({ mode: "standalone" }),
 });

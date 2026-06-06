@@ -38,7 +38,7 @@
           "maxInstances": 1,
           "versionHistoryCount": 10,
           "basePath": ".",
-          "startCommand": ["HOST=0.0.0.0 PORT=8080 tsx server.ts"],
+          "startCommand": ["HOST=0.0.0.0 PORT=8080 tsx start.mjs"],
           "privileged": false,
           "envVariables": {},
           "autoscaling": {
