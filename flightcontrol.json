@@ -15,11 +15,7 @@
           "id": "astro-app-ntvIGO",
           "name": "ride.metro.net",
           "target": {
-            "type": "ecs-ec2",
-            "clusterInstanceSize": "t3.medium",
-            "clusterMinInstances": 1,
-            "clusterMaxInstances": 10,
-            "storage": 30
+            "type": "fargate"
           },
           "buildType": "nixpacks",
           "cpu": 1,
