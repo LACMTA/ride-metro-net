@@ -12,7 +12,7 @@ import pdfSchedules from "../../../data/pdf-schedules.json";
 import { getLineStaticPaths } from "../../../lib/getLineStaticPaths";
 import Column from "../../../components/Column";
 
-// export const prerender = true;
+export const prerender = false;
 
 export async function getStaticPaths() {
   return getLineStaticPaths();

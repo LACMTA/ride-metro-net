@@ -10,7 +10,7 @@ import PageHeader from "../../../components/PageHeader";
 import Column from "../../../components/Column";
 import { getStopStaticPaths } from "../../../lib/getStopStaticPaths";
 
-// export const prerender = true;
+export const prerender = false;
 
 export async function getStaticPaths() {
   return getStopStaticPaths();
@@ -89,10 +89,7 @@ const grouped: StopRoute[][] = stop.routes.reduce((acc, route) => {
           <Column>
             {
               grouped.map((groupedRoutes) => (
-                <StopRoutePrediction
-                  routes={groupedRoutes}
-                  client:load
-                />
+                <StopRoutePrediction routes={groupedRoutes} client:load />
               ))
             }
           </Column>
