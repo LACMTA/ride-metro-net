@@ -9,7 +9,7 @@ import PageHeader from "../../../components/PageHeader";
 import Column from "../../../components/Column";
 import { getStopStaticPaths } from "../../../lib/getStopStaticPaths";
 
-export const prerender = true;
+// export const prerender = true;
 
 export async function getStaticPaths() {
   return getStopStaticPaths();
@@ -48,8 +48,16 @@ const hasRail = stop.routes.some((route) => route.routeType !== 3);
     <section>
       <TabNav
         tabs={[
-          { href: `/stops/${stop.stopId}/`, label: "Arrivals", key: "arrivals" },
-          { href: `/stops/${stop.stopId}/alerts`, label: hasRail ? "Station Alerts" : "Stop Alerts", key: "alerts" },
+          {
+            href: `/stops/${stop.stopId}/`,
+            label: "Arrivals",
+            key: "arrivals",
+          },
+          {
+            href: `/stops/${stop.stopId}/alerts`,
+            label: hasRail ? "Station Alerts" : "Stop Alerts",
+            key: "alerts",
+          },
         ]}
         activeTab="alerts"
       >

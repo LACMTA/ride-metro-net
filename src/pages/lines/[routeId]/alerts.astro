@@ -10,7 +10,7 @@ import AlertsSection from "../../../components/AlertsSection";
 import Column from "../../../components/Column";
 import { getLineStaticPaths } from "../../../lib/getLineStaticPaths";
 
-export const prerender = true;
+// export const prerender = true;
 
 export async function getStaticPaths() {
   return getLineStaticPaths();
@@ -49,7 +49,11 @@ const title =
     <section>
       <TabNav
         tabs={[
-          { href: `/lines/${routeId}/`, label: "Maps & Schedules", key: "schedules" },
+          {
+            href: `/lines/${routeId}/`,
+            label: "Maps & Schedules",
+            key: "schedules",
+          },
           { href: `/lines/${routeId}/alerts`, label: "Alerts", key: "alerts" },
         ]}
         activeTab="alerts"

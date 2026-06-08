@@ -12,7 +12,7 @@ import pdfSchedules from "../../../data/pdf-schedules.json";
 import { getLineStaticPaths } from "../../../lib/getLineStaticPaths";
 import Column from "../../../components/Column";
 
-export const prerender = true;
+// export const prerender = true;
 
 export async function getStaticPaths() {
   return getLineStaticPaths();
@@ -56,7 +56,11 @@ const pdfUrl =
     <section>
       <TabNav
         tabs={[
-          { href: `/lines/${routeId}/`, label: "Maps & Schedules", key: "schedules" },
+          {
+            href: `/lines/${routeId}/`,
+            label: "Maps & Schedules",
+            key: "schedules",
+          },
           { href: `/lines/${routeId}/alerts`, label: "Alerts", key: "alerts" },
         ]}
         activeTab="schedules"

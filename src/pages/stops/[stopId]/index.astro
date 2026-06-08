@@ -10,7 +10,7 @@ import PageHeader from "../../../components/PageHeader";
 import Column from "../../../components/Column";
 import { getStopStaticPaths } from "../../../lib/getStopStaticPaths";
 
-export const prerender = true;
+// export const prerender = true;
 
 export async function getStaticPaths() {
   return getStopStaticPaths();
@@ -69,8 +69,16 @@ const grouped: StopRoute[][] = stop.routes.reduce((acc, route) => {
     <section>
       <TabNav
         tabs={[
-          { href: `/stops/${stop.stopId}/`, label: "Arrivals", key: "arrivals" },
-          { href: `/stops/${stop.stopId}/alerts`, label: hasRail ? "Station Alerts" : "Stop Alerts", key: "alerts" },
+          {
+            href: `/stops/${stop.stopId}/`,
+            label: "Arrivals",
+            key: "arrivals",
+          },
+          {
+            href: `/stops/${stop.stopId}/alerts`,
+            label: hasRail ? "Station Alerts" : "Stop Alerts",
+            key: "alerts",
+          },
         ]}
         activeTab="arrivals"
       >
@@ -79,9 +87,14 @@ const grouped: StopRoute[][] = stop.routes.reduce((acc, route) => {
       <div class="bg-background-gray pt-3 pb-10">
         <div class="py-3">
           <Column>
-            {grouped.map((groupedRoutes, index) => (
-              <StopRoutePrediction key={index} routes={groupedRoutes} client:load />
-            ))}
+            {
+              grouped.map((groupedRoutes) => (
+                <StopRoutePrediction
+                  routes={groupedRoutes}
+                  client:load
+                />
+              ))
+            }
           </Column>
         </div>
       </div>
