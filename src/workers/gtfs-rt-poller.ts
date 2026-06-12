@@ -1,19 +1,15 @@
-import type { Config } from "gtfs";
 import { updateGtfsRealtime } from "gtfs";
 import cron from "node-cron";
 import { gtfsConfig } from "../integrations/import-gtfs.js";
 
-export function startRealtimePoller(config: Config): void {
+export function startRealtimePoller(): void {
   console.log("[gtfs-rt] Scheduling realtime poller (every minute)");
   cron.schedule("* * * * *", async () => {
     try {
-      await updateGtfsRealtime(config);
+      await updateGtfsRealtime(gtfsConfig);
       console.log("[gtfs-rt] Realtime data updated");
     } catch (err) {
       console.error("[gtfs-rt] Update failed:", err);
     }
   });
 }
-
-// Side-effect: start the poller when this module is imported.
-startRealtimePoller(gtfsConfig);
