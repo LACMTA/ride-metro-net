@@ -1,17 +1,12 @@
 export const prerender = false;
 
-type PredictionsApiResponse = {
-  data: {
-    agencyKey: string;
-    predictionsData: RoutePredictions[];
-  };
-  route: string;
-  success: boolean;
-};
+import { openDb } from "gtfs";
+import { gtfsConfig } from "../../integrations/import-gtfs";
+import type Database from "better-sqlite3";
 
 export type RoutePredictions = {
   destinations: {
-    directionId: string; //swiftly returns a string
+    directionId: string;
     headsign: string;
     predictions: Prediction[];
   }[];
@@ -26,82 +21,149 @@ export type RoutePredictions = {
 export type Prediction = {
   min: number;
   sec: number;
+  /** Absolute Unix epoch seconds of the predicted arrival. */
   time: number;
   tripId: string;
   vehicleId: string;
 };
 
+interface PredictionRow {
+  stop_id: string;
+  route_id: string;
+  trip_id: string;
+  direction_id: number | null;
+  arrival_timestamp: string | null;
+  departure_timestamp: string | null;
+  vehicle_id: string | null;
+  route_short_name: string | null;
+  route_long_name: string | null;
+  stop_code: number | null;
+  stop_name: string | null;
+  raw_headsign: string | null;
+}
+
+let dbInstance: Database.Database | null = null;
+
+function getDb(): Database.Database {
+  if (!dbInstance) {
+    dbInstance = openDb(gtfsConfig);
+  }
+  return dbInstance;
+}
+
 /**
  * GET /api/predictions
  * @param {string} stopId - Comma-separated list of stop IDs to fetch predictions for.
  *   For parent stations, pass the child stop IDs. Results are aggregated into a single array.
- * @param {string} agency - The Swiftly agency key.
  * @returns {RoutePredictions[]} Aggregated array of predictions across all requested stops.
  */
 export async function GET(context: import("astro").APIContext) {
-  const API_KEY = import.meta.env.API_KEY;
   const stopIdParam = context.url.searchParams.get("stopId");
-  const agency = context.url.searchParams.get("agency");
 
   if (!stopIdParam)
     return new Response("stopId query parameter is required", { status: 400 });
-  if (!agency)
-    return new Response("agency query parameter is required", { status: 400 });
 
   const stopIds = stopIdParam
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
 
-  const fetchForStop = async (stopId: string): Promise<RoutePredictions[]> => {
-    const predictionsUrl = new URL(
-      `https://api.goswift.ly/real-time/${agency}/predictions`,
-    );
-    predictionsUrl.searchParams.append("stop", stopId);
+  if (stopIds.length === 0)
+    return new Response("stopId query parameter is required", { status: 400 });
 
-    console.log(`Fetching predictions from: ${predictionsUrl.toString()}`);
+  const db = getDb();
+  const placeholders = stopIds.map(() => "?").join(", ");
 
-    const predictionsResponse = await fetch(predictionsUrl.toString(), {
-      method: "GET",
-      headers: {
-        Accept:
-          "application/json, application/json; charset=utf-8, text/csv; charset=utf-8",
-        Authorization: API_KEY as string,
-      },
-      signal: AbortSignal.timeout(25000), // 25 second timeout
-    });
+  const rows = db
+    .prepare(
+      `
+      SELECT
+        stu.stop_id,
+        stu.route_id,
+        stu.trip_id,
+        stu.direction_id,
+        stu.arrival_timestamp,
+        stu.departure_timestamp,
+        tu.vehicle_id,
+        r.route_short_name,
+        r.route_long_name,
+        CAST(s.stop_code AS INTEGER) AS stop_code,
+        s.stop_name,
+        hs.stop_headsign AS raw_headsign
+      FROM stop_time_updates stu
+      JOIN routes r ON r.route_id = stu.route_id
+      JOIN stops s ON s.stop_id = stu.stop_id
+      LEFT JOIN trip_updates tu ON tu.trip_id = stu.trip_id
+      LEFT JOIN (
+        SELECT trip_id, MIN(stop_headsign) AS stop_headsign
+        FROM stop_times
+        GROUP BY trip_id
+      ) hs ON hs.trip_id = stu.trip_id
+      WHERE stu.stop_id IN (${placeholders})
+        AND stu.expiration_timestamp > unixepoch()
+        AND (stu.arrival_timestamp IS NOT NULL OR stu.departure_timestamp IS NOT NULL)
+      ORDER BY CAST(COALESCE(stu.arrival_timestamp, stu.departure_timestamp) AS INTEGER)
+    `,
+    )
+    .all(...stopIds) as PredictionRow[];
 
-    if (!predictionsResponse.ok) {
-      const errorText = await predictionsResponse.text();
-      console.error(
-        `Swiftly predictions API error for stop ${stopId} (${predictionsResponse.status}):`,
-        errorText,
-      );
-      // Return empty rather than failing the whole request when one stop fails
-      return [];
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  // Group flat rows into RoutePredictions shape, keyed by route_id.
+  // Predictions across all requested stop IDs are merged into a single entry
+  // per route so the client sees one unified predictions list per line.
+  const byRoute = new Map<string, RoutePredictions>();
+
+  for (const row of rows) {
+    const arrivalTs = row.arrival_timestamp
+      ? Number(row.arrival_timestamp)
+      : row.departure_timestamp
+        ? Number(row.departure_timestamp)
+        : null;
+    if (arrivalTs === null) continue;
+
+    // Strip "Route Name - " prefix from headsign
+    // e.g. "Metro A Line - Pomona Station" → "Pomona Station"
+    const rawHeadsign = row.raw_headsign ?? "";
+    const dashIdx = rawHeadsign.indexOf(" - ");
+    const headsign =
+      dashIdx >= 0 ? rawHeadsign.slice(dashIdx + 3) : rawHeadsign;
+
+    const { route_id: routeId } = row;
+    if (!byRoute.has(routeId)) {
+      byRoute.set(routeId, {
+        routeId,
+        routeName: row.route_long_name ?? "",
+        routeShortName: row.route_short_name ?? "",
+        stopCode: row.stop_code ?? 0,
+        stopId: row.stop_id,
+        stopName: row.stop_name ?? "",
+        destinations: [],
+      });
     }
 
-    const data: PredictionsApiResponse = await predictionsResponse.json();
-    return data.data.predictionsData;
-  };
+    const routePred = byRoute.get(routeId)!;
+    const directionId = String(row.direction_id ?? 0);
 
-  const results = await Promise.all(stopIds.map(fetchForStop));
-  const allPredictions = results.flat();
+    let dest = routePred.destinations.find(
+      (d) => d.directionId === directionId && d.headsign === headsign,
+    );
+    if (!dest) {
+      dest = { directionId, headsign, predictions: [] };
+      routePred.destinations.push(dest);
+    }
 
-  // clamping any values less then 0 (Swiftly returns this sometimes)
-  const sanitizedPredictions = allPredictions.map((route) => ({
-    ...route,
-    destinations: route.destinations.map((dest) => ({
-      ...dest,
-      predictions: dest.predictions.map((p) => ({
-        ...p,
-        sec: p.sec < 0 ? 0 : p.sec,
-        min: p.min < 0 ? 0 : p.min,
-      })),
-    })),
-  }));
+    const sec = arrivalTs - nowSec;
+    dest.predictions.push({
+      time: arrivalTs,
+      sec: Math.max(0, sec),
+      min: Math.max(0, Math.floor(sec / 60)),
+      tripId: row.trip_id ?? "",
+      vehicleId: row.vehicle_id ?? "",
+    });
+  }
 
-  return new Response(JSON.stringify(sanitizedPredictions), {
+  return new Response(JSON.stringify([...byRoute.values()]), {
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "public, max-age=60",

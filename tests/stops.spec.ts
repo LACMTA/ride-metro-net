@@ -32,7 +32,6 @@ test.describe("Stop pages (/stops/:stopId)", () => {
       // Verify predictions API was called with the correct agency and stop ID
       expect(predictionsRequests.length).toBeGreaterThanOrEqual(1);
       const predictionsUrl = new URL(predictionsRequests[0]);
-      expect(predictionsUrl.searchParams.get("agency")).toBe(stop.agency);
       expect(predictionsUrl.searchParams.get("stopId")).toBeTruthy();
 
       // Verify alerts API was called and includes the stop ID.

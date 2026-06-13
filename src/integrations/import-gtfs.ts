@@ -67,7 +67,13 @@ export const gtfsConfig: Config = {
   agencies,
   verbose: true,
   ignoreDuplicates: true,
+  // node-gtfs defaults this to 0, which makes every realtime row's
+  // expiration_timestamp equal to its created_timestamp — i.e. born expired.
+  // Give realtime rows a real TTL so `expiration_timestamp > now` filters work.
+  // We poll every minute, so 10 minutes is a comfortable buffer.
+  gtfsRealtimeExpirationSeconds: 600,
 };
+
 
 const isDev = process.argv.includes("dev");
 
