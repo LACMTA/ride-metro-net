@@ -1,7 +1,7 @@
 import { importGtfs } from "gtfs";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { gtfsConfig, DB_PATH } from "../src/integrations/import-gtfs";
+import { gtfsConfig, DB_PATH } from "../src/lib/gtfsConfig";
 
 mkdirSync(dirname(resolve(DB_PATH)), { recursive: true });
 

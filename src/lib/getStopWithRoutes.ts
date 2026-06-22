@@ -1,5 +1,4 @@
-import { openDb } from "gtfs";
-import { gtfsConfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 import { objectToCamel } from "ts-case-convert";
 import type Database from "better-sqlite3";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "./routeShortNameOverrides";
@@ -46,21 +45,8 @@ interface ChildStopRow {
   stop_id: string;
 }
 
-let dbInstance: Database.Database | null = null;
 let preparedQuery: Database.Statement | null = null;
 let preparedChildStopsQuery: Database.Statement | null = null;
-
-function getDb() {
-  if (!dbInstance) {
-    dbInstance = openDb(gtfsConfig);
-
-    dbInstance.pragma("synchronous = OFF");
-    dbInstance.pragma("cache_size = 10000");
-    dbInstance.pragma("temp_store = MEMORY");
-    dbInstance.pragma("journal_mode = OFF"); // Safe for in-memory
-  }
-  return dbInstance;
-}
 
 
 const query = `
@@ -148,7 +134,7 @@ const query = `
 
 function getPreparedQuery() {
   if (!preparedQuery) {
-    const db = getDb();
+    const db = getGtfsDb();
     preparedQuery = db.prepare(query);
   }
   return preparedQuery;
@@ -156,7 +142,7 @@ function getPreparedQuery() {
 
 function getPreparedChildStopsQuery() {
   if (!preparedChildStopsQuery) {
-    const db = getDb();
+    const db = getGtfsDb();
     preparedChildStopsQuery = db.prepare(
       `SELECT DISTINCT stops.stop_id FROM stops INNER JOIN stop_times ON stop_times.stop_id = stops.stop_id WHERE stops.parent_station = @stopId`,
     );

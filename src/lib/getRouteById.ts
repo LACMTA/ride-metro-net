@@ -1,5 +1,4 @@
-import { openDb } from "gtfs";
-import { gtfsConfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 import { objectToCamel } from "ts-case-convert";
 import type Database from "better-sqlite3";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
@@ -24,19 +23,14 @@ interface DatabaseQueryResult {
   route_text_color: string;
 }
 
-let dbInstance: Database.Database | null = null;
 let preparedQuery: Database.Statement | null = null;
 
-function getDb() {
-  if (!dbInstance) {
-    dbInstance = openDb(gtfsConfig);
-
-    dbInstance.pragma("synchronous = OFF");
-    dbInstance.pragma("cache_size = 10000");
-    dbInstance.pragma("temp_store = MEMORY");
-    dbInstance.pragma("journal_mode = OFF"); // Safe for in-memory
+function getPreparedQuery() {
+  if (!preparedQuery) {
+    const db = getGtfsDb();
+    preparedQuery = db.prepare(query);
   }
-  return dbInstance;
+  return preparedQuery;
 }
 
 const query = `
@@ -52,14 +46,6 @@ const query = `
        OR route_id LIKE @routeId || '-%'
     LIMIT 1
     `;
-
-function getPreparedQuery() {
-  if (!preparedQuery) {
-    const db = getDb();
-    preparedQuery = db.prepare(query);
-  }
-  return preparedQuery;
-}
 
 export default async function (routeId: string) {
   const mainQuery = getPreparedQuery();

@@ -1,6 +1,6 @@
 import { updateGtfsRealtime } from "gtfs";
 import cron from "node-cron";
-import { gtfsConfig } from "../integrations/import-gtfs.js";
+import { gtfsConfig } from "../lib/gtfsConfig";
 
 export function startRealtimePoller(): void {
   console.log("[gtfs-rt] Scheduling realtime poller (every minute)");

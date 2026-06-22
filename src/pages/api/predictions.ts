@@ -1,8 +1,6 @@
 export const prerender = false;
 
-import { openDb } from "gtfs";
-import { gtfsConfig } from "../../integrations/import-gtfs";
-import type Database from "better-sqlite3";
+import { getGtfsDb } from "../../lib/gtfsConfig";
 
 export type RoutePredictions = {
   destinations: {
@@ -42,15 +40,6 @@ interface PredictionRow {
   raw_headsign: string | null;
 }
 
-let dbInstance: Database.Database | null = null;
-
-function getDb(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = openDb(gtfsConfig);
-  }
-  return dbInstance;
-}
-
 /**
  * GET /api/predictions
  * @param {string} stopId - Comma-separated list of stop IDs to fetch predictions for.
@@ -71,7 +60,7 @@ export async function GET(context: import("astro").APIContext) {
   if (stopIds.length === 0)
     return new Response("stopId query parameter is required", { status: 400 });
 
-  const db = getDb();
+  const db = getGtfsDb();
   const placeholders = stopIds.map(() => "?").join(", ");
 
   const rows = db

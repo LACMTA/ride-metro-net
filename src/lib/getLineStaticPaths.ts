@@ -1,5 +1,4 @@
-import { openDb } from "gtfs";
-import { gtfsConfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "./routeShortNameOverrides";
 
 /**
@@ -10,7 +9,7 @@ import { ROUTE_SHORT_NAME_OVERRIDES } from "./routeShortNameOverrides";
  * Routes with a letter override (e.g. 801 → "A") are served at the letter slug.
  */
 export async function getLineStaticPaths() {
-  const db = openDb(gtfsConfig);
+  const db = getGtfsDb();
   // Build pages for all routes that have trips (are active in the schedule).
   // Strip the version suffix from route_id (e.g. "901-13196" → "901") so that
   // page URLs are stable across GTFS releases, then deduplicate.

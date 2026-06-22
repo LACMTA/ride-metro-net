@@ -1,6 +1,5 @@
-import { getServiceAlerts as gtfsGetServiceAlerts, openDb } from "gtfs";
-import type Database from "better-sqlite3";
-import { gtfsConfig } from "../integrations/import-gtfs";
+import { getServiceAlerts as gtfsGetServiceAlerts } from "gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 import { routeIdPrefix } from "./fetchSwiftlyAlerts";
 import type { SwiftlyAlert, SwiftlyAlertEntity } from "./fetchSwiftlyAlerts";
 
@@ -9,24 +8,7 @@ import type { SwiftlyAlert, SwiftlyAlertEntity } from "./fetchSwiftlyAlerts";
  * from the node-gtfs SQLite database (kept fresh by the every-minute
  * `gtfs-rt-poller` worker) and maps them into the `SwiftlyAlert` shape
  * that `makeConciseAlert` and the rest of the app already consume.
- *
- * Both `lametro` and `lametro-rail` agencies write into the same SQLite
- * tables, so a single query returns alerts across the whole system —
- * no need for the parallel Swiftly fetches the app used to do.
  */
-
-let dbInstance: Database.Database | null = null;
-
-function getDb(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = openDb(gtfsConfig);
-    dbInstance.pragma("synchronous = OFF");
-    dbInstance.pragma("cache_size = 10000");
-    dbInstance.pragma("temp_store = MEMORY");
-    dbInstance.pragma("journal_mode = OFF");
-  }
-  return dbInstance;
-}
 
 /** Parsed shape of the `active_period` JSON column. */
 interface ActivePeriodRow {
@@ -34,21 +16,19 @@ interface ActivePeriodRow {
   end?: number | null;
 }
 
-/**
- * Convert a node-gtfs `ServiceAlert` row (snake_case, with a nested
- * `informed_entities` array) into the `SwiftlyAlert` shape used
- * downstream, normalising route IDs and preserving the accessibility
- * effect override.
- */
-function toSwiftlyAlert(row: ReturnType<typeof gtfsGetServiceAlerts>[number]): SwiftlyAlert {
-  const informedEntities: SwiftlyAlertEntity[] = row.informed_entities.map((entity) => ({
-    routeId: entity.route_id ? routeIdPrefix(entity.route_id) : undefined,
-    stopId: entity.stop_id ?? undefined,
-    // node-gtfs does not store an agencyId on informed entities; alerts
-    // with only a route_type (no route/stop/trip) are treated as
-    // system-wide downstream, so leave agencyId empty to match.
-    agencyId: "",
-  }));
+function toSwiftlyAlert(
+  row: ReturnType<typeof gtfsGetServiceAlerts>[number],
+): SwiftlyAlert {
+  const informedEntities: SwiftlyAlertEntity[] = row.informed_entities.map(
+    (entity) => ({
+      routeId: entity.route_id ? routeIdPrefix(entity.route_id) : undefined,
+      stopId: entity.stop_id ?? undefined,
+      // node-gtfs does not store an agencyId on informed entities; alerts
+      // with only a route_type (no route/stop/trip) are treated as
+      // system-wide downstream, so leave agencyId empty to match.
+      agencyId: "",
+    }),
+  );
 
   // active_period is a JSON string from node-gtfs; fall back to the
   // start_time/end_time columns if it is missing/unparseable.
@@ -66,11 +46,11 @@ function toSwiftlyAlert(row: ReturnType<typeof gtfsGetServiceAlerts>[number]): S
   const start =
     active?.start != null
       ? new Date(active.start * 1000).toISOString()
-      : row.start_time ?? new Date().toISOString();
+      : (row.start_time ?? new Date().toISOString());
   const end =
     active?.end != null
       ? new Date(active.end * 1000).toISOString()
-      : row.end_time ?? null;
+      : (row.end_time ?? null);
 
   let effect = row.effect ?? "";
   let headerText = row.header_text ?? "";
@@ -104,7 +84,7 @@ function toSwiftlyAlert(row: ReturnType<typeof gtfsGetServiceAlerts>[number]): S
  * agency, mapped to the `SwiftlyAlert` shape.
  */
 export async function getServiceAlertsFromDb(): Promise<SwiftlyAlert[]> {
-  const db = getDb();
+  const db = getGtfsDb();
   const nowSeconds = Math.floor(Date.now() / 1000);
 
   // node-gtfs' getServiceAlerts accepts an optional `db` via options,
@@ -114,9 +94,7 @@ export async function getServiceAlertsFromDb(): Promise<SwiftlyAlert[]> {
   // mid-cycle.
   const rows = gtfsGetServiceAlerts({}, [], [], { db });
 
-  const active = rows.filter(
-    (row) => row.expiration_timestamp > nowSeconds,
-  );
+  const active = rows.filter((row) => row.expiration_timestamp > nowSeconds);
 
   return active.map(toSwiftlyAlert);
 }

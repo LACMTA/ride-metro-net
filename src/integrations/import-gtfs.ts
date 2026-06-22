@@ -1,79 +1,7 @@
-import { importGtfs, openDb, type Config } from "gtfs";
+import { importGtfs, type Config } from "gtfs";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-
-export const DB_PATH = "./data/data.db";
-
-// Ensure .env is available
-try {
-  process.loadEnvFile();
-} catch {
-  // No `.env` file present — fall back to whatever is already in the
-  // environment (e.g. variables injected by the hosting platform).
-}
-
-const API_KEY = import.meta.env?.API_KEY || process.env.API_KEY;
-if (!API_KEY) throw new Error("Swiftly API_KEY not defined!");
-
-const agencies: Config["agencies"] = [
-  {
-    // train
-    url: "https://gitlab.com/LACMTA/gtfs_rail/-/raw/master/gtfs_rail.zip?ref_type=heads&inline=false",
-    realtimeAlerts: {
-      url: "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-alerts/v2",
-      headers: {
-        Authorization: API_KEY,
-      },
-    },
-    realtimeTripUpdates: {
-      url: "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-trip-updates",
-      headers: {
-        Authorization: API_KEY,
-      },
-    },
-    realtimeVehiclePositions: {
-      url: "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-vehicle-positions",
-      headers: {
-        Authorization: API_KEY,
-      },
-    },
-  },
-  {
-    // bus
-    url: "https://gitlab.com/LACMTA/gtfs_bus/-/raw/master/gtfs_bus.zip?ref_type=heads&inline=false",
-    realtimeAlerts: {
-      url: "https://api.goswift.ly/real-time/lametro/gtfs-rt-alerts/v2",
-      headers: {
-        Authorization: API_KEY,
-      },
-    },
-    realtimeTripUpdates: {
-      url: "https://api.goswift.ly/real-time/lametro/gtfs-rt-trip-updates",
-      headers: {
-        Authorization: API_KEY,
-      },
-    },
-    realtimeVehiclePositions: {
-      url: "https://api.goswift.ly/real-time/lametro/gtfs-rt-vehicle-positions",
-      headers: {
-        Authorization: API_KEY,
-      },
-    },
-  },
-];
-
-export const gtfsConfig: Config = {
-  sqlitePath: DB_PATH,
-  agencies,
-  verbose: true,
-  ignoreDuplicates: true,
-  // node-gtfs defaults this to 0, which makes every realtime row's
-  // expiration_timestamp equal to its created_timestamp — i.e. born expired.
-  // Give realtime rows a real TTL so `expiration_timestamp > now` filters work.
-  // We poll every minute, so 10 minutes is a comfortable buffer.
-  gtfsRealtimeExpirationSeconds: 600,
-};
-
+import { gtfsConfig, DB_PATH, getGtfsDb } from "../lib/gtfsConfig";
 
 const isDev = process.argv.includes("dev");
 
@@ -94,7 +22,7 @@ const STOP_LOOKUP_PATH = resolve("src/generated/railBuswayStopLookup.json");
  * ```
  */
 function generateStopLookup(config: Config): void {
-  const db = openDb(config);
+  const db = getGtfsDb();
 
   // All stop IDs that directly serve rail or busway routes.
   const directStopRows = db

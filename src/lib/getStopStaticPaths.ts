@@ -1,5 +1,4 @@
-import { openDb } from "gtfs";
-import { gtfsConfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 
 /**
  * Shared `getStaticPaths` logic for stop pages (`/stops/[stopId]/*`).
@@ -12,7 +11,7 @@ import { gtfsConfig } from "../integrations/import-gtfs";
  * or for parent stations whose children have no stop_times yet (not yet in service).
  */
 export async function getStopStaticPaths() {
-  const db = openDb(gtfsConfig);
+  const db = getGtfsDb();
   const allStops = (await db
     .prepare(
       `

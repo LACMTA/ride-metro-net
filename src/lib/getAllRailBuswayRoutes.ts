@@ -1,5 +1,4 @@
-import { openDb } from "gtfs";
-import { gtfsConfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
 import type { RouteWithInfo } from "./getRouteById";
 
@@ -21,7 +20,7 @@ interface DbRow {
  * displayed alongside rail lines throughout the app.
  */
 export default async function getAllRailBuswayRoutes(): Promise<RouteWithInfo[]> {
-  const db = openDb(gtfsConfig);
+  const db = getGtfsDb();
 
   const rows = db
     .prepare(
