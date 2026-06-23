@@ -1,6 +1,6 @@
 import { getServiceAlertsFromDb } from "../../lib/getServiceAlerts";
 import { makeConciseAlert } from "../../lib/makeConciseAlert";
-import stopLookup from "../../generated/railBuswayStopLookup.json";
+import { getChildStopIds } from "../../lib/stopHierarchyLookup";
 import type { SwiftlyAlert } from "../../lib/fetchSwiftlyAlerts";
 
 export const prerender = false;
@@ -30,10 +30,9 @@ export async function GET(context: import("astro").APIContext) {
   const rawStopIds = context.url.searchParams.get("stopId")?.split(",") || [];
 
   // Expand each requested stop ID to also include its child stop IDs
-  // (from the build-time GTFS lookup) so alerts tagged on child stops are
-  // matched from the parent
-  const children = stopLookup.children as Record<string, string[]>;
-  const stopIds = rawStopIds.flatMap((id) => [id, ...(children[id] ?? [])]);
+  // (queried directly from the GTFS stops table) so alerts tagged on
+  // child stops are matched from the parent.
+  const stopIds = [...rawStopIds, ...getChildStopIds(rawStopIds)];
 
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
 

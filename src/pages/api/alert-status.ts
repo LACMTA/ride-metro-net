@@ -1,7 +1,8 @@
-import { isCurrent } from "../../lib/isCurrent";
-import { fetchSwiftlyAlerts } from "../../lib/fetchSwiftlyAlerts";
+import { getServiceAlertsFromDb } from "../../lib/getServiceAlerts";
 import { makeConciseAlert } from "../../lib/makeConciseAlert";
-import stopLookup from "../../generated/railBuswayStopLookup.json";
+import { getStopInfo } from "../../lib/stopHierarchyLookup";
+import { isCurrent } from "../../lib/isCurrent";
+import type { SwiftlyAlert } from "../../lib/fetchSwiftlyAlerts";
 import type { ConciseAlert } from "./alerts";
 
 export const prerender = false;
@@ -26,15 +27,10 @@ export interface AlertStatusResponse {
   /**
    * Rail/busway stops affected by at least one currently active alert whose
    * `effect` is `"ACCESSIBILITY_ISSUE"`, resolved to their top-level station
-   * ID and human-readable name via the build-time GTFS lookup.
+   * ID and human-readable name via the GTFS `stops` table.
    */
   accessibilityAlertStops: AccessibilityAlertStop[];
 }
-
-const stops = stopLookup.stops as Record<
-  string,
-  { stopName: string; stationId: string }
->;
 
 /**
  * GET /api/alert-status
@@ -46,38 +42,40 @@ const stops = stopLookup.stops as Record<
  *     affected by at least one currently active `ACCESSIBILITY_ISSUE` alert,
  *     each with a `stopId` (top-level station) and `stopName`.
  *
- * Fetches from both `lametro` and `lametro-rail` Swiftly agencies in
- * parallel and merges the results.
  *
  * Example response:
  * ```json
  * {
  *   "routeAlertCounts": { "801": 1, "720": 3 },
  *   "accessibilityAlertStops": [
- *     { "stopId": "80214S", "stopName": "Union Station" }
+ *     { "stopId": "80214S", "stopName": "Union Station", "alerts": [...] }
  *   ]
  * }
  * ```
  */
 export async function GET() {
-  const API_KEY = import.meta.env.API_KEY;
+  let allAlerts: SwiftlyAlert[];
+  try {
+    allAlerts = await getServiceAlertsFromDb();
+  } catch (err) {
+    console.error("Failed to read service alerts from SQLite:", err);
+    return new Response(
+      JSON.stringify({
+        error: "Failed to read service alerts from database",
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
 
-  const [lametroResult, railResult] = await Promise.all([
-    fetchSwiftlyAlerts("lametro", API_KEY as string),
-    fetchSwiftlyAlerts("lametro-rail", API_KEY as string),
-  ]);
-
-  // Silently treat upstream failures as empty — alert-status is best-effort.
-  const lametroAlerts = lametroResult.ok ? lametroResult.alerts : [];
-  const railAlerts = railResult.ok ? railResult.alerts : [];
-
-  const allAlerts = [...lametroAlerts, ...railAlerts];
   const routeAlertCounts: AlertStatusMap = {};
 
-  // Deduplicate accessibility stops by their resolved stationId so the same
-  // station doesn't appear twice when Swiftly tags both a parent and child.
-  // Each entry collects all active alerts for that station.
-  const accessibilityStopMap = new Map<string, AccessibilityAlertStop>();
+  const accessibilityAlerts: { alert: SwiftlyAlert; concise: ConciseAlert }[] =
+    [];
+  const stopIdsToResolve = new Set<string>();
 
   for (const alert of allAlerts) {
     const conciseAlert = makeConciseAlert(alert);
@@ -85,7 +83,6 @@ export async function GET() {
 
     // Deduplicate so a single alert is only counted once per route prefix,
     // even if the route appears multiple times in informedEntities.
-    // Route IDs are already normalised to prefix-only by fetchSwiftlyAlerts.
     // Accessibility alerts are surfaced separately and excluded from the count.
     if (alert.effect !== "ACCESSIBILITY_ISSUE") {
       const prefixes = new Set(
@@ -96,27 +93,39 @@ export async function GET() {
       }
     }
 
-    // Collect stop IDs from accessibility alerts, resolved to station names,
-    // and attach the full ConciseAlert to each affected station.
+    // Collect stop IDs from accessibility alerts for batch resolution.
     if (alert.effect === "ACCESSIBILITY_ISSUE") {
       for (const entity of alert.informedEntities) {
         if (entity.stopId) {
-          const entry = stops[entity.stopId];
-          if (entry) {
-            const existing = accessibilityStopMap.get(entry.stationId);
-            if (existing) {
-              if (!existing.alerts.includes(conciseAlert)) {
-                existing.alerts.push(conciseAlert);
-              }
-            } else {
-              accessibilityStopMap.set(entry.stationId, {
-                stopId: entry.stationId,
-                stopName: entry.stopName,
-                alerts: [conciseAlert],
-              });
-            }
-          }
+          stopIdsToResolve.add(entity.stopId);
+          accessibilityAlerts.push({ alert, concise: conciseAlert });
         }
+      }
+    }
+  }
+
+  const accessibilityStopMap = new Map<string, AccessibilityAlertStop>();
+
+  // Batch-resolve all stop IDs → { stopName, stationId } from the GTFS DB.
+  const stopInfoMap = getStopInfo([...stopIdsToResolve]);
+
+  for (const { alert, concise: conciseAlert } of accessibilityAlerts) {
+    for (const entity of alert.informedEntities) {
+      if (!entity.stopId) continue;
+      const info = stopInfoMap.get(entity.stopId);
+      if (!info) continue;
+
+      const existing = accessibilityStopMap.get(info.stationId);
+      if (existing) {
+        if (!existing.alerts.includes(conciseAlert)) {
+          existing.alerts.push(conciseAlert);
+        }
+      } else {
+        accessibilityStopMap.set(info.stationId, {
+          stopId: info.stationId,
+          stopName: info.stopName,
+          alerts: [conciseAlert],
+        });
       }
     }
   }
