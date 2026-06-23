@@ -1,13 +1,13 @@
 import { getServiceAlertsFromDb } from "../../lib/getServiceAlerts";
+import type { Alert } from "../../lib/getServiceAlerts";
 import { makeConciseAlert } from "../../lib/makeConciseAlert";
 import { getChildStopIds } from "../../lib/stopHierarchyLookup";
-import type { SwiftlyAlert } from "../../lib/fetchSwiftlyAlerts";
 
 export const prerender = false;
 
 // activePeriod matches the GTFS spec: a single object with POSIX timestamps.
 export type ConciseAlert = Pick<
-  SwiftlyAlert,
+  Alert,
   "headerText" | "descriptionText" | "effect" | "cause" | "informedEntities"
 > & {
   activePeriod: { start: number; end: number | null };
@@ -36,7 +36,7 @@ export async function GET(context: import("astro").APIContext) {
 
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
 
-  let allAlerts: SwiftlyAlert[];
+  let allAlerts: Alert[];
   try {
     allAlerts = await getServiceAlertsFromDb();
   } catch (err) {

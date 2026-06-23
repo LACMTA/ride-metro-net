@@ -1,8 +1,8 @@
 import { getServiceAlertsFromDb } from "../../lib/getServiceAlerts";
+import type { Alert } from "../../lib/getServiceAlerts";
 import { makeConciseAlert } from "../../lib/makeConciseAlert";
 import { getStopInfo } from "../../lib/stopHierarchyLookup";
 import { isCurrent } from "../../lib/isCurrent";
-import type { SwiftlyAlert } from "../../lib/fetchSwiftlyAlerts";
 import type { ConciseAlert } from "./alerts";
 
 export const prerender = false;
@@ -54,7 +54,7 @@ export interface AlertStatusResponse {
  * ```
  */
 export async function GET() {
-  let allAlerts: SwiftlyAlert[];
+  let allAlerts: Alert[];
   try {
     allAlerts = await getServiceAlertsFromDb();
   } catch (err) {
@@ -73,8 +73,7 @@ export async function GET() {
 
   const routeAlertCounts: AlertStatusMap = {};
 
-  const accessibilityAlerts: { alert: SwiftlyAlert; concise: ConciseAlert }[] =
-    [];
+  const accessibilityAlerts: { alert: Alert; concise: ConciseAlert }[] = [];
   const stopIdsToResolve = new Set<string>();
 
   for (const alert of allAlerts) {

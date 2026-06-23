@@ -92,10 +92,10 @@ let dbInstance: Database.Database | null = null;
 export function getGtfsDb(): Database.Database {
   if (!dbInstance) {
     dbInstance = openDb(gtfsConfig);
-    dbInstance.pragma("synchronous = OFF");
+    dbInstance.pragma("synchronous = NORMAL");
     dbInstance.pragma("cache_size = 10000");
     dbInstance.pragma("temp_store = MEMORY");
-    dbInstance.pragma("journal_mode = OFF");
+    dbInstance.pragma("journal_mode = WAL");
   }
   return dbInstance;
 }
