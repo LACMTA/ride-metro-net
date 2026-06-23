@@ -21,7 +21,6 @@ export type ConciseAlert = Pick<
  * returns them as `ConciseAlert[]`. Both `lametro` and `lametro-rail`
  * agencies write into the same SQLite tables, so a single query covers
  * the whole system — including agency-wide alerts.
- *
  * @param {string} [stopId] - Comma-separated list of stop IDs to filter by
  * @param {string} [routeId] - Comma-separated list of route IDs to filter by
  * @returns {ConciseAlert[]} Array of alerts
@@ -36,9 +35,12 @@ export async function GET(context: import("astro").APIContext) {
 
   const routeIds = context.url.searchParams.get("routeId")?.split(",") || [];
 
-  let allAlerts: Alert[];
+  let alerts: Awaited<ReturnType<typeof getServiceAlertsFromDb>>;
   try {
-    allAlerts = await getServiceAlertsFromDb();
+    // Route IDs are already in prefix-only form from the query string;
+    // getServiceAlertsFromDb handles the DB-side LIKE expansion for the
+    // suffixed form stored in service_alert_informed_entities.
+    alerts = await getServiceAlertsFromDb({ routeIds, stopIds });
   } catch (err) {
     console.error("Failed to read service alerts from SQLite:", err);
     return new Response(
@@ -53,40 +55,7 @@ export async function GET(context: import("astro").APIContext) {
     );
   }
 
-  // Route IDs in informedEntities are already normalised to prefix-only form
-  // by getServiceAlertsFromDb, so simple equality checks work here.
-  const filteredAlerts = allAlerts.reduce<ConciseAlert[]>((acc, alert) => {
-    // Always include alerts that have an agencyId set on any informed entity.
-    // These are system-wide alerts.
-    const matchesAgency = alert.informedEntities.some(
-      (entity) => entity.agencyId != null && entity.agencyId !== "",
-    );
-
-    if (matchesAgency) {
-      acc.push(makeConciseAlert(alert));
-      return acc;
-    }
-
-    const matchesStop = stopIds.some((stopId) =>
-      alert.informedEntities.some((entity) => entity.stopId === stopId),
-    );
-
-    if (matchesStop) {
-      acc.push(makeConciseAlert(alert));
-      return acc;
-    }
-
-    const matchesRoute = routeIds.some((routeId) =>
-      alert.informedEntities.some((entity) => entity.routeId === routeId),
-    );
-
-    if (matchesRoute) {
-      acc.push(makeConciseAlert(alert));
-    }
-    return acc;
-  }, []);
-
-  return new Response(JSON.stringify(filteredAlerts), {
+  return new Response(JSON.stringify(alerts.map(makeConciseAlert)), {
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "public, max-age=900",

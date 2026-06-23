@@ -96,6 +96,24 @@ export function getGtfsDb(): Database.Database {
     dbInstance.pragma("cache_size = 10000");
     dbInstance.pragma("temp_store = MEMORY");
     dbInstance.pragma("journal_mode = WAL");
+
+    // ---------------------------------------------------------------------------
+    // Application-level indexes
+    //
+    // node-gtfs only creates its own schema indexes; any additional indexes
+    // needed for this app's query patterns are created here on first open.
+    // `IF NOT EXISTS` makes these idempotent across restarts and DB rebuilds.
+    // ---------------------------------------------------------------------------
+
+    // Allow the EXISTS subquery in getServiceAlertsFromDb to seek by route_id
+    // and stop_id rather than scanning the full entity table.
+    dbInstance.exec(`
+      CREATE INDEX IF NOT EXISTS idx_saie_route_id
+        ON service_alert_informed_entities (route_id);
+
+      CREATE INDEX IF NOT EXISTS idx_saie_stop_id
+        ON service_alert_informed_entities (stop_id);
+    `);
   }
   return dbInstance;
 }
