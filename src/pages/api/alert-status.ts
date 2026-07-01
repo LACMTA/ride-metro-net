@@ -3,6 +3,7 @@ import type { Alert } from "../../lib/getServiceAlerts";
 import { makeConciseAlert } from "../../lib/makeConciseAlert";
 import { getStopInfo } from "../../lib/stopHierarchyLookup";
 import { isCurrent } from "../../lib/isCurrent";
+import { getAgencyIdsByFlag } from "../../lib/agencies";
 import type { ConciseAlert } from "./alerts";
 
 export const prerender = false;
@@ -56,7 +57,9 @@ export interface AlertStatusResponse {
 export async function GET() {
   let allAlerts: Alert[];
   try {
-    allAlerts = await getServiceAlertsFromDb();
+    allAlerts = await getServiceAlertsFromDb({
+      agencyIds: getAgencyIdsByFlag("showInAlertsIndex"),
+    });
   } catch (err) {
     console.error("Failed to read service alerts from SQLite:", err);
     return new Response(

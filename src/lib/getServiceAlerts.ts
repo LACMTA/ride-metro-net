@@ -106,12 +106,13 @@ function toAlert(row: RawAlertRow, entities: RawEntityRow[]): Alert {
 function fetchAlertRows(
   db: ReturnType<typeof getGtfsDb>,
   nowSeconds: number,
-  filter?: { routeIds?: string[]; stopIds?: string[] },
+  filter?: { routeIds?: string[]; stopIds?: string[]; agencyIds?: string[] },
 ): RawAlertRow[] {
   const hasRoutes = (filter?.routeIds?.length ?? 0) > 0;
   const hasStops = (filter?.stopIds?.length ?? 0) > 0;
+  const hasAgencies = (filter?.agencyIds?.length ?? 0) > 0;
 
-  if (!hasRoutes && !hasStops) {
+  if (!hasRoutes && !hasStops && !hasAgencies) {
     // No filter — return every non-expired alert.
     return db
       .prepare(`SELECT * FROM service_alerts WHERE expiration_timestamp > ?`)
@@ -130,6 +131,17 @@ function fetchAlertRows(
   for (const stopId of filter!.stopIds ?? []) {
     entityConditions.push(`saie.stop_id = ?`);
     params.push(stopId);
+  }
+  if (hasAgencies) {
+    const agencyPlaceholders = filter!.agencyIds!.map(() => "?").join(", ");
+    entityConditions.push(`
+      EXISTS (
+        SELECT 1 FROM routes r
+        WHERE r.route_id = saie.route_id
+          AND r.agency_id IN (${agencyPlaceholders})
+      )
+    `);
+    params.push(...filter!.agencyIds!);
   }
 
   return db
@@ -189,6 +201,7 @@ function fetchEntitiesByAlertId(
 export async function getServiceAlertsFromDb(filter?: {
   routeIds?: string[];
   stopIds?: string[];
+  agencyIds?: string[];
 }): Promise<Alert[]> {
   const db = getGtfsDb();
   const nowSeconds = Math.floor(Date.now() / 1000);

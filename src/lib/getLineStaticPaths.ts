@@ -1,4 +1,5 @@
 import { getGtfsDb } from "./gtfsConfig";
+import { getAgencyIdsByFlag } from "./agencies";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "./routeShortNameOverrides";
 
 /**
@@ -13,6 +14,9 @@ export async function getLineStaticPaths() {
   // Build pages for all routes that have trips (are active in the schedule).
   // Strip the version suffix from route_id (e.g. "901-13196" → "901") so that
   // page URLs are stable across GTFS releases, then deduplicate.
+  const agencyIds = getAgencyIdsByFlag("buildLinePages");
+  const placeholders = agencyIds.map(() => "?").join(", ");
+
   const allRoutes = (await db
     .prepare(
       `
@@ -21,10 +25,11 @@ export async function getLineStaticPaths() {
       JOIN trips t ON t.route_id = r.route_id
       -- long name is only null on stadium expresses, which we don't build for now
       WHERE r.route_long_name IS NOT NULL AND r.route_long_name != ''
+        AND r.agency_id IN (${placeholders})
       ORDER BY r.route_id
       `,
     )
-    .all()) as { route_id: string }[];
+    .all(...agencyIds)) as { route_id: string }[];
 
   const uniquePrefixes = [
     ...new Set(allRoutes.map((route) => route.route_id.split("-")[0])),

@@ -1,5 +1,6 @@
 import { getGtfsDb } from "./gtfsConfig";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
+import { getAgencyIdsByFlag } from "./agencies";
 import type { RouteWithInfo } from "./getRouteById";
 
 interface DbRow {
@@ -9,6 +10,7 @@ interface DbRow {
   route_type: number;
   route_color: string;
   route_text_color: string;
+  agency_id: string;
 }
 
 /**
@@ -22,6 +24,9 @@ interface DbRow {
 export default async function getAllRailBuswayRoutes(): Promise<RouteWithInfo[]> {
   const db = getGtfsDb();
 
+  const agencyIds = getAgencyIdsByFlag("showInAlertsIndex");
+  const placeholders = agencyIds.map(() => "?").join(", ");
+
   const rows = db
     .prepare(
       `
@@ -34,13 +39,16 @@ export default async function getAllRailBuswayRoutes(): Promise<RouteWithInfo[]>
         COALESCE(r.route_text_color, '') AS route_text_color
       FROM routes r
       JOIN trips t ON t.route_id = r.route_id
-      WHERE r.route_type != 3
-         OR r.route_id LIKE '901%'
-         OR r.route_id LIKE '910%'
+      WHERE r.agency_id IN (${placeholders})
+        AND (
+          r.route_type != 3
+          OR r.route_id LIKE '901%'
+          OR r.route_id LIKE '910%'
+        )
       ORDER BY r.route_id
       `,
     )
-    .all() as DbRow[];
+    .all(...agencyIds) as DbRow[];
 
   // Deduplicate by numeric prefix (e.g. "801-13196" → "801"), keeping the
   // first row encountered for each prefix.
