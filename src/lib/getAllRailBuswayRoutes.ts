@@ -74,9 +74,6 @@ export default async function getAllRailBuswayRoutes(): Promise<RouteWithInfo[]>
       routeType: row.route_type,
       routeColor: row.route_color,
       routeTextColor: row.route_text_color,
-      // Busway routes (G/J) are GTFS type 3 → lametro agency.
-      // All other routes here are rail → lametro-rail agency.
-      swiftlyAgencyId: row.route_type === 3 ? "lametro" : "lametro-rail",
     };
   });
 }

@@ -5,8 +5,6 @@ import { hydrationGate } from "./hydrationGate";
 export interface AlertsQuery {
   stopIds: string[];
   routeIds: string[];
-  /** @deprecated The API now always queries both agencies internally. */
-  agency?: string;
 }
 
 async function fetchAlerts(query: AlertsQuery): Promise<ConciseAlert[]> {

@@ -71,7 +71,6 @@ export default async function getAllBusRoutes(): Promise<RouteWithInfo[]> {
       routeType: row.route_type,
       routeColor: row.route_color,
       routeTextColor: row.route_text_color,
-      swiftlyAgencyId: "lametro",
     };
   });
 }

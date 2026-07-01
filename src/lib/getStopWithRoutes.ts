@@ -12,8 +12,6 @@ export interface StopWithRoutes {
    * Use these IDs when requesting real-time predictions from Swiftly.
    */
   childStopIds: string[];
-  /** Swiftly real-time API agency key, derived from route_type at build time. */
-  swiftlyAgencyId: string;
   routes: StopRoute[];
 }
 
@@ -37,7 +35,6 @@ export interface StopRoute {
 interface DatabaseQueryResult {
   stop_name: string;
   stop_id: string;
-  swiftly_agency_id: string;
   routes: string; // JSON string
 }
 
@@ -67,7 +64,6 @@ const query = `
         routes.route_type,
         routes.route_color,
         routes.route_text_color,
-        CASE WHEN routes.route_type = 3 THEN 'lametro' ELSE 'lametro-rail' END AS swiftly_agency_id,
         trips.direction_id,
         MIN(stop_times.stop_sequence) AS min_stop_sequence,
         -- 1 if this stop has at least one following stop in any trip for this
@@ -91,7 +87,6 @@ const query = `
     SELECT
       stops.stop_name AS stop_name,
       stops.stop_id AS stop_id,
-      MIN(route_headsigns.swiftly_agency_id) AS swiftly_agency_id,
       JSON_GROUP_ARRAY(
         JSON_OBJECT(
           'route_id', route_headsigns.route_id,
@@ -174,7 +169,6 @@ export default async function (stopId: string) {
     stopName: res.stop_name,
     stopId: res.stop_id,
     childStopIds: childRows.map((r) => r.stop_id),
-    swiftlyAgencyId: res.swiftly_agency_id,
     routes,
   };
 
