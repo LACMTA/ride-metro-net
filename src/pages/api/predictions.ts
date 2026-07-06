@@ -78,16 +78,18 @@ export async function GET(context: import("astro").APIContext) {
         r.route_long_name,
         CAST(s.stop_code AS INTEGER) AS stop_code,
         s.stop_name,
-        hs.stop_headsign AS raw_headsign
+        st.stop_headsign AS raw_headsign
       FROM stop_time_updates stu
       JOIN routes r ON r.route_id = stu.route_id
       JOIN stops s ON s.stop_id = stu.stop_id
       LEFT JOIN trip_updates tu ON tu.trip_id = stu.trip_id
-      LEFT JOIN (
-        SELECT trip_id, MIN(stop_headsign) AS stop_headsign
-        FROM stop_times
-        GROUP BY trip_id
-      ) hs ON hs.trip_id = stu.trip_id
+      -- Join on the composite PK (trip_id, stop_sequence) for a point
+      -- lookup instead of materializing a 3.5M-row GROUP BY subquery.
+      -- This also returns the headsign for the specific stop rather
+      -- than the alphabetically-first headsign across the whole trip.
+      LEFT JOIN stop_times st
+        ON st.trip_id = stu.trip_id
+        AND st.stop_sequence = stu.stop_sequence
       WHERE stu.stop_id IN (${placeholders})
         AND stu.expiration_timestamp > unixepoch()
         AND (stu.arrival_timestamp IS NOT NULL OR stu.departure_timestamp IS NOT NULL)

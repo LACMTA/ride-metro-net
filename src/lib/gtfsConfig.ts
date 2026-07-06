@@ -56,6 +56,11 @@ export function getGtfsDb(): Database.Database {
 
       CREATE INDEX IF NOT EXISTS idx_saie_stop_id
         ON service_alert_informed_entities (stop_id);
+
+      -- Let the predictions endpoint filter by stop_id AND expiration in a
+      -- single index seek instead of a stop_id lookup + per-row expiration scan.
+      CREATE INDEX IF NOT EXISTS idx_stop_time_updates_stop_id_expiration
+        ON stop_time_updates (stop_id, expiration_timestamp);
     `);
   }
   return dbInstance;
