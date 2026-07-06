@@ -9,6 +9,12 @@ export interface AgencyConfig {
   /** Passed directly to node-gtfs as an entry in `Config["agencies"]`. */
   gtfs: Config["agencies"][number];
   agencySettings: {
+    /**
+     * The agency_id for the feed, including an `prefix` set in `gtfs` config.
+     * We need to define this here so we can reconcile these settings to the right
+     * agency in the database.
+     * TODO: this is potentially brittle if agencies change the agency_id in their feed.
+     */
     agencyId: string;
     /**
      * When `true`, this agency is included in `/alerts`
@@ -145,6 +151,135 @@ export const agencyConfigs: AgencyConfig[] = [
       },
       realtimeVehiclePositions: {
         url: "https://gtfs.bigbluebus.com/vehiclepositions.bin",
+      },
+    },
+  },
+  // Culver CityBus
+  {
+    agencySettings: [
+      {
+        agencyId: "culver-citybus-1",
+        showInAlertsIndex: false,
+        buildLinePages: false,
+        buildStopPages: false,
+      },
+    ],
+    gtfs: {
+      fillEmptyAgencyId: true,
+      prefix: "culver-citybus-",
+      url: "https://web.culvercity.org/gtfs/gtfsexport.zip",
+      // awaiting Swiftly keys
+      // realtimeAlerts: {
+      //   url: "",
+      // },
+      // realtimeTripUpdates: {
+      //   url: "",
+      // },
+      // realtimeVehiclePositions: {
+      //   url: "",
+      // },
+    },
+  },
+  // Torance Transit
+  {
+    agencySettings: [
+      {
+        agencyId: "torrance-transit-1",
+        showInAlertsIndex: false,
+        buildLinePages: false,
+        buildStopPages: false,
+      },
+    ],
+    gtfs: {
+      fillEmptyAgencyId: true,
+      prefix: "torrance-transit-",
+      url: "https://transit.torranceca.gov/gtfs_feed",
+      realtimeAlerts: {
+        url: "http://www.mybusinfo.com/gtfsrt/alerts",
+      },
+      realtimeTripUpdates: {
+        url: "http://www.mybusinfo.com/gtfsrt/trips",
+      },
+      realtimeVehiclePositions: {
+        url: "http://www.mybusinfo.com/gtfsrt/vehicles",
+      },
+    },
+  },
+  // GTrans
+  {
+    agencySettings: [
+      {
+        agencyId: "gtrans-1",
+        showInAlertsIndex: false,
+        buildLinePages: false,
+        buildStopPages: false,
+      },
+    ],
+    gtfs: {
+      fillEmptyAgencyId: true,
+      prefix: "gtrans-",
+      url: "https://ridegtrans.com/gtfs.zip",
+      // awaiting Swiftly keys
+      // realtimeAlerts: {
+      //   url: "",
+      // },
+      // realtimeTripUpdates: {
+      //   url: "",
+      // },
+      // realtimeVehiclePositions: {
+      //   url: "",
+      // },
+    },
+  },
+  // Beach Cities Transit
+  {
+    agencySettings: [
+      {
+        agencyId: "beach-cities-transit-203",
+        showInAlertsIndex: false,
+        buildLinePages: false,
+        buildStopPages: false,
+      },
+    ],
+    gtfs: {
+      fillEmptyAgencyId: true,
+      prefix: "beach-cities-transit-",
+      url: "https://redondobeachbct.com/gtfs",
+      // no feed published for alerts or trip updates
+      // realtimeAlerts: {
+      //   url: "",
+      // },
+      // realtimeTripUpdates: {
+      //   url: "",
+      // },
+      realtimeVehiclePositions: {
+        url: "https://redondobeachbct.com/gtfs-rt/vehiclepositions",
+      },
+    },
+  },
+  // Long Beach Transit
+  {
+    agencySettings: [
+      {
+        agencyId: "long-beach-transit-90023",
+        showInAlertsIndex: false,
+        buildLinePages: false,
+        buildStopPages: false,
+      },
+    ],
+    gtfs: {
+      fillEmptyAgencyId: true,
+      prefix: "long-beach-transit-",
+      // TODO: we don't have a permalink for LBT, this GTFS will go out of date.
+      url: "https://drive.google.com/uc?export=download&id=1869EVa1z6m_iD6QmvRXyTHtYiaSUBROl",
+      realtimeAlerts: {
+        url: "https://gtfs-rt.lbt.vontascloud.com/TMGTFSRealTimeWebService/Alert/Alerts.pb",
+      },
+      realtimeTripUpdates: {
+        url: "https://gtfs-rt.lbt.vontascloud.com/TMGTFSRealTimeWebService/TripUpdate/TripUpdates.pb",
+      },
+      realtimeVehiclePositions: {
+        url: "https://gtfs-rt.lbt.vontascloud.com/TMGTFSRealTimeWebService/Vehicle/VehiclePositions.pb",
       },
     },
   },
