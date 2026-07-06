@@ -194,6 +194,11 @@ export const agencyConfigs: AgencyConfig[] = [
       fillEmptyAgencyId: true,
       prefix: "torrance-transit-",
       url: "https://transit.torranceca.gov/gtfs_feed",
+      // Needed to avoid bot blockers
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
       realtimeAlerts: {
         url: "http://www.mybusinfo.com/gtfsrt/alerts",
       },
