@@ -48,9 +48,9 @@ export function getGtfsDb(): Database.Database {
     // `IF NOT EXISTS` makes these idempotent across restarts and DB rebuilds.
     // ---------------------------------------------------------------------------
 
-    // Allow the EXISTS subquery in getServiceAlertsFromDb to seek by route_id
-    // and stop_id rather than scanning the full entity table.
     dbInstance.exec(`
+      -- Allow the EXISTS subquery in getServiceAlertsFromDb to seek by route_id
+      -- and stop_id rather than scanning the full entity table.
       CREATE INDEX IF NOT EXISTS idx_saie_route_id
         ON service_alert_informed_entities (route_id);
 
