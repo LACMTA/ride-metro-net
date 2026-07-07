@@ -1,0 +1,79 @@
+---
+export const prerender = false;
+
+import getStopWithRoutes from "../../lib/getStopWithRoutes";
+import type { StopRoute } from "../../lib/getStopWithRoutes";
+
+/**
+ * /screens/index.astro
+ *
+ * Multi-stop arrival board (data layer only - no predictions or styling yet).
+ *
+ * Accepts a comma-separated `stopId` query parameter:
+ *   /screens/?stopId=80122,80123
+ *
+ * Multiple stop IDs may refer to the same physical stop (different agencies
+ * use different stop_id values), so all routes from all requested stops are
+ * merged into a single flat list.
+ */
+
+// ---------------------------------------------------------------------------
+// Parse stopId query parameter (comma-separated)
+// ---------------------------------------------------------------------------
+const stopIdParam = Astro.url.searchParams.get("stopId") ?? "";
+const stopIds = stopIdParam
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+
+// ---------------------------------------------------------------------------
+// Fetch data for each stop and merge all routes into a single array
+// ---------------------------------------------------------------------------
+const allRoutes: StopRoute[] = [];
+const notFoundStopIds: string[] = [];
+
+for (const stopId of stopIds) {
+  try {
+    const stop = await getStopWithRoutes(stopId);
+    allRoutes.push(...stop.routes);
+  } catch {
+    notFoundStopIds.push(stopId);
+  }
+}
+---
+
+{
+  stopIds.length === 0 ? (
+    <p>
+      No stopId query parameter provided. Usage: /screens/?stopId=80122,80123
+    </p>
+  ) : (
+    <div>
+      <h1>Arrival Board</h1>
+
+      <h2>Routes</h2>
+      {allRoutes.length === 0 ? (
+        <p>No routes found for the requested stops.</p>
+      ) : (
+        <ul>
+          {allRoutes.map((route) => (
+            <li>
+              <strong>{route.routeShortName}</strong> (route ID: {route.routeId}
+              , type: {route.routeType}, direction: {route.directionId})
+              {route.headsigns.length > 0 && (
+                <> - Headsigns: {route.headsigns.join(", ")}</>
+              )}
+              {route.routeType !== 3 && <> - Platform: {route.childStopId}</>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {notFoundStopIds.length > 0 && (
+        <p>
+          <em>Stops not found: {notFoundStopIds.join(", ")}</em>
+        </p>
+      )}
+    </div>
+  )
+}
