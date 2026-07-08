@@ -76,7 +76,13 @@ const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
           {allRoutes.map((route) => {
             const agencySettings = getAgencySettings(route.agencyId);
             return (
-              <li style={agencySettings?.color ? `border-left: 4px solid ${agencySettings.color}; padding-left: 8px;` : undefined}>
+              <li
+                style={
+                  agencySettings?.color
+                    ? `border-left: 4px solid ${agencySettings.color}; padding-left: 8px;`
+                    : undefined
+                }
+              >
                 {agencySettings?.logoFile && (
                   <img
                     src={`/agency-logos/${agencySettings.logoFile}`}
@@ -84,18 +90,29 @@ const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
                     style="height: 20px; vertical-align: middle; margin-right: 6px;"
                   />
                 )}
-                <strong style={agencySettings?.color ? `color: ${agencySettings.color};` : undefined}>
+                <strong
+                  style={
+                    agencySettings?.color
+                      ? `color: ${agencySettings.color};`
+                      : undefined
+                  }
+                >
                   {route.routeShortName}
-                </strong> (route ID: {route.routeId}
-                , agency: {route.agencyId}
+                </strong>{" "}
+                (route ID: {route.routeId}, agency: {route.agencyId}
                 {agencySettings?.color && <>, color: {agencySettings.color}</>}
-                {agencySettings?.logoFile && <>, logo: /agency-logos/{agencySettings.logoFile}</>}
+                {agencySettings?.logoFile && (
+                  <>, logo: /agency-logos/{agencySettings.logoFile}</>
+                )}
                 , type: {route.routeType}, direction: {route.directionId})
                 {route.headsigns.length > 0 && (
                   <> - Headsigns: {route.headsigns.join(", ")}</>
                 )}
-                {route.routeType !== 3 && <> - Platform: {route.childStopId}</>}
-                <RoutePrediction routeId={route.routeId} directionId={route.directionId} client:load />
+                <RoutePrediction
+                  routeId={route.routeId}
+                  directionId={route.directionId}
+                  client:load
+                />
               </li>
             );
           })}
