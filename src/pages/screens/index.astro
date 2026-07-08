@@ -6,6 +6,7 @@ import type { StopRoute } from "../../lib/getStopWithRoutes";
 import { getAgencySettings } from "../../lib/agencies";
 import DataInjector from "../../components/DataInjector.astro";
 import RoutePrediction from "../../components/ScreenPredictions";
+import Layout from "../../layouts/Layout.astro";
 
 /**
  * /screens/index.astro
@@ -59,71 +60,75 @@ const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
   watchPredictions(stopIds);
 </script>
 
-{
-  stopIds.length === 0 ? (
-    <p>
-      No stopId query parameter provided. Usage: /screens/?stopId=80122,80123
-    </p>
-  ) : (
-    <div>
-      <h1>Arrival Board</h1>
+<Layout screen={true} title="Metro Screen Display">
+  {
+    stopIds.length === 0 ? (
+      <p>
+        No stopId query parameter provided. Usage: /screens/?stopId=80122,80123
+      </p>
+    ) : (
+      <div>
+        <h1 class="text-mustard-orange">Arrival Board</h1>
 
-      <h2>Routes</h2>
-      {allRoutes.length === 0 ? (
-        <p>No routes found for the requested stops.</p>
-      ) : (
-        <ul>
-          {allRoutes.map((route) => {
-            const agencySettings = getAgencySettings(route.agencyId);
-            return (
-              <li
-                style={
-                  agencySettings?.color
-                    ? `border-left: 4px solid ${agencySettings.color}; padding-left: 8px;`
-                    : undefined
-                }
-              >
-                {agencySettings?.logoFile && (
-                  <img
-                    src={`/agency-logos/${agencySettings.logoFile}`}
-                    alt=""
-                    style="height: 20px; vertical-align: middle; margin-right: 6px;"
-                  />
-                )}
-                <strong
+        <h2>Routes</h2>
+        {allRoutes.length === 0 ? (
+          <p>No routes found for the requested stops.</p>
+        ) : (
+          <ul>
+            {allRoutes.map((route) => {
+              const agencySettings = getAgencySettings(route.agencyId);
+              return (
+                <li
                   style={
                     agencySettings?.color
-                      ? `color: ${agencySettings.color};`
+                      ? `border-left: 4px solid ${agencySettings.color}; padding-left: 8px;`
                       : undefined
                   }
                 >
-                  {route.routeShortName}
-                </strong>{" "}
-                (route ID: {route.routeId}, agency: {route.agencyId}
-                {agencySettings?.color && <>, color: {agencySettings.color}</>}
-                {agencySettings?.logoFile && (
-                  <>, logo: /agency-logos/{agencySettings.logoFile}</>
-                )}
-                , type: {route.routeType}, direction: {route.directionId})
-                {route.headsigns.length > 0 && (
-                  <> - Headsigns: {route.headsigns.join(", ")}</>
-                )}
-                <RoutePrediction
-                  routeId={route.routeId}
-                  directionId={route.directionId}
-                  client:load
-                />
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  {agencySettings?.logoFile && (
+                    <img
+                      src={`/agency-logos/${agencySettings.logoFile}`}
+                      alt=""
+                      style="height: 20px; vertical-align: middle; margin-right: 6px;"
+                    />
+                  )}
+                  <strong
+                    style={
+                      agencySettings?.color
+                        ? `color: ${agencySettings.color};`
+                        : undefined
+                    }
+                  >
+                    {route.routeShortName}
+                  </strong>{" "}
+                  (route ID: {route.routeId}, agency: {route.agencyId}
+                  {agencySettings?.color && (
+                    <>, color: {agencySettings.color}</>
+                  )}
+                  {agencySettings?.logoFile && (
+                    <>, logo: /agency-logos/{agencySettings.logoFile}</>
+                  )}
+                  , type: {route.routeType}, direction: {route.directionId})
+                  {route.headsigns.length > 0 && (
+                    <> - Headsigns: {route.headsigns.join(", ")}</>
+                  )}
+                  <RoutePrediction
+                    routeId={route.routeId}
+                    directionId={route.directionId}
+                    client:load
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
-      {notFoundStopIds.length > 0 && (
-        <p>
-          <em>Stops not found: {notFoundStopIds.join(", ")}</em>
-        </p>
-      )}
-    </div>
-  )
-}
+        {notFoundStopIds.length > 0 && (
+          <p>
+            <em>Stops not found: {notFoundStopIds.join(", ")}</em>
+          </p>
+        )}
+      </div>
+    )
+  }
+</Layout>
