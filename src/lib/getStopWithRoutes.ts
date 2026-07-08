@@ -17,6 +17,7 @@ export interface StopWithRoutes {
 
 export interface StopRoute {
   routeId: string;
+  agencyId: string;
   routeShortName: string;
   routeType: number;
   routeColor: string;
@@ -59,6 +60,7 @@ const query = `
       SELECT
         @stopId AS stop_id,
         routes.route_id,
+        routes.agency_id,
         routes.route_short_name,
         routes.route_long_name,
         routes.route_type,
@@ -82,7 +84,7 @@ const query = `
       JOIN relevant_stops rs ON rs.stop_id = stop_times.stop_id
       LEFT JOIN trips ON trips.trip_id = stop_times.trip_id
       LEFT JOIN routes ON routes.route_id = trips.route_id
-      GROUP BY routes.route_id, routes.route_short_name, trips.direction_id
+      GROUP BY routes.route_id, routes.agency_id, routes.route_short_name, trips.direction_id
     )
     SELECT
       stops.stop_name AS stop_name,
@@ -90,6 +92,7 @@ const query = `
       JSON_GROUP_ARRAY(
         JSON_OBJECT(
           'route_id', route_headsigns.route_id,
+          'agency_id', route_headsigns.agency_id,
           'route_short_name', route_headsigns.route_short_name,
           'route_type', route_headsigns.route_type,
           'route_color', COALESCE(route_headsigns.route_color, ''),

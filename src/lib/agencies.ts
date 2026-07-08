@@ -133,7 +133,7 @@ export const agencyConfigs: AgencyConfig[] = [
   {
     agencySettings: [
       {
-        agencyId: "big-blue-bus-6216179",
+        agencyId: "bigbluebus6216179",
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
@@ -141,7 +141,7 @@ export const agencyConfigs: AgencyConfig[] = [
     ],
     gtfs: {
       fillEmptyAgencyId: true,
-      prefix: "big-blue-bus-",
+      prefix: "bigbluebus",
       url: "https://gtfs.bigbluebus.com/current.zip",
       realtimeAlerts: {
         url: "https://gtfs.bigbluebus.com/alerts.bin",
@@ -158,7 +158,7 @@ export const agencyConfigs: AgencyConfig[] = [
   {
     agencySettings: [
       {
-        agencyId: "culver-citybus-1",
+        agencyId: "culvercitybus1",
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
@@ -166,7 +166,7 @@ export const agencyConfigs: AgencyConfig[] = [
     ],
     gtfs: {
       fillEmptyAgencyId: true,
-      prefix: "culver-citybus-",
+      prefix: "culvercitybus",
       url: "https://web.culvercity.org/gtfs/gtfsexport.zip",
       // awaiting Swiftly keys
       // realtimeAlerts: {
@@ -184,7 +184,7 @@ export const agencyConfigs: AgencyConfig[] = [
   {
     agencySettings: [
       {
-        agencyId: "torrance-transit-1",
+        agencyId: "torrancetransit1",
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
@@ -192,7 +192,7 @@ export const agencyConfigs: AgencyConfig[] = [
     ],
     gtfs: {
       fillEmptyAgencyId: true,
-      prefix: "torrance-transit-",
+      prefix: "torrancetransit",
       url: "https://transit.torranceca.gov/gtfs_feed",
       // Needed to avoid bot detectors
       headers: {
@@ -220,7 +220,7 @@ export const agencyConfigs: AgencyConfig[] = [
   {
     agencySettings: [
       {
-        agencyId: "gtrans-1",
+        agencyId: "gtrans1",
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
@@ -228,7 +228,7 @@ export const agencyConfigs: AgencyConfig[] = [
     ],
     gtfs: {
       fillEmptyAgencyId: true,
-      prefix: "gtrans-",
+      prefix: "gtrans",
       url: "https://ridegtrans.com/gtfs.zip",
       // awaiting Swiftly keys
       // realtimeAlerts: {
@@ -246,7 +246,7 @@ export const agencyConfigs: AgencyConfig[] = [
   {
     agencySettings: [
       {
-        agencyId: "beach-cities-transit-203",
+        agencyId: "beachcitiestransit203",
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
@@ -254,7 +254,7 @@ export const agencyConfigs: AgencyConfig[] = [
     ],
     gtfs: {
       fillEmptyAgencyId: true,
-      prefix: "beach-cities-transit-",
+      prefix: "beachcitiestransit",
       url: "https://redondobeachbct.com/gtfs",
       // no feed published for alerts or trip updates
       // realtimeAlerts: {
@@ -272,7 +272,7 @@ export const agencyConfigs: AgencyConfig[] = [
   {
     agencySettings: [
       {
-        agencyId: "long-beach-transit-90023",
+        agencyId: "longbeachtransit90023",
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
@@ -280,7 +280,7 @@ export const agencyConfigs: AgencyConfig[] = [
     ],
     gtfs: {
       fillEmptyAgencyId: true,
-      prefix: "long-beach-transit-",
+      prefix: "longbeachtransit",
       // TODO: we don't have a permalink for LBT, this GTFS will go out of date.
       url: "https://drive.google.com/uc?export=download&id=1869EVa1z6m_iD6QmvRXyTHtYiaSUBROl",
       realtimeAlerts: {

@@ -3,11 +3,13 @@ export const prerender = false;
 
 import getStopWithRoutes from "../../lib/getStopWithRoutes";
 import type { StopRoute } from "../../lib/getStopWithRoutes";
+import DataInjector from "../../components/DataInjector.astro";
+import RoutePrediction from "../../components/ScreenPredictions";
 
 /**
  * /screens/index.astro
  *
- * Multi-stop arrival board (data layer only - no predictions or styling yet).
+ * Multi-stop arrival board (data layer only - no styling yet).
  *
  * Accepts a comma-separated `stopId` query parameter:
  *   /screens/?stopId=80122,80123
@@ -27,20 +29,34 @@ const stopIds = stopIdParam
   .filter(Boolean);
 
 // ---------------------------------------------------------------------------
-// Fetch data for each stop and merge all routes into a single array
+// Fetch data for each stop and merge all routes into a single array.
+// Collect all stop IDs (including child/platform IDs) for predictions polling.
 // ---------------------------------------------------------------------------
 const allRoutes: StopRoute[] = [];
 const notFoundStopIds: string[] = [];
+const allPredictionStopIds: string[] = [];
 
 for (const stopId of stopIds) {
   try {
     const stop = await getStopWithRoutes(stopId);
     allRoutes.push(...stop.routes);
+    allPredictionStopIds.push(stop.stopId, ...stop.childStopIds);
   } catch {
     notFoundStopIds.push(stopId);
   }
 }
+
+const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
 ---
+
+<DataInjector data={uniquePredictionStopIds} id="screen-stop-ids" />
+<script>
+  import { getData } from "../../lib/getData";
+  import watchPredictions from "../../lib/watchPredictions";
+
+  const stopIds = getData("screen-stop-ids") as string[];
+  watchPredictions(stopIds);
+</script>
 
 {
   stopIds.length === 0 ? (
@@ -59,11 +75,12 @@ for (const stopId of stopIds) {
           {allRoutes.map((route) => (
             <li>
               <strong>{route.routeShortName}</strong> (route ID: {route.routeId}
-              , type: {route.routeType}, direction: {route.directionId})
+              , agency: {route.agencyId}, type: {route.routeType}, direction: {route.directionId})
               {route.headsigns.length > 0 && (
                 <> - Headsigns: {route.headsigns.join(", ")}</>
               )}
               {route.routeType !== 3 && <> - Platform: {route.childStopId}</>}
+              <RoutePrediction routeId={route.routeId} directionId={route.directionId} client:load />
             </li>
           ))}
         </ul>
