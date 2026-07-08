@@ -31,6 +31,10 @@ export interface AgencyConfig {
      * @default false
      */
     buildStopPages?: boolean;
+    /** Brand color (hex) for the agency, used on screen displays. */
+    color?: string;
+    /** Filename of the agency logo stored under `/public/agency-logos/`. */
+    logoFile?: string;
   }[];
 }
 
@@ -62,6 +66,18 @@ export function getAgencyIdsByFlag(
   );
 }
 
+/**
+ * Return the `agencySettings` entry for the given `agencyId`, or `undefined`
+ * if no agency in `agencyConfigs` matches.
+ */
+export function getAgencySettings(agencyId: string) {
+  for (const cfg of agencyConfigs) {
+    const s = cfg.agencySettings.find((s) => s.agencyId === agencyId);
+    if (s) return s;
+  }
+  return undefined;
+}
+
 export const agencyConfigs: AgencyConfig[] = [
   // LA Metro Rail
   {
@@ -71,6 +87,8 @@ export const agencyConfigs: AgencyConfig[] = [
         showInAlertsIndex: true,
         buildLinePages: true,
         buildStopPages: true,
+        color: "#E6232C",
+        logoFile: "metro.svg",
       },
     ],
     gtfs: {
@@ -104,6 +122,8 @@ export const agencyConfigs: AgencyConfig[] = [
         showInAlertsIndex: true,
         buildLinePages: true,
         buildStopPages: true,
+        color: "#E6232C",
+        logoFile: "metro.svg",
       },
     ],
     gtfs: {
@@ -137,6 +157,8 @@ export const agencyConfigs: AgencyConfig[] = [
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
+        color: "#005DAA",
+        logoFile: "big-blue-bus.svg",
       },
     ],
     gtfs: {
@@ -162,6 +184,8 @@ export const agencyConfigs: AgencyConfig[] = [
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
+        color: "#F7A800",
+        logoFile: "culver-citybus.svg",
       },
     ],
     gtfs: {
@@ -188,6 +212,8 @@ export const agencyConfigs: AgencyConfig[] = [
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
+        color: "#0066B3",
+        logoFile: "torrance-transit.svg",
       },
     ],
     gtfs: {
@@ -224,6 +250,8 @@ export const agencyConfigs: AgencyConfig[] = [
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
+        color: "#0067B1",
+        logoFile: "gtrans.svg",
       },
     ],
     gtfs: {
@@ -250,6 +278,8 @@ export const agencyConfigs: AgencyConfig[] = [
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
+        color: "#00A14B",
+        logoFile: "beach-cities-transit.svg",
       },
     ],
     gtfs: {
@@ -276,6 +306,8 @@ export const agencyConfigs: AgencyConfig[] = [
         showInAlertsIndex: false,
         buildLinePages: false,
         buildStopPages: false,
+        color: "#003DA5",
+        logoFile: "long-beach-transit.svg",
       },
     ],
     gtfs: {
