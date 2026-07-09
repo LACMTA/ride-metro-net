@@ -1,0 +1,127 @@
+---
+export const prerender = true;
+
+import getStopWithRoutes from "../../lib/getStopWithRoutes";
+import type { StopRoute } from "../../lib/getStopWithRoutes";
+import { getAgencySettings } from "../../lib/agencies";
+import { getScreenSignEntries, getScreenSign } from "../../lib/getScreenSigns";
+import DataInjector from "../../components/DataInjector.astro";
+import RoutePrediction from "../../components/ScreenPredictions";
+import Layout from "../../layouts/Layout.astro";
+
+/**
+ * /screens/[signId].astro
+ *
+ * Config-driven arrival board. Each sign is defined in `src/data/screenSigns.json`
+ * and pre-rendered at build time. Real-time predictions are polled client-side.
+ *
+ * The display behavior matches the query-parameter-based `/screens/` page:
+ * all routes from all configured stop IDs are merged into a single flat list.
+ */
+
+export async function getStaticPaths() {
+  return getScreenSignEntries().map(({ signId }) => ({
+    params: { signId },
+  }));
+}
+
+const { signId } = Astro.params;
+const signConfig = getScreenSign(signId);
+
+if (!signConfig) {
+  throw new Error(`No screen sign config found for signId: ${signId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Fetch data for each stop and merge all routes into a single array.
+// Collect all stop IDs (including child/platform IDs) for predictions polling.
+// ---------------------------------------------------------------------------
+const allRoutes: StopRoute[] = [];
+const notFoundStopIds: string[] = [];
+const allPredictionStopIds: string[] = [];
+
+for (const stopId of signConfig.stopIds) {
+  try {
+    const stop = await getStopWithRoutes(stopId);
+    allRoutes.push(...stop.routes);
+    allPredictionStopIds.push(stop.stopId, ...stop.childStopIds);
+  } catch {
+    notFoundStopIds.push(stopId);
+  }
+}
+
+const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
+---
+
+<DataInjector data={uniquePredictionStopIds} id="screen-stop-ids" />
+<script>
+  import { getData } from "../../lib/getData";
+  import watchPredictions from "../../lib/watchPredictions";
+
+  const stopIds = getData("screen-stop-ids") as string[];
+  watchPredictions(stopIds);
+</script>
+
+<Layout screen={true} title={`Metro Screen Display — ${signId}`}>
+  <div>
+    <h1 class="text-mustard-orange">Arrival Board</h1>
+
+    <h2>Routes</h2>
+    {allRoutes.length === 0 ? (
+      <p>No routes found for the requested stops.</p>
+    ) : (
+      <div class="">
+        {allRoutes.map((route) => {
+          const agencySettings = getAgencySettings(route.agencyId);
+          return (
+            <div class="grid grid-cols-6 gap-4 border-b-4 border-gray-900">
+              <div class="col-span-1 pl-4 py-4"
+                style={
+                agencySettings?.color
+                  ? `background-color: ${agencySettings.color};`
+                  : undefined
+                }
+              >
+                {agencySettings?.logoFile && (
+                  <img
+                    src={`/agency-logos/${agencySettings.logoFile}`}
+                    alt=""
+                    style="height: 20px; vertical-align: middle;"
+                  />
+                )}
+                <strong
+                  style={
+                    agencySettings?.color
+                      ? `color: ${agencySettings.color};`
+                      : undefined
+                  }
+                >
+                  {route.routeShortName}
+                </strong>
+              </div>
+              {" "}
+              <div class="col-span-3 flex items-center justify-start text-4xl text-left py-4">
+                {route.headsigns.length > 0 && (
+                <> {route.headsigns.join(", ")}</>
+                )}
+              </div>
+              <div class="col-span-2 pr-4 flex items-center justify-end text-4xl text-right py-4">
+                <RoutePrediction
+                  routeId={route.routeId}
+                  directionId={route.directionId}
+                  client:load
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {notFoundStopIds.length > 0 && (
+      <p>
+        <em>Stops not found: {notFoundStopIds.join(", ")}</em>
+      </p>
+    )}
+  </div>
+</Layout>
