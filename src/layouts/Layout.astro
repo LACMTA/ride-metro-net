@@ -28,7 +28,7 @@ const includeAnalytics = import.meta.env.PROD && !screen;
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>
-  <body class="font-sans">
+  <body class={screen ? 'bg-black text-white font-sans' : 'font-sans'}>
     {includeAnalytics && <AnalyticsBody />}
     {!screen && <Header />}
     {!screen && <SystemWideAlert client:load />}

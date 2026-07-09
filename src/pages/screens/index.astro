@@ -74,53 +74,61 @@ const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
         {allRoutes.length === 0 ? (
           <p>No routes found for the requested stops.</p>
         ) : (
-          <ul>
+          <div class="">
             {allRoutes.map((route) => {
               const agencySettings = getAgencySettings(route.agencyId);
               return (
-                <li
-                  style={
-                    agencySettings?.color
-                      ? `border-left: 4px solid ${agencySettings.color}; padding-left: 8px;`
-                      : undefined
-                  }
-                >
-                  {agencySettings?.logoFile && (
-                    <img
-                      src={`/agency-logos/${agencySettings.logoFile}`}
-                      alt=""
-                      style="height: 20px; vertical-align: middle; margin-right: 6px;"
-                    />
-                  )}
-                  <strong
+                <div class="grid grid-cols-6 gap-4 border-b-4 border-gray-900">
+                  <div class="col-span-1 pl-4 py-4"
                     style={
-                      agencySettings?.color
-                        ? `color: ${agencySettings.color};`
-                        : undefined
+                    agencySettings?.color
+                      ? `background-color: ${agencySettings.color};`
+                      : undefined
                     }
                   >
-                    {route.routeShortName}
-                  </strong>{" "}
-                  (route ID: {route.routeId}, agency: {route.agencyId}
+                    {agencySettings?.logoFile && (
+                      <img
+                        src={`/agency-logos/${agencySettings.logoFile}`}
+                        alt=""
+                        style="height: 20px; vertical-align: middle;"
+                      />
+                    )}
+                    <strong
+                      style={
+                        agencySettings?.color
+                          ? `color: ${agencySettings.color};`
+                          : undefined
+                      }
+                    >
+                      {route.routeShortName}
+                    </strong>
+                  </div>
+                  {" "}
+                  {/* (route ID: {route.routeId}, agency: {route.agencyId}
                   {agencySettings?.color && (
                     <>, color: {agencySettings.color}</>
                   )}
                   {agencySettings?.logoFile && (
                     <>, logo: /agency-logos/{agencySettings.logoFile}</>
                   )}
-                  , type: {route.routeType}, direction: {route.directionId})
-                  {route.headsigns.length > 0 && (
-                    <> - Headsigns: {route.headsigns.join(", ")}</>
-                  )}
-                  <RoutePrediction
-                    routeId={route.routeId}
-                    directionId={route.directionId}
-                    client:load
-                  />
-                </li>
+                  , type: {route.routeType}, direction: {route.directionId}) */}
+                  
+                  <div class="col-span-3 flex items-center justify-start text-4xl text-left py-4">
+                    {route.headsigns.length > 0 && (
+                    <> {route.headsigns.join(", ")}</>
+                    )}
+                  </div>
+                  <div class="col-span-2 pr-4 flex items-center justify-end text-4xl text-right py-4">
+                    <RoutePrediction
+                      routeId={route.routeId}
+                      directionId={route.directionId}
+                      client:load
+                    />
+                  </div>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
 
         {notFoundStopIds.length > 0 && (
