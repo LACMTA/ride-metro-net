@@ -257,12 +257,12 @@ export const agencyConfigs: AgencyConfig[] = [
       prefix: "beach-cities-transit-",
       url: "https://redondobeachbct.com/gtfs",
       // no feed published for alerts or trip updates
-      // realtimeAlerts: {
-      //   url: "",
-      // },
-      // realtimeTripUpdates: {
-      //   url: "",
-      // },
+      realtimeAlerts: {
+        url: "https://redondobeachbct.com/announcements",
+      },
+      realtimeTripUpdates: {
+        url: "https://redondobeachbct.com/gtfs-rt/tripupdates",
+      },
       realtimeVehiclePositions: {
         url: "https://redondobeachbct.com/gtfs-rt/vehiclepositions",
       },
