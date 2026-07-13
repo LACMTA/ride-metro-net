@@ -256,9 +256,8 @@ export const agencyConfigs: AgencyConfig[] = [
       fillEmptyAgencyId: true,
       prefix: "beach-cities-transit-",
       url: "https://redondobeachbct.com/gtfs",
-      // no feed published for alerts or trip updates
       realtimeAlerts: {
-        url: "https://redondobeachbct.com/announcements",
+        url: "https://redondobeachbct.com/gtfs-rt/alerts",
       },
       realtimeTripUpdates: {
         url: "https://redondobeachbct.com/gtfs-rt/tripupdates",
