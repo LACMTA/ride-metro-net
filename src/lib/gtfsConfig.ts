@@ -61,6 +61,11 @@ export function getGtfsDb(): Database.Database {
       -- single index seek instead of a stop_id lookup + per-row expiration scan.
       CREATE INDEX IF NOT EXISTS idx_stop_time_updates_stop_id_expiration
         ON stop_time_updates (stop_id, expiration_timestamp);
+
+      -- Allow getStopWithRoutes (and the child-stops query) to seek by stop_id
+      -- instead of scanning the full ~3.5M-row stop_times table.
+      CREATE INDEX IF NOT EXISTS idx_stop_times_stop_id
+        ON stop_times (stop_id);
     `);
   }
   return dbInstance;

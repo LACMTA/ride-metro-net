@@ -55,6 +55,31 @@ const query = `
       UNION ALL
       SELECT stop_id FROM stops WHERE parent_station = @stopId
     ),
+    -- Materialize the stop_times rows for relevant stops ONCE so that both
+    -- headsign_counts and route_headsigns can derive from it without each
+    -- scanning the full 3.5M-row stop_times table independently.
+    stop_data AS MATERIALIZED (
+      SELECT
+        stop_times.stop_id,
+        stop_times.trip_id,
+        stop_times.stop_sequence,
+        stop_times.stop_headsign
+      FROM stop_times
+      JOIN relevant_stops rs ON rs.stop_id = stop_times.stop_id
+    ),
+    -- Count how many times each processed headsign appears per route/direction
+    -- at the relevant stops, so headsigns can be sorted by frequency.
+    headsign_counts AS (
+      SELECT
+        trips.route_id,
+        trips.direction_id,
+        SUBSTR(stop_data.stop_headsign, INSTR(stop_data.stop_headsign, ' - ') + 3) AS headsign,
+        COUNT(*) AS headsign_count
+      FROM stop_data
+      JOIN trips ON trips.trip_id = stop_data.trip_id
+      GROUP BY trips.route_id, trips.direction_id,
+        SUBSTR(stop_data.stop_headsign, INSTR(stop_data.stop_headsign, ' - ') + 3)
+    ),
     -- Group by direction for every route type — one StopRoute per direction per route.
     route_headsigns AS (
       SELECT
@@ -67,22 +92,28 @@ const query = `
         routes.route_color,
         routes.route_text_color,
         trips.direction_id,
-        MIN(stop_times.stop_sequence) AS min_stop_sequence,
+        MIN(stop_data.stop_sequence) AS min_stop_sequence,
         -- 1 if this stop has at least one following stop in any trip for this
         -- route/direction (i.e. not a pure terminus); 0 if always the last stop.
         MAX(CASE
-          WHEN stop_times.stop_sequence < (
+          WHEN stop_data.stop_sequence < (
             SELECT MAX(st2.stop_sequence) FROM stop_times st2
-            WHERE st2.trip_id = stop_times.trip_id
+            WHERE st2.trip_id = stop_data.trip_id
           ) THEN 1 ELSE 0
         END) AS has_stops_after,
-        MIN(rs.stop_id) AS child_stop_id,
-        JSON_GROUP_ARRAY(
-          DISTINCT SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
+        MIN(stop_data.stop_id) AS child_stop_id,
+        (
+          SELECT JSON_GROUP_ARRAY(headsign)
+          FROM (
+            SELECT headsign
+            FROM headsign_counts hc
+            WHERE hc.route_id = routes.route_id
+              AND hc.direction_id = trips.direction_id
+            ORDER BY hc.headsign_count DESC, hc.headsign ASC
+          )
         ) AS headsigns
-      FROM stop_times
-      JOIN relevant_stops rs ON rs.stop_id = stop_times.stop_id
-      LEFT JOIN trips ON trips.trip_id = stop_times.trip_id
+      FROM stop_data
+      LEFT JOIN trips ON trips.trip_id = stop_data.trip_id
       LEFT JOIN routes ON routes.route_id = trips.route_id
       GROUP BY routes.route_id, routes.agency_id, routes.route_short_name, trips.direction_id
     )

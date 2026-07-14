@@ -8,6 +8,7 @@ import { getScreenSignEntries, getScreenSign } from "../../lib/getScreenSigns";
 import DataInjector from "../../components/DataInjector.astro";
 import RoutePrediction from "../../components/ScreenPredictions";
 import Layout from "../../layouts/Layout.astro";
+import RouteBadge from "../../components/RouteBadge";
 
 /**
  * /screens/[signId].astro
@@ -67,61 +68,74 @@ const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
     <h1 class="text-mustard-orange">Arrival Board</h1>
 
     <h2>Routes</h2>
-    {allRoutes.length === 0 ? (
-      <p>No routes found for the requested stops.</p>
-    ) : (
-      <div class="">
-        {allRoutes.map((route) => {
-          const agencySettings = getAgencySettings(route.agencyId);
-          return (
-            <div class="grid grid-cols-6 gap-4 border-b-4 border-gray-900">
-              <div class="col-span-1 pl-4 py-4"
-                style={
-                agencySettings?.color
-                  ? `background-color: ${agencySettings.color};`
-                  : undefined
-                }
-              >
-                {agencySettings?.logoFile && (
-                  <img
-                    src={`/agency-logos/${agencySettings.logoFile}`}
-                    alt=""
-                    style="height: 20px; vertical-align: middle;"
-                  />
-                )}
-                <strong
+    {
+      allRoutes.length === 0 ? (
+        <p>No routes found for the requested stops.</p>
+      ) : (
+        <div class="">
+          {allRoutes.map((route) => {
+            const agencySettings = getAgencySettings(route.agencyId);
+            return (
+              <div class="grid grid-cols-6 gap-4 border-b-4 border-gray-900">
+                <div
+                  class="col-span-1 py-4 pl-4"
                   style={
                     agencySettings?.color
-                      ? `color: ${agencySettings.color};`
+                      ? `background-color: ${agencySettings.color};`
                       : undefined
                   }
                 >
-                  {route.routeShortName}
-                </strong>
+                  {agencySettings?.logoFile && (
+                    <img
+                      src={`/agency-logos/${agencySettings.logoFile}`}
+                      alt=""
+                      style="height: 20px; vertical-align: middle;"
+                    />
+                  )}
+                  <strong
+                    style={
+                      agencySettings?.color
+                        ? `color: ${agencySettings.color};`
+                        : undefined
+                    }
+                  />
+                </div>{" "}
+                <div class="col-span-3 flex items-center justify-start py-4">
+                  <RouteBadge
+                    routeId={route.routeId}
+                    routeType={route.routeType}
+                    name={route.routeShortName}
+                    color={route.routeColor}
+                    textColor={route.routeTextColor}
+                    size="xl"
+                  />
+                  <div class="ml-5">
+                    <div class="text-left text-4xl">{route.headsigns[0]}</div>
+                    {route.headsigns.length > 1 && (
+                      <> {route.headsigns.slice(1).join(", ")}</>
+                    )}
+                  </div>
+                </div>
+                <div class="col-span-2 flex items-center justify-end py-4 pr-4 text-right text-4xl">
+                  <RoutePrediction
+                    routeId={route.routeId}
+                    directionId={route.directionId}
+                    client:load
+                  />
+                </div>
               </div>
-              {" "}
-              <div class="col-span-3 flex items-center justify-start text-4xl text-left py-4">
-                {route.headsigns.length > 0 && (
-                <> {route.headsigns.join(", ")}</>
-                )}
-              </div>
-              <div class="col-span-2 pr-4 flex items-center justify-end text-4xl text-right py-4">
-                <RoutePrediction
-                  routeId={route.routeId}
-                  directionId={route.directionId}
-                  client:load
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
+            );
+          })}
+        </div>
+      )
+    }
 
-    {notFoundStopIds.length > 0 && (
-      <p>
-        <em>Stops not found: {notFoundStopIds.join(", ")}</em>
-      </p>
-    )}
+    {
+      notFoundStopIds.length > 0 && (
+        <p>
+          <em>Stops not found: {notFoundStopIds.join(", ")}</em>
+        </p>
+      )
+    }
   </div>
 </Layout>
