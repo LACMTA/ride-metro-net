@@ -2,6 +2,15 @@ export const prerender = false;
 
 import { getGtfsDb } from "../../lib/gtfsConfig";
 
+/**
+ * Grace period (in seconds) after a predicted arrival/departure time has
+ * passed before the prediction is excluded from API responses. This prevents
+ * stale "0 minute" predictions from lingering in the UI between polls.
+ * Tune this value to adjust how long arrivals remain visible after their
+ * predicted time.
+ */
+const PREDICTION_EXPIRY_GRACE_SECONDS = 30;
+
 export type RoutePredictions = {
   destinations: {
     directionId: string;
@@ -93,6 +102,9 @@ export async function GET(context: import("astro").APIContext) {
       WHERE stu.stop_id IN (${placeholders})
         AND stu.expiration_timestamp > unixepoch()
         AND (stu.arrival_timestamp IS NOT NULL OR stu.departure_timestamp IS NOT NULL)
+        -- Exclude predictions whose arrival/departure time has passed by more
+        -- than the grace period, preventing stale "0 minute" predictions.
+        AND CAST(COALESCE(stu.arrival_timestamp, stu.departure_timestamp) AS INTEGER) > unixepoch() - ${PREDICTION_EXPIRY_GRACE_SECONDS}
       ORDER BY CAST(COALESCE(stu.arrival_timestamp, stu.departure_timestamp) AS INTEGER)
     `,
     )

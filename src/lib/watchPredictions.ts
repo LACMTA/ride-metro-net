@@ -5,25 +5,47 @@ import {
 } from "./routePredictionsStore";
 import { hydrationGate } from "./hydrationGate";
 
+/**
+ * Grace period (in seconds) after a predicted arrival/departure time has
+ * passed before the prediction is dropped from the client-side store. This
+ * prevents stale "0 minute" predictions from accumulating between polls.
+ * Tune this value to adjust how long arrivals remain visible after their
+ * predicted time. Should match the API-side constant for consistent behavior.
+ */
+const PREDICTION_EXPIRY_GRACE_SECONDS = 30;
+
 let adjustmentIntervalId: NodeJS.Timeout | null;
 
 /**
  * Recompute `sec` and `min` for every prediction from its absolute `time`
  * (Unix epoch seconds) and the current wall clock. This keeps countdowns
  * accurate regardless of when the server response was cached.
+ *
+ * Predictions whose arrival time has passed by more than
+ * `PREDICTION_EXPIRY_GRACE_SECONDS` are filtered out entirely, preventing
+ * stale "0 minute" predictions from accumulating between polls. Empty
+ * destinations and routes are pruned so the UI can show appropriate fallback
+ * messages (e.g. "No predictions available").
  */
 function computeFromTime(predictions: RoutePredictions[]): RoutePredictions[] {
   const nowSec = Math.floor(Date.now() / 1000);
-  return predictions.map((route) => ({
-    ...route,
-    destinations: route.destinations.map((dest) => ({
-      ...dest,
-      predictions: dest.predictions.map((p) => {
-        const sec = Math.max(0, p.time - nowSec);
-        return { ...p, sec, min: Math.floor(sec / 60) };
-      }),
-    })),
-  }));
+  const expiryThreshold = nowSec - PREDICTION_EXPIRY_GRACE_SECONDS;
+  return predictions
+    .map((route) => ({
+      ...route,
+      destinations: route.destinations
+        .map((dest) => ({
+          ...dest,
+          predictions: dest.predictions
+            .filter((p) => p.time > expiryThreshold)
+            .map((p) => {
+              const sec = Math.max(0, p.time - nowSec);
+              return { ...p, sec, min: Math.floor(sec / 60) };
+            }),
+        }))
+        .filter((dest) => dest.predictions.length > 0),
+    }))
+    .filter((route) => route.destinations.length > 0);
 }
 
 async function getPredictions(stopIds: string[], adjustmentInterval: number) {
