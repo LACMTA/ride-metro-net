@@ -10,8 +10,6 @@ import tailwindcss from "@tailwindcss/vite";
 // https://astro.build/config
 export default defineConfig({
   build: {
-    // Our latency is mostly from SQLite,
-    // which in-memory is only really hurt by higher concurrency.
     concurrency: 1,
   },
   env: {
@@ -23,11 +21,9 @@ export default defineConfig({
     },
   },
   vite: {
-    // force GTFS/SQLite integration to run only at buildtime
     ssr: {
       external: ["gtfs", "better-sqlite3", "sqlite3"],
     },
-
     plugins: [tailwindcss()],
   },
   integrations: [importGTFS(), gtfsRealtimeCron(), react()],
