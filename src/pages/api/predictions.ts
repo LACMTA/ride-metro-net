@@ -75,6 +75,21 @@ export async function GET(context: import("astro").APIContext) {
   const rows = db
     .prepare(
       `
+      WITH deduped_stu AS (
+        SELECT
+          stu.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY stu.trip_id, stu.stop_id, stu.stop_sequence
+            ORDER BY stu.created_timestamp DESC
+          ) AS _dedupe_rank
+        FROM stop_time_updates stu
+        WHERE stu.stop_id IN (${placeholders})
+          AND stu.expiration_timestamp > unixepoch()
+          AND (stu.arrival_timestamp IS NOT NULL OR stu.departure_timestamp IS NOT NULL)
+          -- Exclude predictions whose arrival/departure time has passed by more
+          -- than the grace period, preventing stale "0 minute" predictions.
+          AND CAST(COALESCE(stu.arrival_timestamp, stu.departure_timestamp) AS INTEGER) > unixepoch() - ${PREDICTION_EXPIRY_GRACE_SECONDS}
+      )
       SELECT
         stu.stop_id,
         stu.route_id,
@@ -88,7 +103,7 @@ export async function GET(context: import("astro").APIContext) {
         CAST(s.stop_code AS INTEGER) AS stop_code,
         s.stop_name,
         st.stop_headsign AS raw_headsign
-      FROM stop_time_updates stu
+      FROM deduped_stu stu
       JOIN routes r ON r.route_id = stu.route_id
       JOIN stops s ON s.stop_id = stu.stop_id
       LEFT JOIN trip_updates tu ON tu.trip_id = stu.trip_id
@@ -99,12 +114,7 @@ export async function GET(context: import("astro").APIContext) {
       LEFT JOIN stop_times st
         ON st.trip_id = stu.trip_id
         AND st.stop_sequence = stu.stop_sequence
-      WHERE stu.stop_id IN (${placeholders})
-        AND stu.expiration_timestamp > unixepoch()
-        AND (stu.arrival_timestamp IS NOT NULL OR stu.departure_timestamp IS NOT NULL)
-        -- Exclude predictions whose arrival/departure time has passed by more
-        -- than the grace period, preventing stale "0 minute" predictions.
-        AND CAST(COALESCE(stu.arrival_timestamp, stu.departure_timestamp) AS INTEGER) > unixepoch() - ${PREDICTION_EXPIRY_GRACE_SECONDS}
+      WHERE stu._dedupe_rank = 1
       ORDER BY CAST(COALESCE(stu.arrival_timestamp, stu.departure_timestamp) AS INTEGER)
     `,
     )
