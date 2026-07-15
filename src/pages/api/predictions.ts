@@ -11,6 +11,13 @@ import { getGtfsDb } from "../../lib/gtfsConfig";
  */
 const PREDICTION_EXPIRY_GRACE_SECONDS = 30;
 
+/**
+ * Default maximum number of predictions to return per route per direction.
+ * The soonest arrivals across all headsigns in a direction are kept.
+ * Callers may override via the `limit` query parameter.
+ */
+const DEFAULT_PREDICTIONS_LIMIT = 3;
+
 export type RoutePredictions = {
   destinations: {
     directionId: string;
@@ -53,6 +60,8 @@ interface PredictionRow {
  * GET /api/predictions
  * @param {string} stopId - Comma-separated list of stop IDs to fetch predictions for.
  *   For parent stations, pass the child stop IDs. Results are aggregated into a single array.
+ * @param {number} [limit] - Maximum number of predictions to return per route per direction.
+ *   The soonest arrivals across all headsigns in a direction are kept. Defaults to 3.
  * @returns {RoutePredictions[]} Aggregated array of predictions across all requested stops.
  */
 export async function GET(context: import("astro").APIContext) {
@@ -68,6 +77,19 @@ export async function GET(context: import("astro").APIContext) {
 
   if (stopIds.length === 0)
     return new Response("stopId query parameter is required", { status: 400 });
+
+  // Optional `limit` query param: cap predictions per route per direction.
+  const limitParam = context.url.searchParams.get("limit");
+  let limit = DEFAULT_PREDICTIONS_LIMIT;
+  if (limitParam !== null) {
+    const parsed = Number.parseInt(limitParam, 10);
+    if (Number.isNaN(parsed) || parsed < 1) {
+      return new Response("limit query parameter must be a positive integer", {
+        status: 400,
+      });
+    }
+    limit = parsed;
+  }
 
   const db = getGtfsDb();
   const placeholders = stopIds.map(() => "?").join(", ");
@@ -174,6 +196,42 @@ export async function GET(context: import("astro").APIContext) {
       tripId: row.trip_id ?? "",
       vehicleId: row.vehicle_id ?? "",
     });
+  }
+
+  // Cap predictions per route per direction. For each direction, merge all
+  // predictions across headsigns, sort by arrival time, keep the soonest
+  // `limit`, then redistribute them back to their respective destinations.
+  // Destinations emptied by the cap are pruned.
+  for (const routePred of byRoute.values()) {
+    const byDirection = new Map<
+      string,
+      { directionId: string; headsign: string; predictions: Prediction[] }[]
+    >();
+    for (const dest of routePred.destinations) {
+      if (!byDirection.has(dest.directionId))
+        byDirection.set(dest.directionId, []);
+      byDirection.get(dest.directionId)!.push(dest);
+    }
+
+    routePred.destinations = [];
+    for (const dirDests of byDirection.values()) {
+      const all: { time: number; dest: (typeof dirDests)[0]; pred: Prediction }[] =
+        [];
+      for (const dest of dirDests)
+        for (const pred of dest.predictions)
+          all.push({ time: pred.time, dest, pred });
+
+      all.sort((a, b) => a.time - b.time);
+      const kept = all.slice(0, limit);
+
+      for (const dest of dirDests) {
+        const preds = kept.filter((k) => k.dest === dest).map((k) => k.pred);
+        if (preds.length > 0) {
+          dest.predictions = preds;
+          routePred.destinations.push(dest);
+        }
+      }
+    }
   }
 
   return new Response(JSON.stringify([...byRoute.values()]), {
