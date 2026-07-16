@@ -16,6 +16,15 @@
 export interface ScreenSignConfig {
   /** GTFS stop IDs whose routes should be merged on this sign. */
   stopIds: string[];
+
+  /**
+   * Optional array of `route_id` values that controls the display order of
+   * routes on the sign. Routes are sorted to match the order listed here;
+   * any routes returned by the query but not listed here appear at the end,
+   * preserving their original relative order. Route IDs that are listed
+   * but not returned by the query are silently ignored.
+   */
+  routeOrder?: string[];
 }
 
 /**
