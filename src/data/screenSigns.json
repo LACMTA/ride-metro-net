@@ -1,5 +1,5 @@
 {
   "union-station-east-tower": {
-    "stopIds": ["80214S"]
+    "stopIds": ["80214S", "3300", "3301", "30000"]
   }
 }
