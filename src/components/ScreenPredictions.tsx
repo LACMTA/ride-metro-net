@@ -18,11 +18,11 @@ export default function RoutePrediction({ routeId, directionId }: Props) {
   );
 
   if ($predictionsRequestStatus === "loading") {
-    return <p>Loading predictions...</p>;
+    return <>Loading predictions...</>;
   }
 
   if ($predictionsRequestStatus === "error" || !routePred) {
-    return <p>No predictions available</p>;
+    return <>No predictions available</>;
   }
 
   const predictions = routePred.destinations
@@ -33,5 +33,5 @@ export default function RoutePrediction({ routeId, directionId }: Props) {
     return <p>No predictions available</p>;
   }
 
-  return <p>{predictions.map((pred) => pred.min).join(", ")} mins</p>;
+  return <>{predictions.map((pred) => pred.min).join(", ")} mins</>;
 }

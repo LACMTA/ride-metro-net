@@ -89,16 +89,9 @@ const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
                   <img
                     src={`/agency-logos/${agencySettings.logoFile}`}
                     alt=""
-                    class="h-full"
+                    class="margin-x-auto h-full py-5"
                   />
                 )}
-                <strong
-                  style={
-                    agencySettings?.color
-                      ? `color: ${agencySettings.color};`
-                      : undefined
-                  }
-                />
               </div>{" "}
               <div class="col-span-3 flex items-center justify-start py-4">
                 <RouteBadge
@@ -109,11 +102,21 @@ const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
                   textColor={route.routeTextColor}
                   size="xl"
                 />
-                <div class="ml-5">
-                  <div class="text-left text-4xl">{route.headsigns[0]}</div>
-                  {route.headsigns.length > 1 && (
-                    <> {route.headsigns.slice(1).join(", ")}</>
-                  )}
+                <div class="ml-5 overflow-hidden">
+                  <div class="mt-7 text-left text-4xl text-nowrap">
+                    {route.headsigns[0].replace(" Station", "")}
+                  </div>
+                  <div class="h-7 text-xl">
+                    {route.headsigns.length > 1 && (
+                      <>
+                        {" "}
+                        {route.headsigns
+                          .slice(1)
+                          .map((h) => h.replace(" Station", ""))
+                          .join(", ")}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <div class="col-span-2 flex items-center justify-end py-4 pr-4 text-right text-4xl">
