@@ -1,0 +1,2044 @@
+{
+  "2": {
+    "trips": [
+      {
+        "tripId": "10002011530332-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10002011620507-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10002011602502-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10002011642429-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "4": {
+    "trips": [
+      {
+        "tripId": "10004003640437-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10004003600624-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10004003712323-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10004003632321-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "10": {
+    "trips": [
+      {
+        "tripId": "10010008140739-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "10"
+      },
+      {
+        "tripId": "10010008240510-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "10"
+      },
+      {
+        "tripId": "10010007530811-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "48",
+        "stopHeadsignFilter": "48"
+      },
+      {
+        "tripId": "10010007510526-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "48",
+        "stopHeadsignFilter": "48"
+      }
+    ]
+  },
+  "14": {
+    "trips": [
+      {
+        "tripId": "10014005161501-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "14"
+      },
+      {
+        "tripId": "10014005070721-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "14"
+      },
+      {
+        "tripId": "10014005150429-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "37",
+        "stopHeadsignFilter": "37"
+      },
+      {
+        "tripId": "10014005110512-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "37",
+        "stopHeadsignFilter": "37"
+      }
+    ]
+  },
+  "16": {
+    "trips": [
+      {
+        "tripId": "10016004440510-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10016004240519-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "18": {
+    "trips": [
+      {
+        "tripId": "10018003770614-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10018003680535-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10018003802508-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10018003722426-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "20": {
+    "trips": [
+      {
+        "tripId": "10020008820658-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10020008910630-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10020008842329-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10020008882317-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "28": {
+    "trips": [
+      {
+        "tripId": "10028006580423-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10028006300537-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "30": {
+    "trips": [
+      {
+        "tripId": "10030008320418-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10030008330445-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "33": {
+    "trips": [
+      {
+        "tripId": "10033006770455-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10033006750636-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10033006802404-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10033006792352-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "35": {
+    "trips": [
+      {
+        "tripId": "10035002730651-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "35"
+      },
+      {
+        "tripId": "10035002740613-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "35"
+      },
+      {
+        "tripId": "10035002812307-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl",
+        "splitLineNumber": "35"
+      },
+      {
+        "tripId": "10035002662324-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl",
+        "splitLineNumber": "35"
+      },
+      {
+        "tripId": "10035002882230-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "38"
+      },
+      {
+        "tripId": "10035002922312-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "38"
+      }
+    ]
+  },
+  "40": {
+    "trips": [
+      {
+        "tripId": "10040009490436-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10040009470541-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10040009630302-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10040009582412-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "45": {
+    "trips": [
+      {
+        "tripId": "10045005850425-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10045006060434-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "51": {
+    "trips": [
+      {
+        "tripId": "10051003720646-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10051003500534-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10051003752343-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10051003372412-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "53": {
+    "trips": [
+      {
+        "tripId": "10053002850350-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10053002950442-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "55": {
+    "trips": [
+      {
+        "tripId": "10055003020452-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10055003010531-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10055003042323-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10055003032312-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "60": {
+    "trips": [
+      {
+        "tripId": "10060001830435-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10060001880426-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10060001812500-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10060001872357-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "62": {
+    "trips": [
+      {
+        "tripId": "10062003840637-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10062003930436-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "66": {
+    "trips": [
+      {
+        "tripId": "10066004560510-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10066004510351-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10066004542343-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10066004552331-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "70": {
+    "trips": [
+      {
+        "tripId": "10070003020450-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10070003190405-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10070002992307-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10070003192340-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "74": {
+    "trips": [
+      {
+        "tripId": "10074000040501-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10074000020428-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10074000012331-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10074000032318-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "76": {
+    "trips": [
+      {
+        "tripId": "10076002170506-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10076002150436-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10076002142305-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10076002152337-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "78": {
+    "trips": [
+      {
+        "tripId": "10078005440456-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10078005410405-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "81": {
+    "trips": [
+      {
+        "tripId": "10081003710434-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10081003750421-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10081003742549-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10081003582531-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "90": {
+    "trips": [
+      {
+        "tripId": "10090003650457-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10090003630414-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "92": {
+    "trips": [
+      {
+        "tripId": "10092003050456-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10092002990454-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10092003072315-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10092003022321-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "93": {
+    "trips": [
+      {
+        "tripId": "10093000030449-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10093000040511-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "94": {
+    "trips": [
+      {
+        "tripId": "10094002660436-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10094002640449-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "102": {
+    "trips": [
+      {
+        "tripId": "10102000940500-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10102000930505-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10102000902315-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "105": {
+    "trips": [
+      {
+        "tripId": "10105002720414-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10105002770551-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10105002742439-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10105002732506-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "108": {
+    "trips": [
+      {
+        "tripId": "10108004620615-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10108004290517-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "110": {
+    "trips": [
+      {
+        "tripId": "10110003110720-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10110003130540-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "111": {
+    "trips": [
+      {
+        "tripId": "10111004420437-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10111004360444-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10111004030236-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10111004350317-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "115": {
+    "trips": [
+      {
+        "tripId": "10115005580902-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10115005590418-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10115005602316-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "117": {
+    "trips": [
+      {
+        "tripId": "10117000930515-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10117000870403-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "120": {
+    "trips": [
+      {
+        "tripId": "10120001240409-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10120001160420-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "125": {
+    "trips": [
+      {
+        "tripId": "10125001570450-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10125001580417-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "127": {
+    "trips": [
+      {
+        "tripId": "10127000430530-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10127000410602-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "128": {
+    "trips": [
+      {
+        "tripId": "10128000310600-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10128000300550-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "134": {
+    "trips": [
+      {
+        "tripId": "10134000030641-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10134000010535-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "150": {
+    "trips": [
+      {
+        "tripId": "10150002150437-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10150002080510-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10150002142302-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10150002092300-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "152": {
+    "trips": [
+      {
+        "tripId": "10152001710342-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10152001700425-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "154": {
+    "trips": [
+      {
+        "tripId": "10154000450520-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10154000460507-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "155": {
+    "trips": [
+      {
+        "tripId": "10155000460418-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10155000410429-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "158": {
+    "trips": [
+      {
+        "tripId": "10158000690530-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10158000700555-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "161": {
+    "trips": [
+      {
+        "tripId": "10161000990549-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10161001000520-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "162": {
+    "trips": [
+      {
+        "tripId": "10162000060402-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10162000020502-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "164": {
+    "trips": [
+      {
+        "tripId": "10164000710448-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10164000690440-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "165": {
+    "trips": [
+      {
+        "tripId": "10165002100437-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10165002070430-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "166": {
+    "trips": [
+      {
+        "tripId": "10166000330519-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10166000860435-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "167": {
+    "trips": [
+      {
+        "tripId": "60167001120459-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "60167001140555-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "60167001132301-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "60167001152300-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "169": {
+    "trips": [
+      {
+        "tripId": "10169001520605-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10169001570522-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "179": {
+    "trips": [
+      {
+        "tripId": "10179000050747-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10179000170722-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10179000042344-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10179000162300-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "180": {
+    "trips": [
+      {
+        "tripId": "10180002740450-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10180002770500-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10180002732417-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10180002592416-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "182": {
+    "trips": [
+      {
+        "tripId": "10182000420446-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10182000440421-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "202": {
+    "trips": [
+      {
+        "tripId": "10202000620559-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10202000570519-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "204": {
+    "trips": [
+      {
+        "tripId": "10204001300432-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10204001270451-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "205": {
+    "trips": [
+      {
+        "tripId": "10205001000440-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10205001010429-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "206": {
+    "trips": [
+      {
+        "tripId": "10206001920435-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10206001900456-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "207": {
+    "trips": [
+      {
+        "tripId": "10207003040526-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10207003120513-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10207003042339-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10207003122315-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "209": {
+    "trips": [
+      {
+        "tripId": "10209000530529-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10209000520526-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "210": {
+    "trips": [
+      {
+        "tripId": "10210003490505-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10210003470423-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "211": {
+    "trips": [
+      {
+        "tripId": "10211000900541-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "211"
+      },
+      {
+        "tripId": "10211000890619-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "215"
+      }
+    ]
+  },
+  "212": {
+    "trips": [
+      {
+        "tripId": "10212002380441-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10212002390450-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10212002382320-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10212002372431-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "217": {
+    "trips": [
+      {
+        "tripId": "10217003500401-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10217003510438-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10217003542316-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10217003532323-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "218": {
+    "trips": [
+      {
+        "tripId": "10218000380555-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10218000310556-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "222": {
+    "trips": [
+      {
+        "tripId": "10222000830432-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10222000840504-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "224": {
+    "trips": [
+      {
+        "tripId": "10224002700504-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10224002720444-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10224002772348-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10224002742319-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "230": {
+    "trips": [
+      {
+        "tripId": "10230000830453-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10230000870503-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "232": {
+    "trips": [
+      {
+        "tripId": "10232001030333-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10232001060417-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "233": {
+    "trips": [
+      {
+        "tripId": "10233002020527-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10233002080544-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10233002162304-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10233002142330-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "234": {
+    "trips": [
+      {
+        "tripId": "10234000790448-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10234000820321-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10234000792326-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10234000820321-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "236": {
+    "trips": [
+      {
+        "tripId": "10236001230522-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "235"
+      },
+      {
+        "tripId": "10236001240530-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "235"
+      },
+      {
+        "tripId": "10236001350452-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "236"
+      },
+      {
+        "tripId": "10236001360557-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "236"
+      }
+    ]
+  },
+  "237": {
+    "trips": [
+      {
+        "tripId": "10237000350515-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10237000360512-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "240": {
+    "trips": [
+      {
+        "tripId": "10240000090425-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10240000110505-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "242": {
+    "trips": [
+      {
+        "tripId": "10242000040522-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "242"
+      },
+      {
+        "tripId": "10242000010547-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "242"
+      },
+      {
+        "tripId": "10242000050516-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "243"
+      },
+      {
+        "tripId": "10242000030549-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "243"
+      }
+    ]
+  },
+  "244": {
+    "trips": [
+      {
+        "tripId": "10244000010455-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10244000020512-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "246": {
+    "trips": [
+      {
+        "tripId": "10246000850507-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10246000820522-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10246000862327-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10246000802325-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "251": {
+    "trips": [
+      {
+        "tripId": "10251002100458-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10251002140330-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10251002112343-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10251002032331-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "258": {
+    "trips": [
+      {
+        "tripId": "10258000600502-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10258000620609-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "260": {
+    "trips": [
+      {
+        "tripId": "10260003230444-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "260"
+      },
+      {
+        "tripId": "10260003210522-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "260"
+      },
+      {
+        "tripId": "10260002980354-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "261"
+      },
+      {
+        "tripId": "10260003220413-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "261"
+      }
+    ]
+  },
+  "265": {
+    "trips": [
+      {
+        "tripId": "10265000150505-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10265000160534-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "266": {
+    "trips": [
+      {
+        "tripId": "10266000330506-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10266000340418-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "267": {
+    "trips": [
+      {
+        "tripId": "10267001040445-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10267001050507-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "268": {
+    "trips": [
+      {
+        "tripId": "10268001530505-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10268001510540-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "287": {
+    "trips": [
+      {
+        "tripId": "10287000772114-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10287000822049-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "294": {
+    "trips": [
+      {
+        "tripId": "10294000050450-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10294000060450-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "296": {
+    "trips": [
+      {
+        "tripId": "10296000040507-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10296000050444-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "344": {
+    "trips": [
+      {
+        "tripId": "10344000470610-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10344000480500-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "460": {
+    "trips": [
+      {
+        "tripId": "10460002000551-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10460002050355-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "487": {
+    "trips": [
+      {
+        "tripId": "10487001191022-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "487"
+      },
+      {
+        "tripId": "10487001180831-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "487"
+      },
+      {
+        "tripId": "10487001151450-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "489"
+      },
+      {
+        "tripId": "10487001240559-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "489"
+      }
+    ]
+  },
+  "501": {
+    "trips": [
+      {
+        "tripId": "10501000150506-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10501000160503-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "550": {
+    "trips": [
+      {
+        "tripId": "10550001340507-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10550001350540-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "577": {
+    "trips": [
+      {
+        "tripId": "10577000400540-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10577000420422-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "601": {
+    "trips": [
+      {
+        "tripId": "10601000010555-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10601000020541-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10601000032314-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10601000022301-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "602": {
+    "trips": [
+      {
+        "tripId": "10602000250531-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10602000300600-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10602000072350-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10602000292330-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "605": {
+    "trips": [
+      {
+        "tripId": "10605000450537-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10605000470530-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "611": {
+    "trips": [
+      {
+        "tripId": "10611000330540-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10611000270606-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "617": {
+    "trips": [
+      {
+        "tripId": "10617000080541-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10617000070530-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "660": {
+    "trips": [
+      {
+        "tripId": "10660000060525-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10660000110444-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10660000082348-JUNE26",
+        "directionId": 0,
+        "serviceType": "owl"
+      },
+      {
+        "tripId": "10660000102315-JUNE26",
+        "directionId": 1,
+        "serviceType": "owl"
+      }
+    ]
+  },
+  "662": {
+    "trips": [
+      {
+        "tripId": "10662000140539-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10662000130450-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "665": {
+    "trips": [
+      {
+        "tripId": "10665000400550-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10665000410453-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "690": {
+    "trips": [
+      {
+        "tripId": "10690000060532-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10690000080523-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "720": {
+    "trips": [
+      {
+        "tripId": "10720013710505-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10720013670637-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "754": {
+    "trips": [
+      {
+        "tripId": "10754001050530-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10754001060459-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "761": {
+    "trips": [
+      {
+        "tripId": "10761000790538-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10761000780356-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "801": {
+    "trips": [
+      {
+        "tripId": "64143523",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "64143528",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "802": {
+    "trips": [
+      {
+        "tripId": "64187012",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "64187016",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "803": {
+    "trips": [
+      {
+        "tripId": "64204710",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "64204712",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "804": {
+    "trips": [
+      {
+        "tripId": "64334581",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "64334594",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "805": {
+    "trips": [
+      {
+        "tripId": "64187026",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "64187017",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "807": {
+    "trips": [
+      {
+        "tripId": "64204877",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "64204876",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "901": {
+    "trips": [
+      {
+        "tripId": "10901000650329-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10901000660447-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  },
+  "910": {
+    "trips": [
+      {
+        "tripId": "10910002140434-JUNE26",
+        "directionId": 0,
+        "serviceType": "core"
+      },
+      {
+        "tripId": "10910002100326-JUNE26",
+        "directionId": 1,
+        "serviceType": "core"
+      }
+    ]
+  }
+}

@@ -1,0 +1,356 @@
+---
+import "leaflet/dist/leaflet.css";
+
+interface Props {
+  /** Numeric route ID prefix (e.g. "801", "720") for the API endpoint. */
+  routeId: string;
+  /** GTFS `route_color` hex without the leading `#`, e.g. `"E47525"`. */
+  routeColor: string;
+}
+
+const { routeId, routeColor } = Astro.props;
+---
+
+<div
+  class="bg-background-white mb-8 rounded-lg"
+  data-line-map
+  data-route-id={routeId}
+  data-route-color={routeColor}
+>
+  <div class="mb-2 flex flex-wrap items-center gap-3 px-3 pt-3 pb-1">
+    <div data-split-line-control hidden>
+      <label class="mr-2 font-medium" for="split-line-select">Line:</label>
+      <select
+        id="split-line-select"
+        class="border-divider-line rounded border px-2 py-1"
+      ></select>
+    </div>
+    <div data-service-type-control hidden>
+      <label class="mr-2 font-medium" for="service-type-select">Service:</label>
+      <select
+        id="service-type-select"
+        class="border-divider-line rounded border px-2 py-1"
+      >
+        <option value="core">Core</option>
+        <option value="owl">Owl</option>
+      </select>
+    </div>
+    <div>
+      <label class="mr-2 font-medium" for="shape-select">To:</label>
+      <select
+        id="shape-select"
+        class="border-divider-line rounded border px-2 py-1"
+      ></select>
+    </div>
+  </div>
+
+  <div
+    class="h-96 w-full overflow-hidden"
+    aria-label="Map of Metro line route"
+    role="img"
+    data-map-container
+  >
+  </div>
+</div>
+
+<script>
+  import type { RouteShapesGeoJSON, RouteShapeFeature } from "../lib/getRouteShapes";
+
+  // Default center: LA Metro service area
+  const DEFAULT_CENTER: [number, number] = [
+    34.00095151499077, -118.25133692966446,
+  ];
+  const DEFAULT_ZOOM = 11;
+
+  type LeafletModule = typeof import("leaflet");
+
+  interface MapState {
+    L: LeafletModule;
+    map: import("leaflet").Map;
+    geojson: RouteShapesGeoJSON | null;
+    shapeLayer: import("leaflet").LayerGroup | null;
+    stopsLayer: import("leaflet").LayerGroup | null;
+    selectedIndex: number;
+    serviceType: "core" | "owl";
+    splitLineNumber: string | null;
+  }
+
+  function shapeOptionLabel(feature: RouteShapeFeature): string {
+    const stops = feature.properties.stops;
+    const terminal = stops.at(-1);
+    return terminal ? terminal.stopName : "Unknown direction";
+  }
+
+  function initMap(container: HTMLElement): void {
+    const routeId = container.dataset.routeId!;
+    const routeColor = container.dataset.routeColor!;
+
+    const controlRoot = container.closest("[data-line-map]")!;
+    const splitLineControl = controlRoot.querySelector(
+      "[data-split-line-control]",
+    ) as HTMLElement;
+    const serviceTypeControl = controlRoot.querySelector(
+      "[data-service-type-control]",
+    ) as HTMLElement;
+    const splitLineSelect = controlRoot.querySelector(
+      "#split-line-select",
+    ) as HTMLSelectElement;
+    const serviceTypeSelect = controlRoot.querySelector(
+      "#service-type-select",
+    ) as HTMLSelectElement;
+    const shapeSelect = controlRoot.querySelector(
+      "#shape-select",
+    ) as HTMLSelectElement;
+    const mapContainer = controlRoot.querySelector(
+      "[data-map-container]",
+    ) as HTMLElement;
+
+    let state: MapState | null = null;
+
+    async function bootstrap() {
+      const [{ default: L }] = await Promise.all([
+        import("leaflet"),
+        import("esri-leaflet-vector"),
+      ]);
+
+      const map = L.map(mapContainer, { minZoom: 2 }).setView(
+        DEFAULT_CENTER,
+        DEFAULT_ZOOM,
+      );
+
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+
+      state = {
+        L,
+        map,
+        geojson: null,
+        shapeLayer: null,
+        stopsLayer: null,
+        selectedIndex: 0,
+        serviceType: "core",
+        splitLineNumber: null,
+      };
+
+      // Fetch the route shape GeoJSON from the cached API endpoint.
+      try {
+        const res = await fetch(`/api/route-shape/${routeId}.json`);
+        if (!res.ok) {
+          throw new Error(`Shape fetch failed: ${res.status}`);
+        }
+        const data = (await res.json()) as RouteShapesGeoJSON;
+
+        if (!state) return;
+        state.geojson = data;
+
+        // Initialise split-line selection to the first sub-line number found.
+        if (data.isSplitline) {
+          const firstNumber = data.features.find(
+            (f) => f.properties.splitLineNumber !== undefined,
+          )?.properties.splitLineNumber;
+          state.splitLineNumber = firstNumber ?? null;
+        } else {
+          state.splitLineNumber = null;
+        }
+
+        populateControls();
+        renderSelection();
+      } catch (err) {
+        // Non-fatal: leave the map on its default LA-wide view.
+        console.error("Failed to load route shape:", err);
+      }
+    }
+
+    function getFilteredOptions(): RouteShapeFeature[] {
+      if (!state?.geojson) return [];
+      return state.geojson.features.filter(
+        (f) =>
+          f.properties.serviceType === state!.serviceType &&
+          (state!.splitLineNumber === null ||
+            f.properties.splitLineNumber === state!.splitLineNumber),
+      );
+    }
+
+    function populateControls() {
+      if (!state?.geojson) return;
+
+      // Split-line selector
+      if (state.geojson.isSplitline) {
+        const seen = new Set<string>();
+        for (const f of state.geojson.features) {
+          if (f.properties.splitLineNumber !== undefined) {
+            seen.add(f.properties.splitLineNumber);
+          }
+        }
+        const numbers = [...seen].sort();
+        if (numbers.length > 0) {
+          splitLineControl.hidden = false;
+          splitLineSelect.innerHTML = numbers
+            .map((num) => `<option value="${num}">${num}</option>`)
+            .join("");
+          splitLineSelect.value = state.splitLineNumber ?? numbers[0];
+        }
+      }
+
+      // Service type selector — show only if owl service exists for the
+      // current split-line selection.
+      const hasOwl = state.geojson.features.some(
+        (f) =>
+          f.properties.serviceType === "owl" &&
+          (state!.splitLineNumber === null ||
+            f.properties.splitLineNumber === state.splitLineNumber),
+      );
+      if (hasOwl) {
+        serviceTypeControl.hidden = false;
+        serviceTypeSelect.value = state.serviceType;
+      } else {
+        serviceTypeControl.hidden = true;
+      }
+
+      // Direction selector
+      const filtered = getFilteredOptions();
+      shapeSelect.innerHTML = filtered
+        .map(
+          (f, i) =>
+            `<option value="${i}">${shapeOptionLabel(f)}</option>`,
+        )
+        .join("");
+      state.selectedIndex = 0;
+      shapeSelect.value = "0";
+    }
+
+    function renderSelection() {
+      if (!state?.L || !state.map || !state.geojson) return;
+      if (state.geojson.features.length === 0) return;
+
+      const filtered = getFilteredOptions();
+      if (filtered.length === 0) return;
+
+      const feature = filtered[state.selectedIndex] ?? filtered[0];
+
+      // Remove previous shape and stop layers.
+      if (state.shapeLayer) {
+        state.shapeLayer.remove();
+        state.shapeLayer = null;
+      }
+      if (state.stopsLayer) {
+        state.stopsLayer.remove();
+        state.stopsLayer = null;
+      }
+
+      const lineColor = routeColor ? `#${routeColor}` : "#000";
+      const L = state.L;
+      const map = state.map;
+
+      const shapeGroup = L.layerGroup().addTo(map);
+      state.shapeLayer = shapeGroup;
+
+      // Ghost layer: non-selected split-line side, same service type.
+      if (state.geojson.isSplitline && state.splitLineNumber !== null) {
+        const ghostFeatures = state.geojson.features.filter(
+          (f) =>
+            f.properties.splitLineNumber !== state!.splitLineNumber &&
+            f.properties.serviceType === state!.serviceType,
+        );
+        if (ghostFeatures.length > 0) {
+          L.geoJSON(
+            {
+              type: "FeatureCollection",
+              features: ghostFeatures,
+            } as import("geojson").FeatureCollection,
+            {
+              style: { color: lineColor, weight: 6, opacity: 0.35 },
+            },
+          ).addTo(shapeGroup);
+        }
+      }
+
+      // Selected feature layer — rendered on top of the ghost.
+      L.geoJSON(feature, {
+        style: { color: lineColor, weight: 6, opacity: 0.9 },
+      }).addTo(shapeGroup);
+
+      // Render a circle marker for each stop served by the selected shape.
+      const stopsGroup = L.layerGroup().addTo(map);
+      state.stopsLayer = stopsGroup;
+
+      for (const stop of feature.properties.stops) {
+        L.circleMarker([stop.lat, stop.lon], {
+          radius: 5,
+          color: lineColor,
+          weight: 3,
+          fillColor: "#fff",
+          fillOpacity: 1,
+        })
+          .bindPopup(`<strong>${stop.stopName}</strong>`)
+          .addTo(stopsGroup);
+      }
+
+      // Fit the map to the selected feature AND the ghost (when present).
+      const allLatLngs: [number, number][] = [
+        ...feature.geometry.coordinates.map(
+          ([lon, lat]) => [lat, lon] as [number, number],
+        ),
+        ...feature.properties.stops.map(
+          (s) => [s.lat, s.lon] as [number, number],
+        ),
+      ];
+
+      if (state.geojson.isSplitline && state.splitLineNumber !== null) {
+        const ghostFeatures = state.geojson.features.filter(
+          (f) =>
+            f.properties.splitLineNumber !== state!.splitLineNumber &&
+            f.properties.serviceType === state!.serviceType,
+        );
+        for (const gf of ghostFeatures) {
+          for (const [lon, lat] of gf.geometry.coordinates) {
+            allLatLngs.push([lat, lon]);
+          }
+        }
+      }
+
+      map.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });
+    }
+
+    function onSplitLineChange(value: string) {
+      if (!state) return;
+      state.splitLineNumber = value || null;
+      state.serviceType = "core";
+      populateControls();
+      renderSelection();
+    }
+
+    function onServiceTypeChange(value: string) {
+      if (!state) return;
+      state.serviceType = value as "core" | "owl";
+      populateControls();
+      renderSelection();
+    }
+
+    function onShapeChange(value: string) {
+      if (!state) return;
+      state.selectedIndex = Number(value);
+      renderSelection();
+    }
+
+    splitLineSelect.addEventListener("change", (e) => {
+      onSplitLineChange((e.target as HTMLSelectElement).value);
+    });
+    serviceTypeSelect.addEventListener("change", (e) => {
+      onServiceTypeChange((e.target as HTMLSelectElement).value);
+    });
+    shapeSelect.addEventListener("change", (e) => {
+      onShapeChange((e.target as HTMLSelectElement).value);
+    });
+
+    bootstrap();
+  }
+
+  // Initialise all line map containers on the page.
+  document.querySelectorAll("[data-line-map]").forEach((el) => {
+    initMap(el as HTMLElement);
+  });
+</script>

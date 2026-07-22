@@ -11,6 +11,8 @@ import getRouteOverview from "../../../lib/getRouteOverview";
 import pdfSchedules from "../../../data/pdf-schedules.json";
 import { getLineStaticPaths } from "../../../lib/getLineStaticPaths";
 import Column from "../../../components/Column";
+import LineMap from "../../../components/LineMap.astro";
+import { getLineMapTrips } from "../../../lib/getLineMapTrips";
 
 export const prerender = true;
 
@@ -31,6 +33,16 @@ const title =
 const routeOverview = await getRouteOverview(route.routeId);
 const pdfUrl =
   (pdfSchedules as Record<string, string>)[numericId ?? routeId] ?? null;
+
+// Verify that a map config exists for this route. If not, throw at build time
+// so the developer knows to add an entry to src/data/lineMapTrips.json.
+const mapConfig = getLineMapTrips(route.routeId);
+if (!mapConfig) {
+  throw new Error(
+    `No lineMapTrips config found for route ${route.routeId}. ` +
+      `Add an entry to src/data/lineMapTrips.json.`,
+  );
+}
 ---
 
 <DataInjector data={route} id="data-route" />
@@ -68,6 +80,8 @@ const pdfUrl =
       </TabNav>
       <div class="bg-background-gray pt-3 pb-10">
         <Column>
+          <h2 class="mb-6 text-2xl font-bold">{title} Map</h2>
+          <LineMap routeId={route.routeId} routeColor={route.routeColor} />
           <LineOverview
             lineTitle={title}
             routeOverview={routeOverview}

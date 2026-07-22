@@ -1,0 +1,44 @@
+import type { APIRoute } from "astro";
+import getRouteShapes from "../../../lib/getRouteShapes";
+
+export const prerender = false;
+
+/**
+ * GET /api/route-shape/[routeId].json
+ *
+ * Returns the GTFS shape geometry for a line as a GeoJSON
+ * `FeatureCollection` of `LineString`s, one feature per canonical trip
+ * defined in `src/data/lineMapTrips.json`.
+ *
+ * This is a server-rendered endpoint (not prerendered) that queries the
+ * SQLite database on each request. A 1-hour `Cache-Control` header is set
+ * to avoid overtaxing the database.
+ *
+ * @param params.routeId Numeric route ID prefix (e.g. "801", "720").
+ */
+export const GET: APIRoute = ({ params }) => {
+  const { routeId } = params;
+
+  if (!routeId) {
+    return new Response(JSON.stringify({ error: "Missing routeId" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const geojson = getRouteShapes(routeId);
+
+  if (!geojson) {
+    return new Response(JSON.stringify({ error: "No map config for route" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  return new Response(JSON.stringify(geojson), {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=3600",
+    },
+  });
+};
