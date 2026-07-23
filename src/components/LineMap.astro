@@ -62,6 +62,33 @@ const { routeId, routeColor } = Astro.props;
   ];
   const DEFAULT_ZOOM = 11;
 
+  /**
+   * Blend a hex color toward white by `amount` (0–1). Used to render "ghost"
+   * route lines as a pale tint at full opacity rather than as a translucent
+   * overlay — that way stacked/overlapping ghost lines don't darken each other
+   * the way alpha compositing does. Accepts a leading `#`, bare hex, 3-digit
+   * shorthand, or empty string (treated as black).
+   */
+  function lightenColor(hex: string, amount: number): string {
+    let clean = hex.replace(/^#/, "");
+    // Expand 3-digit hex shorthand (e.g. "000" → "000000").
+    if (clean.length === 3) {
+      clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2];
+    }
+    // Pad short or empty strings to 6 digits (treats "" as black).
+    if (clean.length < 6) {
+      clean = clean.padEnd(6, "0");
+    }
+    const r = parseInt(clean.slice(0, 2), 16) || 0;
+    const g = parseInt(clean.slice(2, 4), 16) || 0;
+    const b = parseInt(clean.slice(4, 6), 16) || 0;
+    const t = Math.max(0, Math.min(1, amount));
+    const lr = Math.round(r + (255 - r) * t);
+    const lg = Math.round(g + (255 - g) * t);
+    const lb = Math.round(b + (255 - b) * t);
+    return `#${lr.toString(16).padStart(2, "0")}${lg.toString(16).padStart(2, "0")}${lb.toString(16).padStart(2, "0")}`;
+  }
+
   type LeafletModule = typeof import("leaflet");
 
   interface MapState {
@@ -174,6 +201,32 @@ const { routeId, routeColor } = Astro.props;
       );
     }
 
+    /**
+     * Returns "ghost" features — shapes that differ from the current selection
+     * in exactly one dimension (service type XOR split-line number) so they
+     * render as a faint background, mirroring the split-line ghost behaviour
+     * for unselected owl service.
+     *
+     * - Owl ghost: same split-line (or no split-line), different service type.
+     * - Split-line ghost: different split-line number, same service type.
+     *
+     * A feature that differs in BOTH dimensions is excluded so we don't ghost
+     * the unrelated sub-line's other service period.
+     */
+    function getGhostFeatures(): RouteShapeFeature[] {
+      if (!state?.geojson) return [];
+      const splitNum = state.splitLineNumber;
+      const serviceType = state.serviceType;
+      return state.geojson.features.filter((f) => {
+        const fSplit = f.properties.splitLineNumber;
+        const sameSplit = splitNum === null ? fSplit === undefined : fSplit === splitNum;
+        const diffSplit = !sameSplit;
+        const diffService = f.properties.serviceType !== serviceType;
+        // Exactly one dimension differs.
+        return diffService !== diffSplit && (diffService || diffSplit);
+      });
+    }
+
     function populateControls() {
       if (!state?.geojson) return;
 
@@ -242,30 +295,30 @@ const { routeId, routeColor } = Astro.props;
       }
 
       const lineColor = routeColor ? `#${routeColor}` : "#000";
+      const ghostColor = lightenColor(lineColor, 0.5);
       const L = state.L;
       const map = state.map;
 
       const shapeGroup = L.layerGroup().addTo(map);
       state.shapeLayer = shapeGroup;
 
-      // Ghost layer: non-selected split-line side, same service type.
-      if (state.geojson.isSplitline && state.splitLineNumber !== null) {
-        const ghostFeatures = state.geojson.features.filter(
-          (f) =>
-            f.properties.splitLineNumber !== state!.splitLineNumber &&
-            f.properties.serviceType === state!.serviceType,
-        );
-        if (ghostFeatures.length > 0) {
-          L.geoJSON(
-            {
-              type: "FeatureCollection",
-              features: ghostFeatures,
-            } as import("geojson").FeatureCollection,
-            {
-              style: { color: lineColor, weight: 6, opacity: 0.35 },
-            },
-          ).addTo(shapeGroup);
-        }
+      // Ghost layer: features that differ from the current selection in
+      // exactly one dimension — the unselected split-line side (same service
+      // type) or the unselected service type (same split-line, e.g. owl when
+      // core is selected). Rendered as a lightened tint at full opacity so
+      // overlapping ghost lines don't darken each other the way translucent
+      // (alpha-blended) lines do.
+      const ghostFeatures = getGhostFeatures();
+      if (ghostFeatures.length > 0) {
+        L.geoJSON(
+          {
+            type: "FeatureCollection",
+            features: ghostFeatures,
+          } as import("geojson").FeatureCollection,
+          {
+            style: { color: ghostColor, weight: 6, opacity: 1 },
+          },
+        ).addTo(shapeGroup);
       }
 
       // Selected feature layer — rendered on top of the ghost.
@@ -299,16 +352,9 @@ const { routeId, routeColor } = Astro.props;
         ),
       ];
 
-      if (state.geojson.isSplitline && state.splitLineNumber !== null) {
-        const ghostFeatures = state.geojson.features.filter(
-          (f) =>
-            f.properties.splitLineNumber !== state!.splitLineNumber &&
-            f.properties.serviceType === state!.serviceType,
-        );
-        for (const gf of ghostFeatures) {
-          for (const [lon, lat] of gf.geometry.coordinates) {
-            allLatLngs.push([lat, lon]);
-          }
+      for (const gf of getGhostFeatures()) {
+        for (const [lon, lat] of gf.geometry.coordinates) {
+          allLatLngs.push([lat, lon]);
         }
       }
 
