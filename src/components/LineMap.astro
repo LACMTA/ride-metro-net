@@ -9,6 +9,7 @@ interface Props {
 }
 
 const { routeId, routeColor } = Astro.props;
+const esriKey = import.meta.env.ESRI_KEY;
 ---
 
 <div
@@ -16,6 +17,7 @@ const { routeId, routeColor } = Astro.props;
   data-line-map
   data-route-id={routeId}
   data-route-color={routeColor}
+  data-esri-key={esriKey}
 >
   <div class="mb-2 flex flex-wrap items-center gap-3 px-3 pt-3 pb-1">
     <div data-split-line-control hidden>
@@ -63,6 +65,10 @@ const { routeId, routeColor } = Astro.props;
   ];
   const DEFAULT_ZOOM = 11;
 
+  // ESRI basemap configuration — Metro branded vector basemap.
+  // See https://github.com/LACMTA/map-template.
+  const ESRI_BASERMAP_ENUM = "65aff2873118478482ec3dec199e9058";
+
   type LeafletModule = typeof import("leaflet");
 
   interface MapState {
@@ -85,6 +91,7 @@ const { routeId, routeColor } = Astro.props;
   function initMap(container: HTMLElement): void {
     const routeId = container.dataset.routeId!;
     const routeColor = container.dataset.routeColor!;
+    const esriKey = container.dataset.esriKey!;
 
     const controlRoot = container.closest("[data-line-map]")!;
     const splitLineControl = controlRoot.querySelector(
@@ -109,7 +116,7 @@ const { routeId, routeColor } = Astro.props;
     let state: MapState | null = null;
 
     async function bootstrap() {
-      const [{ default: L }] = await Promise.all([
+      const [{ default: L }, { vectorBasemapLayer }] = await Promise.all([
         import("leaflet"),
         import("esri-leaflet-vector"),
       ]);
@@ -119,10 +126,9 @@ const { routeId, routeColor } = Astro.props;
         DEFAULT_ZOOM,
       );
 
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution:
-          '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      // Metro branded ESRI vector basemap.
+      vectorBasemapLayer(ESRI_BASERMAP_ENUM, {
+        apiKey: esriKey,
       }).addTo(map);
 
       state = {
