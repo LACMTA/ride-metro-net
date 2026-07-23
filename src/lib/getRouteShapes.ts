@@ -269,12 +269,11 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | nu
       lon: s.stop_lon,
     }));
 
-    // Trim the polyline to match the first and last stops. This is especially
-    // important for the split-line mixed-trip fallback, where the full shape
-    // covers both sub-lines but only one sub-line's stops are shown.
-    const coordinates = tripConfig.stopHeadsignFilter
-      ? trimCoordinates(allCoords, routeStops)
-      : allCoords;
+    // Trim the polyline to match the first and last stops. This ensures the
+    // shape doesn't extend beyond the terminal stops — important for
+    // split-line routes (both mixed-trip fallback and dedicated-trip variants)
+    // where the full shape may cover a longer path than the displayed stops.
+    const coordinates = trimCoordinates(allCoords, routeStops);
 
     const feature: RouteShapeFeature = {
       type: "Feature",

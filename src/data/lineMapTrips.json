@@ -2032,12 +2032,26 @@
       {
         "tripId": "10910002140434-JUNE26",
         "directionId": 0,
-        "serviceType": "core"
+        "serviceType": "core",
+        "splitLineNumber": "910"
       },
       {
         "tripId": "10910002100326-JUNE26",
         "directionId": 1,
-        "serviceType": "core"
+        "serviceType": "core",
+        "splitLineNumber": "910"
+      },
+      {
+        "tripId": "10910002150419-JUNE26",
+        "directionId": 0,
+        "serviceType": "core",
+        "splitLineNumber": "950"
+      },
+      {
+        "tripId": "10910002090354-JUNE26",
+        "directionId": 1,
+        "serviceType": "core",
+        "splitLineNumber": "950"
       }
     ]
   }
