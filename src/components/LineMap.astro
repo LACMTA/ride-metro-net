@@ -228,7 +228,7 @@ const { routeId, routeColor } = Astro.props;
         (f) =>
           f.properties.serviceType === "owl" &&
           (state!.splitLineNumber === null ||
-            f.properties.splitLineNumber === state.splitLineNumber),
+            f.properties.splitLineNumber === state!.splitLineNumber),
       );
       if (hasOwl) {
         serviceTypeControl.hidden = false;
