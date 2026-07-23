@@ -105,19 +105,31 @@ const stmts = {
     GROUP BY sc.direction_id, sc.trip_count
   `),
 
-  // Representative trip_id for a given shape_id (lexicographically smallest)
+  // Representative trip_id for a given shape_id — the trip with the most
+  // stop_times (longest trip) to avoid short-turn trips. Ties broken by
+  // lexicographically smallest trip_id for determinism.
   repTrip: db.prepare(`
-    SELECT MIN(t.trip_id) AS trip_id
+    SELECT t.trip_id
     FROM trips t
+    JOIN stop_times st ON st.trip_id = t.trip_id
     WHERE t.shape_id = ?
+    GROUP BY t.trip_id
+    ORDER BY COUNT(st.stop_id) DESC, t.trip_id ASC
+    LIMIT 1
   `),
 
-  // Representative trip_id for a given shape_id, restricted to a set of trip_ids
+  // Representative trip_id for a given shape_id, restricted to a set of
+  // trip_ids — the trip with the most stop_times (longest trip), ties broken
+  // by lexicographically smallest trip_id.
   repTripFromTrips: db.prepare(`
-    SELECT MIN(t.trip_id) AS trip_id
+    SELECT t.trip_id
     FROM trips t
+    JOIN stop_times st ON st.trip_id = t.trip_id
     WHERE t.shape_id = @shapeId
       AND t.trip_id IN (SELECT value FROM json_each(@tripIdsJson))
+    GROUP BY t.trip_id
+    ORDER BY COUNT(st.stop_id) DESC, t.trip_id ASC
+    LIMIT 1
   `),
 
   // Owl trips: trips whose every stop_time is in [23:00, 05:00)
@@ -216,30 +228,38 @@ const stmts = {
     ) AS visits_non_core
   `),
 
-  // Stops for a shape (representative trip)
+  // Stops for a shape (representative trip — the longest trip on the shape)
   shapeStops: db.prepare(`
     SELECT s.stop_id
     FROM stop_times st
     JOIN stops s ON s.stop_id = st.stop_id
     WHERE st.trip_id = (
-      SELECT MIN(t.trip_id)
+      SELECT t.trip_id
       FROM trips t
+      JOIN stop_times st2 ON st2.trip_id = t.trip_id
       WHERE t.shape_id = ?
+      GROUP BY t.trip_id
+      ORDER BY COUNT(st2.stop_id) DESC, t.trip_id ASC
+      LIMIT 1
     )
       AND (st.pickup_type = 0 OR st.drop_off_type = 0)
     ORDER BY st.stop_sequence ASC
   `),
 
-  // Stops for a shape restricted to a set of trip_ids
+  // Stops for a shape restricted to a set of trip_ids (longest trip)
   shapeStopsFromTrips: db.prepare(`
     SELECT s.stop_id
     FROM stop_times st
     JOIN stops s ON s.stop_id = st.stop_id
     WHERE st.trip_id = (
-      SELECT MIN(t.trip_id)
+      SELECT t.trip_id
       FROM trips t
+      JOIN stop_times st2 ON st2.trip_id = t.trip_id
       WHERE t.shape_id = @shapeId
         AND t.trip_id IN (SELECT value FROM json_each(@tripIdsJson))
+      GROUP BY t.trip_id
+      ORDER BY COUNT(st2.stop_id) DESC, t.trip_id ASC
+      LIMIT 1
     )
       AND (st.pickup_type = 0 OR st.drop_off_type = 0)
     ORDER BY st.stop_sequence ASC
