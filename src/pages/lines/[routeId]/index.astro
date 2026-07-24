@@ -44,6 +44,14 @@ if (!mapConfig) {
       `Add an entry to src/data/lineMapTrips.json.`,
   );
 }
+
+// Resolve the line color once: GTFS route_color takes precedence, then the
+// agency-level default line color, then a black fallback.
+const lineColor = route.routeColor
+  ? `#${route.routeColor}`
+  : route.defaultLineColor
+    ? `#${route.defaultLineColor}`
+    : "#000";
 ---
 
 <DataInjector data={route} id="data-route" />
@@ -82,8 +90,8 @@ if (!mapConfig) {
       <div class="bg-background-gray pt-3 pb-10">
         <Column>
           <h2 class="mb-6 text-2xl font-bold">{title} Map</h2>
-          <LineMap routeId={route.routeId} routeColor={route.routeColor} defaultLineColor={route.defaultLineColor} />
-          <StopList client:load />
+          <LineMap routeId={route.routeId} lineColor={lineColor} />
+          <StopList client:load lineColor={lineColor} />
           <LineOverview
             lineTitle={title}
             routeOverview={routeOverview}
