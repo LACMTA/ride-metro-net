@@ -59,6 +59,7 @@ const lineColor = route.routeColor
   import { getData } from "../../../lib/getData";
   import type { RouteWithInfo } from "../../../lib/getRouteById";
   import watchAlerts from "../../../lib/watchAlerts";
+  import { setLineMapGeoJson } from "../../../lib/lineMapStore";
 
   const route = getData("data-route") as RouteWithInfo;
 
@@ -68,6 +69,17 @@ const lineColor = route.routeColor
       routeIds: [route.routeId],
     },
   ]);
+
+  // Fetch the route shape GeoJSON and populate the shared nanostore.
+  fetch(`/api/route-shape/${route.routeId}.json`)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`Shape fetch failed: ${res.status}`);
+      }
+      return res.json();
+    })
+    .then((data) => setLineMapGeoJson(data))
+    .catch((err) => console.error("Failed to load route shape:", err));
 </script>
 
 <Layout title={title}>
