@@ -1,7 +1,7 @@
 import { getGtfsDb } from "./gtfsConfig";
 import { getLineMapTripList } from "./getLineMapTrips";
 import { getAgencyIdsByFlag } from "./agencies";
-import { resolveRouteShortName } from "./routeShortNameOverrides";
+import { resolveRouteShortName, isBuswayRoute } from "./routeShortNameOverrides";
 import type Database from "better-sqlite3";
 
 // ---------------------------------------------------------------------------
@@ -69,6 +69,21 @@ export interface ConnectingRoute {
   routeType: number;
   routeColor: string;
   routeTextColor: string;
+}
+
+/**
+ * Sort key for connecting routes, ordering them by mode so that rail lines
+ * appear first, then busway lines (G / J), then regular bus lines. Within a
+ * mode group, original database order is preserved (stable sort).
+ *
+ * - Rail: GTFS `route_type != 3` (0 = tram/streetcar, 1 = subway/metro, etc.)
+ * - Busway: GTFS `route_type == 3` but operated on a dedicated busway (901, 910)
+ * - Bus: everything else (GTFS `route_type == 3`, non-busway)
+ */
+function connectionSortKey(route: ConnectingRoute): number {
+  if (route.routeType !== 3) return 0; // rail
+  if (isBuswayRoute(route.routeId)) return 1; // busway
+  return 2; // bus
 }
 
 export interface RouteStop {
@@ -518,7 +533,9 @@ export default function getRouteShapes(
     for (const stop of feature.properties.stops) {
       const all = connectionsByParent.get(stop.parentStationId);
       if (all) {
-        stop.connections = all.filter((c) => c.routeId !== routeIdPrefix);
+        stop.connections = all
+          .filter((c) => c.routeId !== routeIdPrefix)
+          .sort((a, b) => connectionSortKey(a) - connectionSortKey(b));
       }
     }
   }
