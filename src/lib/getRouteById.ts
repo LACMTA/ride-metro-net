@@ -2,6 +2,7 @@ import { getGtfsDb } from "./gtfsConfig";
 import { objectToCamel } from "ts-case-convert";
 import type Database from "better-sqlite3";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
+import { getAgencySettings } from "./agencies";
 
 export interface RouteWithInfo {
   routeId: string;
@@ -10,10 +11,13 @@ export interface RouteWithInfo {
   routeType: number;
   routeColor: string;
   routeTextColor: string;
+  /** Agency-level default line color (hex without `#`), or `""` if unset. */
+  defaultLineColor: string;
 }
 
 interface DatabaseQueryResult {
   route_id: string;
+  agency_id: string;
   route_short_name: string;
   route_long_name: string;
   route_type: number;
@@ -34,6 +38,7 @@ function getPreparedQuery() {
 const query = `
     SELECT
       route_id,
+      agency_id,
       route_short_name,
       route_long_name,
       route_type,
@@ -54,6 +59,7 @@ export default async function (routeId: string) {
   }
 
   const routeIdPrefix = res.route_id.split("-")[0];
+  const agencySettings = getAgencySettings(res.agency_id);
 
   const route: RouteWithInfo = {
     routeId: routeIdPrefix,
@@ -65,6 +71,7 @@ export default async function (routeId: string) {
     routeType: res.route_type,
     routeColor: res.route_color,
     routeTextColor: res.route_text_color,
+    defaultLineColor: agencySettings?.lineColor ?? "",
   };
 
   return route;

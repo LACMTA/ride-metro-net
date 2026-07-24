@@ -6,9 +6,11 @@ interface Props {
   routeId: string;
   /** GTFS `route_color` hex without the leading `#`, e.g. `"E47525"`. */
   routeColor: string;
+  /** Agency-level default line color (hex without `#`) used when `routeColor` is empty. */
+  defaultLineColor?: string;
 }
 
-const { routeId, routeColor } = Astro.props;
+const { routeId, routeColor, defaultLineColor } = Astro.props;
 const esriKey = import.meta.env.ESRI_KEY;
 ---
 
@@ -17,6 +19,7 @@ const esriKey = import.meta.env.ESRI_KEY;
   data-line-map
   data-route-id={routeId}
   data-route-color={routeColor}
+  data-default-line-color={defaultLineColor}
   data-esri-key={esriKey}
 >
   <div class="mb-2 flex flex-wrap items-center gap-3 px-3 pt-3 pb-1">
@@ -96,6 +99,7 @@ const esriKey = import.meta.env.ESRI_KEY;
   function initMap(container: HTMLElement): void {
     const routeId = container.dataset.routeId!;
     const routeColor = container.dataset.routeColor!;
+    const defaultLineColor = container.dataset.defaultLineColor ?? "";
     const esriKey = container.dataset.esriKey!;
 
     const controlRoot = container.closest("[data-line-map]")!;
@@ -269,7 +273,11 @@ const esriKey = import.meta.env.ESRI_KEY;
         state.stopsLayer = null;
       }
 
-      const lineColor = routeColor ? `#${routeColor}` : "#000";
+      const lineColor = routeColor
+        ? `#${routeColor}`
+        : defaultLineColor
+          ? `#${defaultLineColor}`
+          : "#000";
       const ghostColor = lightenColor(lineColor, 0.5);
       const L = state.L;
       const map = state.map;
