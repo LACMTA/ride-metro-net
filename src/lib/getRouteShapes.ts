@@ -4,6 +4,43 @@ import { getAgencyIdsByFlag } from "./agencies";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
 import type Database from "better-sqlite3";
 
+// ---------------------------------------------------------------------------
+// Connecting-lines radius configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * Radius (in meters) for finding nearby stops whose served lines should appear
+ * as "connecting lines" at each stop on the route. Tunable: increase to show
+ * more nearby connections, decrease to show only same-station connections.
+ *
+ * At 400 m (~0.25 mi), this catches transfers between closely-spaced bus stops
+ * and rail stations without introducing noise from distant unrelated lines.
+ */
+const CONNECTION_RADIUS_METERS = 200;
+
+/** Meters per degree of latitude — effectively constant worldwide. */
+const METERS_PER_DEG_LAT = 111_320;
+
+/** Meters per degree of longitude at LA's average latitude (~34.05° N). */
+const METERS_PER_DEG_LON = 111_320 * Math.cos((34.05 * Math.PI) / 180);
+
+/** Haversine great-circle distance between two lat/lon points, in meters. */
+function haversineMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6_371_000; // Earth radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 /**
  * GeoJSON `FeatureCollection` of `LineString`s — one per configured trip —
  * for a given route. Each feature contains the shape geometry and ordered
@@ -107,6 +144,11 @@ interface ConnectionRow {
   route_text_color: string;
 }
 
+interface NearbyConnectionRow extends ConnectionRow {
+  nearbyStopLat: number;
+  nearbyStopLon: number;
+}
+
 // ---------------------------------------------------------------------------
 // Polyline trimming utilities
 // ---------------------------------------------------------------------------
@@ -177,9 +219,7 @@ function trimCoordinates(
     allCoords.length - 1,
     0,
   );
-  return startIdx < endIdx
-    ? allCoords.slice(startIdx, endIdx + 1)
-    : allCoords;
+  return startIdx < endIdx ? allCoords.slice(startIdx, endIdx + 1) : allCoords;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +232,7 @@ const _stmts: Partial<{
   shapeStops: Database.Statement;
   shapeStopsFiltered: Database.Statement;
   connections: Database.Statement;
+  nearbyConnections: Database.Statement;
 }> = {};
 
 function getTripQuery() {
@@ -293,6 +334,59 @@ function getConnectionsQuery() {
   `));
 }
 
+/**
+ * Finds all Metro routes serving stops within a geographic bounding box of
+ * each stop on the route. Uses the `idx_stops_latlon` index for a fast
+ * range scan, then joins through `stop_times` → `trips` → `routes`.
+ *
+ * A Haversine post-filter in JS discards stops in the bounding-box corners
+ * that are beyond the exact circular radius.
+ *
+ * The `@stopsJson` parameter is a JSON array of `{ parentId, lat, lon }`
+ * objects — one per unique parent station on the route.
+ */
+function getNearbyConnectionsQuery() {
+  return (_stmts.nearbyConnections ??= getGtfsDb().prepare(`
+    WITH our_stops AS (
+      SELECT
+        json_extract(value, '$.parentId') AS parentId,
+        json_extract(value, '$.lat')       AS lat,
+        json_extract(value, '$.lon')       AS lon
+      FROM json_each(@stopsJson)
+    ),
+    agency_ids AS (
+      SELECT value AS agency_id FROM json_each(@agencyIdsJson)
+    ),
+    nearby_stops AS (
+      SELECT DISTINCT
+        s.stop_id   AS nearbyStopId,
+        s.stop_lat  AS nearbyStopLat,
+        s.stop_lon  AS nearbyStopLon,
+        os.parentId AS ourParentId
+      FROM our_stops os
+      JOIN stops s
+        ON s.stop_lat BETWEEN os.lat - @radiusLatDeg AND os.lat + @radiusLatDeg
+       AND s.stop_lon BETWEEN os.lon - @radiusLonDeg AND os.lon + @radiusLonDeg
+    )
+    SELECT DISTINCT
+      ns.ourParentId   AS parentStationId,
+      ns.nearbyStopLat,
+      ns.nearbyStopLon,
+      r.route_id,
+      r.route_short_name,
+      r.route_type,
+      COALESCE(r.route_color, '') AS route_color,
+      COALESCE(r.route_text_color, '') AS route_text_color
+    FROM nearby_stops ns
+    JOIN stop_times st ON st.stop_id = ns.nearbyStopId
+      AND (st.pickup_type = 0 OR st.drop_off_type = 0)
+    JOIN trips t ON t.trip_id = st.trip_id
+    JOIN routes r ON r.route_id = t.route_id
+    WHERE r.agency_id IN (SELECT agency_id FROM agency_ids)
+      AND r.route_long_name IS NOT NULL AND r.route_long_name != ''
+  `));
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -305,7 +399,9 @@ function getConnectionsQuery() {
  * @param routeId Numeric route ID prefix (e.g. "801", "720").
  * @returns GeoJSON FeatureCollection, or `null` if no config exists.
  */
-export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | null {
+export default function getRouteShapes(
+  routeId: string,
+): RouteShapesGeoJSON | null {
   const trips = getLineMapTripList(routeId);
   if (!trips || trips.length === 0) {
     return null;
@@ -324,13 +420,19 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | nu
   // resolve connecting lines in a single query after the loop.
   const allParentIds = new Set<string>();
 
+  // Collect one representative coordinate per parent station for the
+  // radius-based nearby-stop query.
+  const stopCoords = new Map<string, { lat: number; lon: number }>();
+
   for (const tripConfig of trips) {
     const tripRow = tripQuery.get(tripConfig.tripId) as TripRow | undefined;
     if (!tripRow || !tripRow.shape_id) {
       continue;
     }
 
-    const shapePoints = shapePointsQuery.all(tripRow.shape_id) as ShapePointRow[];
+    const shapePoints = shapePointsQuery.all(
+      tripRow.shape_id,
+    ) as ShapePointRow[];
     if (shapePoints.length === 0) {
       continue;
     }
@@ -352,6 +454,9 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | nu
     const routeStops = stops.map((s) => {
       const parentStationId = s.parent_station || s.stop_id;
       allParentIds.add(parentStationId);
+      if (!stopCoords.has(parentStationId)) {
+        stopCoords.set(parentStationId, { lat: s.stop_lat, lon: s.stop_lon });
+      }
       return {
         stopId: s.stop_id,
         stopName: s.stop_name,
@@ -399,15 +504,21 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | nu
     allParentIds,
   );
 
+  // Merge in radius-based nearby-stop connections (lines serving stops
+  // within CONNECTION_RADIUS_METERS of each stop on the route).
+  mergeNearbyConnections(
+    connectionsByParent,
+    getNearbyConnectionsQuery(),
+    stopCoords,
+  );
+
   const routeIdPrefix = routeId.split("-")[0];
 
   for (const feature of features) {
     for (const stop of feature.properties.stops) {
       const all = connectionsByParent.get(stop.parentStationId);
       if (all) {
-        stop.connections = all.filter(
-          (c) => c.routeId !== routeIdPrefix,
-        );
+        stop.connections = all.filter((c) => c.routeId !== routeIdPrefix);
       }
     }
   }
@@ -449,7 +560,10 @@ function buildConnectionsMap(
 
     const route: ConnectingRoute = {
       routeId: prefix,
-      routeShortName: resolveRouteShortName(row.route_id, row.route_short_name || ""),
+      routeShortName: resolveRouteShortName(
+        row.route_id,
+        row.route_short_name || "",
+      ),
       routeType: row.route_type,
       routeColor: row.route_color,
       routeTextColor: row.route_text_color,
@@ -463,4 +577,85 @@ function buildConnectionsMap(
   }
 
   return map;
+}
+
+/**
+ * Runs the nearby-stop connecting-routes query and merges results into the
+ * existing `connectionsByParent` map. Uses a Haversine post-filter to discard
+ * stops in the bounding-box corners that are beyond the exact radius.
+ *
+ * Routes already present (from the parent-station query) are not duplicated.
+ */
+function mergeNearbyConnections(
+  map: Map<string, ConnectingRoute[]>,
+  stmt: Database.Statement,
+  stopCoords: Map<string, { lat: number; lon: number }>,
+): void {
+  if (stopCoords.size === 0) return;
+
+  const agencyIds = getAgencyIdsByFlag("buildLinePages");
+  const radiusLatDeg = CONNECTION_RADIUS_METERS / METERS_PER_DEG_LAT;
+  const radiusLonDeg = CONNECTION_RADIUS_METERS / METERS_PER_DEG_LON;
+
+  const stopsJson = JSON.stringify(
+    [...stopCoords.entries()].map(([parentId, coords]) => ({
+      parentId,
+      lat: coords.lat,
+      lon: coords.lon,
+    })),
+  );
+
+  const rows = stmt.all({
+    stopsJson,
+    agencyIdsJson: JSON.stringify(agencyIds),
+    radiusLatDeg,
+    radiusLonDeg,
+  }) as NearbyConnectionRow[];
+
+  // Track (parentStationId, routeId prefix) pairs already confirmed so we
+  // don't add the same route twice or re-check distant occurrences.
+  const confirmed = new Set<string>();
+
+  for (const row of rows) {
+    const prefix = row.route_id.split("-")[0];
+    const dedupeKey = `${row.parentStationId}:${prefix}`;
+    if (confirmed.has(dedupeKey)) continue;
+
+    // Skip if already present from the parent-station query.
+    const existing = map.get(row.parentStationId);
+    if (existing && existing.some((r) => r.routeId === prefix)) {
+      confirmed.add(dedupeKey);
+      continue;
+    }
+
+    // Haversine post-filter: discard stops outside the exact radius.
+    const ourCoords = stopCoords.get(row.parentStationId);
+    if (!ourCoords) continue;
+    const dist = haversineMeters(
+      ourCoords.lat,
+      ourCoords.lon,
+      row.nearbyStopLat,
+      row.nearbyStopLon,
+    );
+    if (dist > CONNECTION_RADIUS_METERS) continue;
+
+    confirmed.add(dedupeKey);
+
+    const route: ConnectingRoute = {
+      routeId: prefix,
+      routeShortName: resolveRouteShortName(
+        row.route_id,
+        row.route_short_name || "",
+      ),
+      routeType: row.route_type,
+      routeColor: row.route_color,
+      routeTextColor: row.route_text_color,
+    };
+    let list = map.get(row.parentStationId);
+    if (!list) {
+      list = [];
+      map.set(row.parentStationId, list);
+    }
+    list.push(route);
+  }
 }

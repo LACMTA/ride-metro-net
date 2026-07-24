@@ -29,7 +29,9 @@ export default function StopList() {
 
   const feature = getSelectedShape(geojson, selection);
   if (!feature) {
-    return <p className="p-4 text-gray-500">No stops found for this selection.</p>;
+    return (
+      <p className="p-4 text-gray-500">No stops found for this selection.</p>
+    );
   }
 
   const stops = feature.properties.stops;
