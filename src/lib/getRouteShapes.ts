@@ -514,9 +514,13 @@ export default function getRouteShapes(
   // lines that serve any stop under that parent. The current route is then
   // filtered out in JS.
   // -----------------------------------------------------------------------
+  // Compute agency IDs once and reuse for both connection queries.
+  const agencyIdsJson = JSON.stringify(getAgencyIdsByFlag("buildLinePages"));
+
   const connectionsByParent = buildConnectionsMap(
     getConnectionsQuery(),
     allParentIds,
+    agencyIdsJson,
   );
 
   // Merge in radius-based nearby-stop connections (lines serving stops
@@ -525,6 +529,7 @@ export default function getRouteShapes(
     connectionsByParent,
     getNearbyConnectionsQuery(),
     stopCoords,
+    agencyIdsJson,
   );
 
   const routeIdPrefix = routeId.split("-")[0];
@@ -556,14 +561,14 @@ export default function getRouteShapes(
 function buildConnectionsMap(
   stmt: Database.Statement,
   parentIds: Set<string>,
+  agencyIdsJson: string,
 ): Map<string, ConnectingRoute[]> {
   const map = new Map<string, ConnectingRoute[]>();
   if (parentIds.size === 0) return map;
 
-  const agencyIds = getAgencyIdsByFlag("buildLinePages");
   const rows = stmt.all({
     parentIdsJson: JSON.stringify([...parentIds]),
-    agencyIdsJson: JSON.stringify(agencyIds),
+    agencyIdsJson,
   }) as ConnectionRow[];
 
   // Deduplicate by (parentStationId, numeric routeId prefix) since a route
@@ -607,10 +612,10 @@ function mergeNearbyConnections(
   map: Map<string, ConnectingRoute[]>,
   stmt: Database.Statement,
   stopCoords: Map<string, { lat: number; lon: number }>,
+  agencyIdsJson: string,
 ): void {
   if (stopCoords.size === 0) return;
 
-  const agencyIds = getAgencyIdsByFlag("buildLinePages");
   const radiusLatDeg = CONNECTION_RADIUS_METERS / METERS_PER_DEG_LAT;
   const radiusLonDeg = CONNECTION_RADIUS_METERS / METERS_PER_DEG_LON;
 
@@ -624,7 +629,7 @@ function mergeNearbyConnections(
 
   const rows = stmt.all({
     stopsJson,
-    agencyIdsJson: JSON.stringify(agencyIds),
+    agencyIdsJson,
     radiusLatDeg,
     radiusLonDeg,
   }) as NearbyConnectionRow[];
