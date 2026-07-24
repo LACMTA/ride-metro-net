@@ -35,7 +35,7 @@ export default function StopList() {
             {index + 1}
           </span>
           <a
-            href={`/stops/${stop.stopId}/`}
+            href={`/stops/${stop.parentStationId ?? stop.stopId}/`}
             className="text-metro-text hover:text-metro-blue hover:underline"
           >
             {stop.stopName}

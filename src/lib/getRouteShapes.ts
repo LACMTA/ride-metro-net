@@ -27,6 +27,12 @@ export interface RouteStop {
   stopName: string;
   lat: number;
   lon: number;
+  /**
+   * The parent station ID for this stop, or the stop's own ID when the stop
+   * is standalone (no `parent_station`). Used for linking to stop pages,
+   * which are generated for parent stops rather than child/platform stops.
+   */
+  parentStationId: string;
 }
 
 export interface RouteShapeFeature {
@@ -67,6 +73,7 @@ interface StopRow {
   stop_name: string;
   stop_lat: number;
   stop_lon: number;
+  parent_station: string | null;
 }
 
 interface TripRow {
@@ -183,7 +190,7 @@ function getShapePointsQuery() {
  */
 function getTripStopsQuery() {
   return (_stmts.shapeStops ??= getGtfsDb().prepare(`
-    SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+    SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, s.parent_station
     FROM stop_times st
     JOIN stops s ON s.stop_id = st.stop_id
     WHERE st.trip_id = ?
@@ -200,7 +207,7 @@ function getTripStopsQuery() {
  */
 function getTripStopsFilteredQuery() {
   return (_stmts.shapeStopsFiltered ??= getGtfsDb().prepare(`
-    SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+    SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, s.parent_station
     FROM stop_times st
     JOIN stops s ON s.stop_id = st.stop_id
     WHERE st.trip_id = @tripId
@@ -267,6 +274,7 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | nu
       stopName: s.stop_name,
       lat: s.stop_lat,
       lon: s.stop_lon,
+      parentStationId: s.parent_station || s.stop_id,
     }));
 
     // Trim the polyline to match the first and last stops. This ensures the
