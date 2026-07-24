@@ -12,6 +12,7 @@ import pdfSchedules from "../../../data/pdf-schedules.json";
 import { getLineStaticPaths } from "../../../lib/getLineStaticPaths";
 import Column from "../../../components/Column";
 import LineMap from "../../../components/LineMap.astro";
+import StopList from "../../../components/StopList";
 import { getLineMapTrips } from "../../../lib/getLineMapTrips";
 
 export const prerender = true;
@@ -82,6 +83,7 @@ if (!mapConfig) {
         <Column>
           <h2 class="mb-6 text-2xl font-bold">{title} Map</h2>
           <LineMap routeId={route.routeId} routeColor={route.routeColor} />
+          <StopList client:load />
           <LineOverview
             lineTitle={title}
             routeOverview={routeOverview}

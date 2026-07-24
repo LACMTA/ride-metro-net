@@ -58,6 +58,15 @@ const esriKey = import.meta.env.ESRI_KEY;
 <script>
   import type { RouteShapesGeoJSON, RouteShapeFeature } from "../lib/getRouteShapes";
   import { lightenColor } from "../lib/lightenColor";
+  import {
+    lineMapGeoJson,
+    lineMapSelection,
+    setLineMapGeoJson,
+    setServiceType,
+    setSplitLineNumber,
+    setSelectedIndex,
+    getFilteredShapes,
+  } from "../lib/lineMapStore";
 
   // Default center: LA Metro service area
   const DEFAULT_CENTER: [number, number] = [
@@ -74,12 +83,8 @@ const esriKey = import.meta.env.ESRI_KEY;
   interface MapState {
     L: LeafletModule;
     map: import("leaflet").Map;
-    geojson: RouteShapesGeoJSON | null;
     shapeLayer: import("leaflet").LayerGroup | null;
     stopsLayer: import("leaflet").LayerGroup | null;
-    selectedIndex: number;
-    serviceType: "core" | "owl";
-    splitLineNumber: string | null;
   }
 
   function shapeOptionLabel(feature: RouteShapeFeature): string {
@@ -134,12 +139,8 @@ const esriKey = import.meta.env.ESRI_KEY;
       state = {
         L,
         map,
-        geojson: null,
         shapeLayer: null,
         stopsLayer: null,
-        selectedIndex: 0,
-        serviceType: "core",
-        splitLineNumber: null,
       };
 
       // Fetch the route shape GeoJSON from the cached API endpoint.
@@ -151,17 +152,9 @@ const esriKey = import.meta.env.ESRI_KEY;
         const data = (await res.json()) as RouteShapesGeoJSON;
 
         if (!state) return;
-        state.geojson = data;
 
-        // Initialise split-line selection to the first sub-line number found.
-        if (data.isSplitline) {
-          const firstNumber = data.features.find(
-            (f) => f.properties.splitLineNumber !== undefined,
-          )?.properties.splitLineNumber;
-          state.splitLineNumber = firstNumber ?? null;
-        } else {
-          state.splitLineNumber = null;
-        }
+        // Push geojson + default selection into the shared nanostore.
+        setLineMapGeoJson(data);
 
         populateControls();
         renderSelection();
@@ -171,33 +164,11 @@ const esriKey = import.meta.env.ESRI_KEY;
       }
     }
 
-    function getFilteredOptions(): RouteShapeFeature[] {
-      if (!state?.geojson) return [];
-      return state.geojson.features.filter(
-        (f) =>
-          f.properties.serviceType === state!.serviceType &&
-          (state!.splitLineNumber === null ||
-            f.properties.splitLineNumber === state!.splitLineNumber),
-      );
-    }
-
-    /**
-     * Returns "ghost" features — shapes that differ from the current selection
-     * in exactly one dimension (service type XOR split-line number) so they
-     * render as a faint background, mirroring the split-line ghost behaviour
-     * for unselected owl service.
-     *
-     * - Owl ghost: same split-line (or no split-line), different service type.
-     * - Split-line ghost: different split-line number, same service type.
-     *
-     * A feature that differs in BOTH dimensions is excluded so we don't ghost
-     * the unrelated sub-line's other service period.
-     */
-    function getGhostFeatures(): RouteShapeFeature[] {
-      if (!state?.geojson) return [];
-      const splitNum = state.splitLineNumber;
-      const serviceType = state.serviceType;
-      return state.geojson.features.filter((f) => {
+    function getGhostFeatures(geojson: RouteShapesGeoJSON): RouteShapeFeature[] {
+      const selection = lineMapSelection.get();
+      const splitNum = selection.splitLineNumber;
+      const serviceType = selection.serviceType;
+      return geojson.features.filter((f) => {
         const fSplit = f.properties.splitLineNumber;
         const sameSplit = splitNum === null ? fSplit === undefined : fSplit === splitNum;
         const diffSplit = !sameSplit;
@@ -208,12 +179,14 @@ const esriKey = import.meta.env.ESRI_KEY;
     }
 
     function populateControls() {
-      if (!state?.geojson) return;
+      const geojson = lineMapGeoJson.get();
+      if (!geojson) return;
+      const selection = lineMapSelection.get();
 
       // Split-line selector
-      if (state.geojson.isSplitline) {
+      if (geojson.isSplitline) {
         const seen = new Set<string>();
-        for (const f of state.geojson.features) {
+        for (const f of geojson.features) {
           if (f.properties.splitLineNumber !== undefined) {
             seen.add(f.properties.splitLineNumber);
           }
@@ -224,45 +197,46 @@ const esriKey = import.meta.env.ESRI_KEY;
           splitLineSelect.innerHTML = numbers
             .map((num) => `<option value="${num}">${num}</option>`)
             .join("");
-          splitLineSelect.value = state.splitLineNumber ?? numbers[0];
+          splitLineSelect.value = selection.splitLineNumber ?? numbers[0];
         }
       }
 
       // Service type selector — show only if owl service exists for the
       // current split-line selection.
-      const hasOwl = state.geojson.features.some(
+      const hasOwl = geojson.features.some(
         (f) =>
           f.properties.serviceType === "owl" &&
-          (state!.splitLineNumber === null ||
-            f.properties.splitLineNumber === state!.splitLineNumber),
+          (selection.splitLineNumber === null ||
+            f.properties.splitLineNumber === selection.splitLineNumber),
       );
       if (hasOwl) {
         serviceTypeControl.hidden = false;
-        serviceTypeSelect.value = state.serviceType;
+        serviceTypeSelect.value = selection.serviceType;
       } else {
         serviceTypeControl.hidden = true;
       }
 
       // Direction selector
-      const filtered = getFilteredOptions();
+      const filtered = getFilteredShapes(geojson, selection);
       shapeSelect.innerHTML = filtered
         .map(
           (f, i) =>
             `<option value="${i}">${shapeOptionLabel(f)}</option>`,
         )
         .join("");
-      state.selectedIndex = 0;
       shapeSelect.value = "0";
     }
 
     function renderSelection() {
-      if (!state?.L || !state.map || !state.geojson) return;
-      if (state.geojson.features.length === 0) return;
+      if (!state?.L || !state.map) return;
+      const geojson = lineMapGeoJson.get();
+      if (!geojson || geojson.features.length === 0) return;
+      const selection = lineMapSelection.get();
 
-      const filtered = getFilteredOptions();
+      const filtered = getFilteredShapes(geojson, selection);
       if (filtered.length === 0) return;
 
-      const feature = filtered[state.selectedIndex] ?? filtered[0];
+      const feature = filtered[selection.selectedIndex] ?? filtered[0];
 
       // Remove previous shape and stop layers.
       if (state.shapeLayer) {
@@ -288,7 +262,7 @@ const esriKey = import.meta.env.ESRI_KEY;
       // core is selected). Rendered as a lightened tint at full opacity so
       // overlapping ghost lines don't darken each other the way translucent
       // (alpha-blended) lines do.
-      const ghostFeatures = getGhostFeatures();
+      const ghostFeatures = getGhostFeatures(geojson);
       if (ghostFeatures.length > 0) {
         L.geoJSON(
           {
@@ -332,7 +306,7 @@ const esriKey = import.meta.env.ESRI_KEY;
         ),
       ];
 
-      for (const gf of getGhostFeatures()) {
+      for (const gf of getGhostFeatures(geojson)) {
         for (const [lon, lat] of gf.geometry.coordinates) {
           allLatLngs.push([lat, lon]);
         }
@@ -341,35 +315,22 @@ const esriKey = import.meta.env.ESRI_KEY;
       map.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });
     }
 
-    function onSplitLineChange(value: string) {
-      if (!state) return;
-      state.splitLineNumber = value || null;
-      state.serviceType = "core";
-      populateControls();
-      renderSelection();
-    }
-
-    function onServiceTypeChange(value: string) {
-      if (!state) return;
-      state.serviceType = value as "core" | "owl";
-      populateControls();
-      renderSelection();
-    }
-
-    function onShapeChange(value: string) {
-      if (!state) return;
-      state.selectedIndex = Number(value);
-      renderSelection();
-    }
-
     splitLineSelect.addEventListener("change", (e) => {
-      onSplitLineChange((e.target as HTMLSelectElement).value);
+      setSplitLineNumber((e.target as HTMLSelectElement).value || null);
     });
     serviceTypeSelect.addEventListener("change", (e) => {
-      onServiceTypeChange((e.target as HTMLSelectElement).value);
+      setServiceType((e.target as HTMLSelectElement).value as "core" | "owl");
     });
     shapeSelect.addEventListener("change", (e) => {
-      onShapeChange((e.target as HTMLSelectElement).value);
+      setSelectedIndex(Number((e.target as HTMLSelectElement).value));
+    });
+
+    // Re-render the map whenever the selection store changes (this covers
+    // both user-driven control changes and external updates from the
+    // StopList component or any other consumer).
+    lineMapSelection.listen(() => {
+      populateControls();
+      renderSelection();
     });
 
     bootstrap();
