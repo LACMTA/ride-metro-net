@@ -64,7 +64,7 @@ const esriKey = import.meta.env.ESRI_KEY;
     setLineMapGeoJson,
     setServiceType,
     setSplitLineNumber,
-    setSelectedIndex,
+    setDirectionId,
     getFilteredShapes,
   } from "../lib/lineMapStore";
 
@@ -216,15 +216,36 @@ const esriKey = import.meta.env.ESRI_KEY;
         serviceTypeControl.hidden = true;
       }
 
-      // Direction selector
-      const filtered = getFilteredShapes(geojson, selection);
-      shapeSelect.innerHTML = filtered
+      // Direction selector — options are keyed by GTFS direction_id (0 or 1)
+      // rather than array index, so the store can filter by direction.
+      // We need all features matching the service type + split-line (ignoring
+      // direction) to populate the dropdown with one option per direction.
+      const allForDirections = geojson.features.filter(
+        (f) =>
+          f.properties.serviceType === selection.serviceType &&
+          (selection.splitLineNumber === null ||
+            f.properties.splitLineNumber === selection.splitLineNumber),
+      );
+      // Deduplicate by direction_id, keeping the first feature for each.
+      const seenDirs = new Set<number>();
+      const dirOptions: RouteShapeFeature[] = [];
+      for (const f of allForDirections) {
+        const dirId = f.properties.directionIds[0] ?? 0;
+        if (!seenDirs.has(dirId)) {
+          seenDirs.add(dirId);
+          dirOptions.push(f);
+        }
+      }
+      dirOptions.sort(
+        (a, b) => (a.properties.directionIds[0] ?? 0) - (b.properties.directionIds[0] ?? 0),
+      );
+      shapeSelect.innerHTML = dirOptions
         .map(
-          (f, i) =>
-            `<option value="${i}">${shapeOptionLabel(f)}</option>`,
+          (f) =>
+            `<option value="${f.properties.directionIds[0] ?? 0}">${shapeOptionLabel(f)}</option>`,
         )
         .join("");
-      shapeSelect.value = "0";
+      shapeSelect.value = String(selection.directionId);
     }
 
     function renderSelection() {
@@ -236,7 +257,7 @@ const esriKey = import.meta.env.ESRI_KEY;
       const filtered = getFilteredShapes(geojson, selection);
       if (filtered.length === 0) return;
 
-      const feature = filtered[selection.selectedIndex] ?? filtered[0];
+      const feature = filtered[0];
 
       // Remove previous shape and stop layers.
       if (state.shapeLayer) {
@@ -322,7 +343,7 @@ const esriKey = import.meta.env.ESRI_KEY;
       setServiceType((e.target as HTMLSelectElement).value as "core" | "owl");
     });
     shapeSelect.addEventListener("change", (e) => {
-      setSelectedIndex(Number((e.target as HTMLSelectElement).value));
+      setDirectionId(Number((e.target as HTMLSelectElement).value));
     });
 
     // Re-render the map whenever the selection store changes (this covers

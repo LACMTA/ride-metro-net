@@ -20,14 +20,14 @@ export interface LineMapSelection {
   serviceType: "core" | "owl";
   /** For split-line routes: the selected sub-line number, or `null`. */
   splitLineNumber: string | null;
-  /** Index into the filtered features array (the "To:" / direction selector). */
-  selectedIndex: number;
+  /** GTFS `direction_id` (0 or 1) for the selected trip. */
+  directionId: number;
 }
 
 export const lineMapSelection = atom<LineMapSelection>({
   serviceType: "core",
   splitLineNumber: null,
-  selectedIndex: 0,
+  directionId: 0,
 });
 
 // ---------------------------------------------------------------------------
@@ -50,13 +50,13 @@ export function setLineMapGeoJson(data: RouteShapesGeoJSON): void {
   lineMapSelection.set({
     serviceType: "core",
     splitLineNumber,
-    selectedIndex: 0,
+    directionId: 0,
   });
 }
 
 export function setServiceType(serviceType: "core" | "owl"): void {
   const sel = lineMapSelection.get();
-  lineMapSelection.set({ ...sel, serviceType, selectedIndex: 0 });
+  lineMapSelection.set({ ...sel, serviceType, directionId: 0 });
 }
 
 export function setSplitLineNumber(splitLineNumber: string | null): void {
@@ -65,13 +65,13 @@ export function setSplitLineNumber(splitLineNumber: string | null): void {
     ...sel,
     splitLineNumber,
     serviceType: "core",
-    selectedIndex: 0,
+    directionId: 0,
   });
 }
 
-export function setSelectedIndex(selectedIndex: number): void {
+export function setDirectionId(directionId: number): void {
   const sel = lineMapSelection.get();
-  lineMapSelection.set({ ...sel, selectedIndex });
+  lineMapSelection.set({ ...sel, directionId });
 }
 
 // ---------------------------------------------------------------------------
@@ -80,8 +80,8 @@ export function setSelectedIndex(selectedIndex: number): void {
 
 /**
  * Returns the features from `geojson` that match the current selection's
- * service type and split-line number. Used by both the Leaflet map script
- * and the React stop list to derive the visible shapes/stops.
+ * service type, split-line number, and direction. Used by both the Leaflet
+ * map script and the React stop list to derive the visible shapes/stops.
  */
 export function getFilteredShapes(
   geojson: RouteShapesGeoJSON,
@@ -91,13 +91,15 @@ export function getFilteredShapes(
     (f) =>
       f.properties.serviceType === selection.serviceType &&
       (selection.splitLineNumber === null ||
-        f.properties.splitLineNumber === selection.splitLineNumber),
+        f.properties.splitLineNumber === selection.splitLineNumber) &&
+      (f.properties.directionIds[0] ?? 0) === selection.directionId,
   );
 }
 
 /**
  * Returns the single feature corresponding to the current selection, or
- * `null` if no features match.
+ * `null` if no features match. If multiple features match (a data/config
+ * error), the first is returned but the ambiguity should be investigated.
  */
 export function getSelectedShape(
   geojson: RouteShapesGeoJSON,
@@ -105,5 +107,5 @@ export function getSelectedShape(
 ): RouteShapeFeature | null {
   const filtered = getFilteredShapes(geojson, selection);
   if (filtered.length === 0) return null;
-  return filtered[selection.selectedIndex] ?? filtered[0];
+  return filtered[0];
 }
