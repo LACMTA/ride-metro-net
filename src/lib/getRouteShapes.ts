@@ -1,5 +1,7 @@
 import { getGtfsDb } from "./gtfsConfig";
 import { getLineMapTripList } from "./getLineMapTrips";
+import { getAgencyIdsByFlag } from "./agencies";
+import { resolveRouteShortName } from "./routeShortNameOverrides";
 import type Database from "better-sqlite3";
 
 /**
@@ -22,6 +24,16 @@ export interface RouteShapesGeoJSON {
   features: RouteShapeFeature[];
 }
 
+export interface ConnectingRoute {
+  /** Normalized numeric route ID prefix (e.g. "801"). */
+  routeId: string;
+  /** Resolved display name (e.g. "A" for rail, "720" for bus). */
+  routeShortName: string;
+  routeType: number;
+  routeColor: string;
+  routeTextColor: string;
+}
+
 export interface RouteStop {
   stopId: string;
   stopName: string;
@@ -33,6 +45,11 @@ export interface RouteStop {
    * which are generated for parent stops rather than child/platform stops.
    */
   parentStationId: string;
+  /**
+   * Other Metro lines that serve this stop's parent station (i.e. lines
+   * that "intersect" here). Empty when no other line shares the station.
+   */
+  connections: ConnectingRoute[];
 }
 
 export interface RouteShapeFeature {
@@ -79,6 +96,15 @@ interface StopRow {
 interface TripRow {
   shape_id: string;
   direction_id: number | null;
+}
+
+interface ConnectionRow {
+  parentStationId: string;
+  route_id: string;
+  route_short_name: string;
+  route_type: number;
+  route_color: string;
+  route_text_color: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +191,7 @@ const _stmts: Partial<{
   shapePoints: Database.Statement;
   shapeStops: Database.Statement;
   shapeStopsFiltered: Database.Statement;
+  connections: Database.Statement;
 }> = {};
 
 function getTripQuery() {
@@ -217,6 +244,55 @@ function getTripStopsFilteredQuery() {
   `));
 }
 
+/**
+ * Returns all distinct Metro routes serving any stop under the given parent
+ * station IDs. A route "serves" a parent station when it has at least one
+ * trip that picks up or drops off at a child stop of that station (or at
+ * the standalone stop itself when there is no parent).
+ *
+ * The `@parentIdsJson` parameter is a JSON array of parent station IDs,
+ * passed to SQLite's `json_each()` so the query runs once for an entire
+ * route regardless of stop count.
+ */
+function getConnectionsQuery() {
+  // Use named parameters for both inputs — better-sqlite3 does not support
+  // mixing named (@) and positional (?) placeholders in one statement.
+  return (_stmts.connections ??= getGtfsDb().prepare(`
+    WITH parent_ids AS (
+      SELECT value AS parent_id FROM json_each(@parentIdsJson)
+    ),
+    agency_ids AS (
+      SELECT value AS agency_id FROM json_each(@agencyIdsJson)
+    ),
+    relevant_stops AS (
+      -- Child stops whose parent_station is in our set
+      SELECT s.stop_id, s.parent_station AS parent_id
+      FROM stops s
+      WHERE s.parent_station IN (SELECT parent_id FROM parent_ids)
+      UNION ALL
+      -- Standalone stops whose own stop_id is in our set (no parent_station)
+      SELECT s.stop_id, s.stop_id AS parent_id
+      FROM stops s
+      WHERE s.stop_id IN (SELECT parent_id FROM parent_ids)
+        AND (s.parent_station IS NULL OR s.parent_station = '')
+    )
+    SELECT DISTINCT
+      rs.parent_id AS parentStationId,
+      r.route_id,
+      r.route_short_name,
+      r.route_type,
+      COALESCE(r.route_color, '') AS route_color,
+      COALESCE(r.route_text_color, '') AS route_text_color
+    FROM relevant_stops rs
+    JOIN stop_times st ON st.stop_id = rs.stop_id
+      AND (st.pickup_type = 0 OR st.drop_off_type = 0)
+    JOIN trips t ON t.trip_id = st.trip_id
+    JOIN routes r ON r.route_id = t.route_id
+    WHERE r.agency_id IN (SELECT agency_id FROM agency_ids)
+      AND r.route_long_name IS NOT NULL AND r.route_long_name != ''
+  `));
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -244,6 +320,10 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | nu
   let hasOwlService = false;
   let isSplitline = false;
 
+  // Collect all unique parent station IDs across every trip so we can
+  // resolve connecting lines in a single query after the loop.
+  const allParentIds = new Set<string>();
+
   for (const tripConfig of trips) {
     const tripRow = tripQuery.get(tripConfig.tripId) as TripRow | undefined;
     if (!tripRow || !tripRow.shape_id) {
@@ -269,13 +349,19 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | nu
     const allCoords = shapePoints.map(
       (p) => [p.shape_pt_lon, p.shape_pt_lat] as [number, number],
     );
-    const routeStops = stops.map((s) => ({
-      stopId: s.stop_id,
-      stopName: s.stop_name,
-      lat: s.stop_lat,
-      lon: s.stop_lon,
-      parentStationId: s.parent_station || s.stop_id,
-    }));
+    const routeStops = stops.map((s) => {
+      const parentStationId = s.parent_station || s.stop_id;
+      allParentIds.add(parentStationId);
+      return {
+        stopId: s.stop_id,
+        stopName: s.stop_name,
+        lat: s.stop_lat,
+        lon: s.stop_lon,
+        parentStationId,
+        // Placeholder — populated after the connecting-routes query below.
+        connections: [] as ConnectingRoute[],
+      };
+    });
 
     // Trim the polyline to match the first and last stops. This ensures the
     // shape doesn't extend beyond the terminal stops — important for
@@ -303,10 +389,78 @@ export default function getRouteShapes(routeId: string): RouteShapesGeoJSON | nu
     features.push(feature);
   }
 
+  // -----------------------------------------------------------------------
+  // Resolve connecting lines: for each parent station, find all other Metro
+  // lines that serve any stop under that parent. The current route is then
+  // filtered out in JS.
+  // -----------------------------------------------------------------------
+  const connectionsByParent = buildConnectionsMap(
+    getConnectionsQuery(),
+    allParentIds,
+  );
+
+  const routeIdPrefix = routeId.split("-")[0];
+
+  for (const feature of features) {
+    for (const stop of feature.properties.stops) {
+      const all = connectionsByParent.get(stop.parentStationId);
+      if (all) {
+        stop.connections = all.filter(
+          (c) => c.routeId !== routeIdPrefix,
+        );
+      }
+    }
+  }
+
   return {
     type: "FeatureCollection",
     hasOwlService,
     isSplitline,
     features,
   };
+}
+
+/**
+ * Runs the connecting-routes query for a set of parent station IDs and
+ * returns a `Map<parentStationId, ConnectingRoute[]>` with route IDs
+ * normalized to their stable numeric prefix and short names resolved.
+ */
+function buildConnectionsMap(
+  stmt: Database.Statement,
+  parentIds: Set<string>,
+): Map<string, ConnectingRoute[]> {
+  const map = new Map<string, ConnectingRoute[]>();
+  if (parentIds.size === 0) return map;
+
+  const agencyIds = getAgencyIdsByFlag("buildLinePages");
+  const rows = stmt.all({
+    parentIdsJson: JSON.stringify([...parentIds]),
+    agencyIdsJson: JSON.stringify(agencyIds),
+  }) as ConnectionRow[];
+
+  // Deduplicate by (parentStationId, numeric routeId prefix) since a route
+  // may appear under multiple versioned route_ids at the same station.
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const prefix = row.route_id.split("-")[0];
+    const dedupeKey = `${row.parentStationId}:${prefix}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const route: ConnectingRoute = {
+      routeId: prefix,
+      routeShortName: resolveRouteShortName(row.route_id, row.route_short_name || ""),
+      routeType: row.route_type,
+      routeColor: row.route_color,
+      routeTextColor: row.route_text_color,
+    };
+    let list = map.get(row.parentStationId);
+    if (!list) {
+      list = [];
+      map.set(row.parentStationId, list);
+    }
+    list.push(route);
+  }
+
+  return map;
 }
