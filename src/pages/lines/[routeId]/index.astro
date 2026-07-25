@@ -60,6 +60,7 @@ const lineColor = route.routeColor
   import type { RouteWithInfo } from "../../../lib/getRouteById";
   import watchAlerts from "../../../lib/watchAlerts";
   import { setLineMapGeoJson } from "../../../lib/lineMapStore";
+  import { hydrationGate } from "../../../lib/hydrationGate";
 
   const route = getData("data-route") as RouteWithInfo;
 
@@ -71,6 +72,12 @@ const lineColor = route.routeColor
   ]);
 
   // Fetch the route shape GeoJSON and populate the shared nanostore.
+  // The fetch starts immediately (in parallel with hydration), but the
+  // store write is deferred until the hydration gate opens — the same
+  // pattern used by watchAlerts/watchPredictions/watchAlertStatus — to
+  // prevent a fast (cached) response from updating the store while
+  // React is still reconciling SSR HTML, which would cause a hydration
+  // mismatch in LineMapControls and StopList.
   fetch(`/api/route-shape/${route.routeId}.json`)
     .then((res) => {
       if (!res.ok) {
@@ -78,7 +85,10 @@ const lineColor = route.routeColor
       }
       return res.json();
     })
-    .then((data) => setLineMapGeoJson(data))
+    .then(async (data) => {
+      await hydrationGate;
+      setLineMapGeoJson(data);
+    })
     .catch((err) => console.error("Failed to load route shape:", err));
 </script>
 
