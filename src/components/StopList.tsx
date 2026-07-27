@@ -61,10 +61,7 @@ export default function StopList({ lineColor }: StopListProps) {
       aria-label="Stops on this route"
     >
       {stops.map((stop, index) => (
-        <li
-          key={stop.stopId}
-          className="flex items-stretch gap-3 px-4"
-        >
+        <li key={stop.stopId} className="flex items-stretch gap-3 px-4">
           {/* Dot rail: fixed-width column containing the stop dot with
               vertical connector lines above (except first stop) and below
               (except last stop). Connectors are absolutely positioned so
@@ -106,7 +103,7 @@ export default function StopList({ lineColor }: StopListProps) {
           <div className="flex flex-col gap-1 py-4">
             <a
               href={`/stops/${stop.parentStationId ?? stop.stopId}/`}
-              className="text-metro-text hover:text-metro-blue font-bold hover:underline"
+              className="text-metro-text hover:text-link-hover font-bold hover:underline"
             >
               {stop.stopName}
             </a>
