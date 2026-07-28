@@ -16,11 +16,10 @@ import LineMap from "../../../components/LineMap.astro";
 import StopList from "../../../components/StopList";
 import { getLineMapTrips } from "../../../lib/getLineMapTrips";
 
-export const prerender = true;
+export const prerender = false;
 
-export async function getStaticPaths() {
-  return getLineStaticPaths();
-}
+// Alerts-only launch: line "Maps & Schedules" pages are disabled.
+return new Response(null, { status: 404 });
 
 const { routeId } = Astro.params;
 const { numericId } = Astro.props as { numericId: string };
