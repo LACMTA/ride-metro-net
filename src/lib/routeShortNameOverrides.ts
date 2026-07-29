@@ -19,12 +19,13 @@ export const ROUTE_SHORT_NAME_OVERRIDES: Record<string, string> = {
  * Inverse of ROUTE_SHORT_NAME_OVERRIDES, used to resolve a lettered URL slug
  * (e.g. "a") back to the stable numeric prefix (e.g. "801") for DB lookups.
  */
-export const ROUTE_ID_BY_SHORT_NAME: Record<string, string> = Object.fromEntries(
-  Object.entries(ROUTE_SHORT_NAME_OVERRIDES).map(([id, letter]) => [
-    letter.toLowerCase(),
-    id,
-  ]),
-);
+export const ROUTE_ID_BY_SHORT_NAME: Record<string, string> =
+  Object.fromEntries(
+    Object.entries(ROUTE_SHORT_NAME_OVERRIDES).map(([id, letter]) => [
+      letter.toLowerCase(),
+      id,
+    ]),
+  );
 
 /**
  * Route ID prefixes that the GTFS lists as bus (type 3) but which Metro

@@ -1,8 +1,5 @@
 import { atom } from "nanostores";
-import type {
-  RouteShapesGeoJSON,
-  RouteShapeFeature,
-} from "./getRouteShapes";
+import type { RouteShapesGeoJSON, RouteShapeFeature } from "./getRouteShapes";
 
 /**
  * The full GeoJSON shape data for the current route's line map.

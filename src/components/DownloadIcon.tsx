@@ -12,7 +12,10 @@ export default function DownloadIcon({ className = "text-metro-text" }: Props) {
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      <path d="M14 6H10V0H4V6H0L7 13L14 6ZM0 15V17H14V15H0Z" fill="currentColor" />
+      <path
+        d="M14 6H10V0H4V6H0L7 13L14 6ZM0 15V17H14V15H0Z"
+        fill="currentColor"
+      />
     </svg>
   );
 }

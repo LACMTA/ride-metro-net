@@ -46,7 +46,6 @@ interface ChildStopRow {
 let preparedQuery: Database.Statement | null = null;
 let preparedChildStopsQuery: Database.Statement | null = null;
 
-
 const query = `
     WITH
     -- Collect the stop itself plus any child stops (when @stopId is a parent station).

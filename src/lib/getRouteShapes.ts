@@ -1,7 +1,10 @@
 import { getGtfsDb } from "./gtfsConfig";
 import { getLineMapTripList } from "./getLineMapTrips";
 import { getAgencyIdsByFlag } from "./agencies";
-import { resolveRouteShortName, isBuswayRoute } from "./routeShortNameOverrides";
+import {
+  resolveRouteShortName,
+  isBuswayRoute,
+} from "./routeShortNameOverrides";
 import type Database from "better-sqlite3";
 
 // ---------------------------------------------------------------------------

@@ -1,13 +1,71 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import SystemMap from "../components/SystemMap.astro";
+import getAllRouteShapes from "../lib/getAllRouteShapes";
+import { getLineSlug, isBuswayRoute } from "../lib/routeShortNameOverrides";
 
-Astro.response.status = 404;
-export const prerender = false;
+export const prerender = true;
+
+const systemShapes = await getAllRouteShapes();
 ---
 
-<Layout title="404 - Page Not Found">
-  <main class="flex flex-col items-center justify-center gap-4 py-24">
-    <h1 class="text-3xl font-bold text-black">Page not found</h1>
-    <a class="text-link" href="https://www.metro.net">Return to Metro.net</a>
-  </main>
+<Layout title="Metro System Map" fullHeight>
+  <div class="flex h-full flex-col lg:flex-row">
+    <!-- Sidebar / bottom panel -->
+    <aside
+      class="bg-background-white border-border-light flex shrink-0 flex-col overflow-y-auto border-b lg:w-80 lg:border-r lg:border-b-0"
+    >
+      <div class="p-4">
+        <h1 class="text-2xl font-bold">Metro System Map</h1>
+        <p class="text-secondary-text mt-1 text-sm">Rail & Busway lines</p>
+      </div>
+      <nav class="flex-1 px-4 pb-4">
+        <ul class="space-y-2">
+          {
+            systemShapes.features.map((feature) => {
+              const { routeId, routeShortName, routeType, color } =
+                feature.properties;
+              const slug = getLineSlug(routeId);
+              const isRail = routeType !== 3;
+              const isBusway = isBuswayRoute(routeId);
+              const label =
+                isRail || isBusway
+                  ? `${routeShortName} Line`
+                  : `Line ${routeShortName}`;
+              const badgeShape = isBusway
+                ? "" // square for busway
+                : isRail
+                  ? "rounded-full"
+                  : "rounded-lg";
+              const badgeColor =
+                isRail || isBusway
+                  ? `background-color: ${color}; color: #fff;`
+                  : "";
+              return (
+                <li>
+                  <a
+                    href={`/lines/${slug}`}
+                    class="flex items-center gap-3 rounded p-2 hover:bg-gray-100"
+                  >
+                    <span
+                      class={`inline-flex h-8 w-8 shrink-0 items-center justify-center text-lg font-bold ${badgeShape}`}
+                      style={badgeColor}
+                    >
+                      {routeShortName}
+                    </span>
+                    <span class="text-sm font-medium">{label}</span>
+                  </a>
+                </li>
+              );
+            })
+          }
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Full-bleed map -->
+    <div class="flex-1 overflow-hidden">
+      <SystemMap shapes={systemShapes} />
+    </div>
+  </div>
 </Layout>

@@ -215,8 +215,11 @@ export async function GET(context: import("astro").APIContext) {
 
     routePred.destinations = [];
     for (const dirDests of byDirection.values()) {
-      const all: { time: number; dest: (typeof dirDests)[0]; pred: Prediction }[] =
-        [];
+      const all: {
+        time: number;
+        dest: (typeof dirDests)[0];
+        pred: Prediction;
+      }[] = [];
       for (const dest of dirDests)
         for (const pred of dest.predictions)
           all.push({ time: pred.time, dest, pred });

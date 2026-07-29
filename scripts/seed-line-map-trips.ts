@@ -40,7 +40,9 @@ const stmts = {
     FROM routes r
     JOIN trips t ON t.route_id = r.route_id
     WHERE r.route_long_name IS NOT NULL AND r.route_long_name != ''
-      AND r.agency_id IN (${getAgencyIdsByFlag("buildLinePages").map(() => "?").join(", ")})
+      AND r.agency_id IN (${getAgencyIdsByFlag("buildLinePages")
+        .map(() => "?")
+        .join(", ")})
     ORDER BY r.route_id
   `),
 
@@ -582,7 +584,10 @@ function processRoute(
 // ---------------------------------------------------------------------------
 
 const agencyIds = getAgencyIdsByFlag("buildLinePages");
-const allRoutes = stmts.allRoutes.all.apply(stmts.allRoutes, agencyIds) as unknown as { route_id: string }[];
+const allRoutes = stmts.allRoutes.all.apply(
+  stmts.allRoutes,
+  agencyIds,
+) as unknown as { route_id: string }[];
 
 const uniquePrefixes = [
   ...new Set(allRoutes.map((route) => route.route_id.split("-")[0])),
@@ -600,4 +605,6 @@ for (const numericPrefix of uniquePrefixes) {
 const outputPath = "src/data/lineMapTrips.json";
 writeFileSync(outputPath, JSON.stringify(config, null, 2) + "\n");
 
-console.log(`Wrote ${Object.keys(config).length} route configs to ${outputPath}`);
+console.log(
+  `Wrote ${Object.keys(config).length} route configs to ${outputPath}`,
+);

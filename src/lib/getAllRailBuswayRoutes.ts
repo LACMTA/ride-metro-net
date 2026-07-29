@@ -1,6 +1,6 @@
 import { getGtfsDb } from "./gtfsConfig";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
-import { getAgencyIdsByFlag } from "./agencies";
+import { getAgencyIdsByFlag, getAgencySettings } from "./agencies";
 import type { RouteWithInfo } from "./getRouteById";
 
 interface DbRow {
@@ -21,7 +21,9 @@ interface DbRow {
  * Busway routes are GTFS type 3 but are operated on dedicated busways and
  * displayed alongside rail lines throughout the app.
  */
-export default async function getAllRailBuswayRoutes(): Promise<RouteWithInfo[]> {
+export default async function getAllRailBuswayRoutes(): Promise<
+  RouteWithInfo[]
+> {
   const db = getGtfsDb();
 
   const agencyIds = getAgencyIdsByFlag("showInAlertsIndex");
@@ -31,6 +33,7 @@ export default async function getAllRailBuswayRoutes(): Promise<RouteWithInfo[]>
     .prepare(
       `
       SELECT
+        r.agency_id,
         r.route_id,
         r.route_short_name,
         r.route_long_name,
@@ -64,6 +67,7 @@ export default async function getAllRailBuswayRoutes(): Promise<RouteWithInfo[]>
 
   return unique.map((row) => {
     const prefix = row.route_id.split("-")[0];
+    const agencySettings = getAgencySettings(row.agency_id);
     return {
       routeId: prefix,
       routeShortName: resolveRouteShortName(
@@ -74,6 +78,7 @@ export default async function getAllRailBuswayRoutes(): Promise<RouteWithInfo[]>
       routeType: row.route_type,
       routeColor: row.route_color,
       routeTextColor: row.route_text_color,
+      defaultLineColor: agencySettings?.lineColor ?? "",
     };
   });
 }

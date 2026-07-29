@@ -1,0 +1,83 @@
+---
+import DataInjector from "./DataInjector.astro";
+import type { SystemRouteShapes } from "../lib/getAllRouteShapes";
+
+interface Props {
+  shapes: SystemRouteShapes;
+}
+
+const { shapes } = Astro.props;
+const esriKey = import.meta.env.ESRI_KEY;
+---
+
+<DataInjector data={shapes} id="data-system-shapes" />
+<div class="h-full w-full" data-system-map data-esri-key={esriKey}>
+  <div
+    class="h-full w-full"
+    aria-label="Map of Metro rail and busway lines"
+    role="img"
+    data-map-container
+  >
+  </div>
+</div>
+
+<script>
+  import { createMap } from "../lib/createMap";
+  import { getData } from "../lib/getData";
+  import type { SystemRouteShapes } from "../lib/getAllRouteShapes";
+  import { getLineSlug } from "../lib/routeShortNameOverrides";
+
+  function initSystemMap(container: HTMLElement): void {
+    const esriKey = container.dataset.esriKey!;
+    const mapContainer = container.querySelector(
+      "[data-map-container]",
+    ) as HTMLElement;
+
+    const shapes = getData("data-system-shapes") as SystemRouteShapes;
+
+    async function bootstrap() {
+      const { L, map } = await createMap(mapContainer, esriKey);
+
+      if (shapes.features.length === 0) return;
+
+      const allLatLngs: [number, number][] = [];
+
+      for (const feature of shapes.features) {
+        const color = feature.properties.color;
+        const routeId = feature.properties.routeId;
+        const routeShortName = feature.properties.routeShortName;
+        const slug = getLineSlug(routeId);
+
+        // Collect lat/lngs for bounds-fitting.
+        for (const [lon, lat] of feature.geometry.coordinates) {
+          allLatLngs.push([lat, lon]);
+        }
+
+        // Render the route polyline, colored by line color.
+        L.geoJSON(feature, {
+          style: {
+            color,
+            weight: 5,
+            opacity: 0.9,
+          },
+        })
+          .bindPopup(
+            `<a href="/lines/${slug}" style="font-weight:bold;color:${color}">${routeShortName} Line</a>`,
+          )
+          .addTo(map);
+      }
+
+      // Fit the map to all route shapes.
+      if (allLatLngs.length > 0) {
+        map.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });
+      }
+    }
+
+    bootstrap();
+  }
+
+  // Initialise all system map containers on the page.
+  document.querySelectorAll("[data-system-map]").forEach((el) => {
+    initSystemMap(el as HTMLElement);
+  });
+</script>
