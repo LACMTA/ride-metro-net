@@ -67,6 +67,30 @@ const esriKey = import.meta.env.ESRI_KEY;
           .addTo(map);
       }
 
+      // Render a circle marker for each unique station across all lines.
+      // Deduplicate by parentStationId so shared stations (e.g. Union Station)
+      // only appear once on the map.
+      const seenStations = new Set<string>();
+      for (const feature of shapes.features) {
+        for (const stop of feature.properties.stops ?? []) {
+          if (seenStations.has(stop.parentStationId)) continue;
+          seenStations.add(stop.parentStationId);
+
+          L.circleMarker([stop.lat, stop.lon], {
+            radius: 4,
+            fillColor: "#ffffff",
+            color: "#1a1a1a",
+            weight: 1.5,
+            opacity: 1,
+            fillOpacity: 1,
+          })
+            .bindPopup(
+              `<a href="/stops/${stop.parentStationId}" style="font-weight:600">${stop.stopName}</a>`,
+            )
+            .addTo(map);
+        }
+      }
+
       // Fit the map to all route shapes.
       if (allLatLngs.length > 0) {
         map.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });

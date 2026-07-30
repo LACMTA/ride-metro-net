@@ -26,7 +26,27 @@ export interface SystemRouteFeature {
     mode: "rail" | "busway";
     /** Resolved CSS color string with leading `#`. */
     color: string;
+    /**
+     * Ordered list of stops served by this route's displayed shape. Only the
+     * fields needed for map rendering and linking are included — the
+     * `connections` field from {@link RouteStop} is stripped to keep the
+     * prerendered payload small.
+     */
+    stops: SystemStop[];
   };
+}
+
+/**
+ * Minimal stop data for the system-wide map — enough to render a marker,
+ * show a popup label, and link to the stop page. The heavier `connections`
+ * field from {@link RouteStop} is intentionally omitted.
+ */
+export interface SystemStop {
+  stopId: string;
+  stopName: string;
+  lat: number;
+  lon: number;
+  parentStationId: string;
 }
 
 /**
@@ -92,6 +112,13 @@ export default async function getAllRouteShapes(): Promise<SystemRouteShapes> {
         routeType: route.routeType,
         mode: isBuswayRoute(route.routeId) ? "busway" : "rail",
         color: resolveLineColor(route),
+        stops: feature.properties.stops.map((s) => ({
+          stopId: s.stopId,
+          stopName: s.stopName,
+          lat: s.lat,
+          lon: s.lon,
+          parentStationId: s.parentStationId,
+        })),
       },
     });
   }
