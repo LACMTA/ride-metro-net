@@ -41,11 +41,20 @@ const esriKey = import.meta.env.ESRI_KEY;
     getFilteredShapes,
   } from "../lib/lineMapStore";
   import { createMap } from "../lib/createMap";
+  import {
+    makeCasingLayer,
+    makeLineLayer,
+    makeStopLayer,
+    makePopupOptions,
+    attachPopupHandlers,
+    fitBoundsToCoords,
+  } from "../lib/mapStyles";
   import type { Map as MLMap } from "maplibre-gl";
   import type { FeatureCollection, LineString, Point } from "geojson";
 
   /** Unique source/layer IDs for the line map. */
   const SHAPES_SOURCE = "line-shapes";
+  const CASING_LAYER = "line-casing";
   const GHOST_LAYER = "line-ghost";
   const SELECTED_LAYER = "line-selected";
   const STOPS_SOURCE = "line-stops";
@@ -85,41 +94,39 @@ const esriKey = import.meta.env.ESRI_KEY;
       map.on("load", () => {
         state!.loaded = true;
 
-        // --- Shape source (ghost + selected share one source) ---
+        // --- Shape source (casing + ghost + selected share one source) ---
         map.addSource(SHAPES_SOURCE, {
           type: "geojson",
           data: emptyLineCollection(),
         });
+
+        // White casing layer — drawn beneath both ghost and selected lines
+        // for visual separation of overlapping segments, consistent with
+        // the system map.
+        map.addLayer(
+          makeCasingLayer(CASING_LAYER, SHAPES_SOURCE, { offset: null }),
+        );
 
         // Ghost layer: features that differ from the current selection in
         // exactly one dimension — the unselected split-line side (same
         // service type) or the unselected service type (same split-line,
         // e.g. owl when core is selected). Rendered as a lightened tint at
         // full opacity so overlapping ghost lines don't darken each other.
-        map.addLayer({
-          id: GHOST_LAYER,
-          type: "line",
-          source: SHAPES_SOURCE,
-          filter: ["==", ["get", "isGhost"], true],
-          paint: {
-            "line-color": lightenColor(lineColor, 0.5),
-            "line-width": 6,
-            "line-opacity": 1,
-          },
-        });
+        map.addLayer(
+          makeLineLayer(GHOST_LAYER, SHAPES_SOURCE, {
+            color: lightenColor(lineColor, 0.5),
+            filter: ["==", ["get", "isGhost"], true],
+            opacity: 1,
+          }),
+        );
 
         // Selected line layer — rendered on top of the ghost.
-        map.addLayer({
-          id: SELECTED_LAYER,
-          type: "line",
-          source: SHAPES_SOURCE,
-          filter: ["==", ["get", "isGhost"], false],
-          paint: {
-            "line-color": lineColor,
-            "line-width": 6,
-            "line-opacity": 0.9,
-          },
-        });
+        map.addLayer(
+          makeLineLayer(SELECTED_LAYER, SHAPES_SOURCE, {
+            color: lineColor,
+            filter: ["==", ["get", "isGhost"], false],
+          }),
+        );
 
         // --- Stops ---
         map.addSource(STOPS_SOURCE, {
@@ -127,42 +134,16 @@ const esriKey = import.meta.env.ESRI_KEY;
           data: emptyPointCollection(),
         });
 
-        map.addLayer({
-          id: STOPS_LAYER,
-          type: "circle",
-          source: STOPS_SOURCE,
-          paint: {
-            "circle-radius": 5,
-            "circle-color": "#ffffff",
-            "circle-stroke-color": lineColor,
-            "circle-stroke-width": 3,
-            "circle-opacity": 1,
-          },
-        });
+        map.addLayer(
+          makeStopLayer(STOPS_LAYER, STOPS_SOURCE, {
+            strokeColor: lineColor,
+          }),
+        );
 
         // --- Stop popups ---
-        const popup = new maplibregl.Popup({
-          closeButton: false,
-          closeOnClick: true,
-        });
+        const popup = new maplibregl.Popup(makePopupOptions());
 
-        map.on("click", STOPS_LAYER, (e) => {
-          const feature = e.features?.[0];
-          if (!feature) return;
-          const stopName = feature.properties?.stopName;
-          if (typeof stopName === "string") {
-            popup.setHTML(`<strong>${stopName}</strong>`);
-            popup.setLngLat(e.lngLat);
-            popup.addTo(map);
-          }
-        });
-
-        map.on("mouseenter", STOPS_LAYER, () => {
-          map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", STOPS_LAYER, () => {
-          map.getCanvas().style.cursor = "";
-        });
+        attachPopupHandlers(map, STOPS_LAYER, popup);
 
         // Render any data that arrived while we were setting up.
         if (state!.pendingRender) {

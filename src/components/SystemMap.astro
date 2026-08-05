@@ -27,11 +27,20 @@ const esriKey = import.meta.env.ESRI_KEY;
   import type { SystemMapData } from "../lib/getAllRouteShapes";
   import type { FeatureCollection, LineString, Point } from "geojson";
   import { getLineSlug } from "../lib/routeShortNameOverrides";
+  import {
+    makeCasingLayer,
+    makeLineLayer,
+    makeStopLayer,
+    makePopupOptions,
+    attachPopupHandlers,
+    fitBoundsToCoords,
+    STOP_STROKE_DARK,
+  } from "../lib/mapStyles";
 
   /**
    * Pixel spacing between adjacent side-by-side lines. Offset slots from the
    * build-time processor are ±1, ±2, … in steps of 2, so the visual gap
-   * between two co-running 5px lines is `2 * OFFSET_STEP_PX`.
+   * between two co-running 6px lines is `2 * OFFSET_STEP_PX`.
    */
   const OFFSET_STEP_PX = 3;
 
@@ -106,8 +115,6 @@ const esriKey = import.meta.env.ESRI_KEY;
               coordinates: [station.lon, station.lat],
             },
             properties: {
-              lineCount: station.lineCount,
-              radius: station.lineCount > 1 ? 4 + station.lineCount * 1.75 : 4,
               popupHtml:
                 `<a href="/stops/${station.stationId}" style="font-weight:600">${station.stopName}</a>` +
                 (lineBadges
@@ -128,38 +135,15 @@ const esriKey = import.meta.env.ESRI_KEY;
 
         // White casing layer — drawn underneath for visual separation of
         // overlapping lines.
-        map.addLayer({
-          id: CASING_LAYER,
-          type: "line",
-          source: LINES_SOURCE,
-          layout: {
-            "line-join": "round",
-            "line-cap": "round",
-          },
-          paint: {
-            "line-color": "#ffffff",
-            "line-width": 7,
-            "line-opacity": 1,
-            "line-offset": ["get", "offset"],
-          },
-        });
+        map.addLayer(makeCasingLayer(CASING_LAYER, LINES_SOURCE));
 
         // Colored line layer — drawn on top of the casing.
-        map.addLayer({
-          id: LINES_LAYER,
-          type: "line",
-          source: LINES_SOURCE,
-          layout: {
-            "line-join": "round",
-            "line-cap": "round",
-          },
-          paint: {
-            "line-color": ["get", "color"],
-            "line-width": 5,
-            "line-opacity": 0.9,
-            "line-offset": ["get", "offset"],
-          },
-        });
+        map.addLayer(
+          makeLineLayer(LINES_LAYER, LINES_SOURCE, {
+            color: ["get", "color"],
+            offset: ["get", "offset"],
+          }),
+        );
 
         // --- Stations ---
         map.addSource(STATIONS_SOURCE, {
@@ -167,77 +151,23 @@ const esriKey = import.meta.env.ESRI_KEY;
           data: stationFeatures,
         });
 
-        map.addLayer({
-          id: STATIONS_LAYER,
-          type: "circle",
-          source: STATIONS_SOURCE,
-          paint: {
-            "circle-radius": ["get", "radius"],
-            "circle-color": "#ffffff",
-            "circle-stroke-color": "#1a1a1a",
-            "circle-stroke-width": [
-              "case",
-              [">", ["get", "lineCount"], 1],
-              2,
-              1.5,
-            ],
-            "circle-stroke-opacity": 1,
-            "circle-opacity": 1,
-          },
-        });
+        map.addLayer(
+          makeStopLayer(STATIONS_LAYER, STATIONS_SOURCE, {
+            strokeColor: STOP_STROKE_DARK,
+          }),
+        );
 
         // --- Popups ---
-        const popup = new maplibregl.Popup({
-          closeButton: false,
-          closeOnClick: true,
-        });
+        const popup = new maplibregl.Popup(makePopupOptions());
 
-        map.on("click", LINES_LAYER, (e) => {
-          const feature = e.features?.[0];
-          if (!feature) return;
-          const html = feature.properties?.popupHtml;
-          if (typeof html === "string") {
-            popup.setHTML(html);
-            popup.setLngLat(e.lngLat);
-            popup.addTo(map);
-          }
-        });
-
-        map.on("click", STATIONS_LAYER, (e) => {
-          const feature = e.features?.[0];
-          if (!feature) return;
-          const html = feature.properties?.popupHtml;
-          if (typeof html === "string") {
-            popup.setHTML(html);
-            popup.setLngLat(e.lngLat);
-            popup.addTo(map);
-          }
-        });
-
-        // Cursor feedback.
-        map.on("mouseenter", LINES_LAYER, () => {
-          map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", LINES_LAYER, () => {
-          map.getCanvas().style.cursor = "";
-        });
-        map.on("mouseenter", STATIONS_LAYER, () => {
-          map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", STATIONS_LAYER, () => {
-          map.getCanvas().style.cursor = "";
-        });
+        attachPopupHandlers(map, LINES_LAYER, popup);
+        attachPopupHandlers(map, STATIONS_LAYER, popup);
 
         // Fit bounds to all line coordinates.
-        const bounds = new maplibregl.LngLatBounds();
-        for (const feature of lineFeatures.features) {
-          for (const coord of feature.geometry.coordinates) {
-            bounds.extend(coord as [number, number]);
-          }
-        }
-        if (!bounds.isEmpty()) {
-          map.fitBounds(bounds, { padding: 20 });
-        }
+        const allCoords: [number, number][] = lineFeatures.features
+          .flatMap((f) => f.geometry.coordinates)
+          .map(([lng, lat]) => [lng, lat]);
+        fitBoundsToCoords(map, maplibregl, allCoords);
       });
     }
 
