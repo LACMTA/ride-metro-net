@@ -35,6 +35,15 @@ export interface SystemRouteLine {
 }
 
 /**
+ * A line serving a station, for rendering colored route badges in popups.
+ */
+export interface SystemStationLine {
+  routeShortName: string;
+  /** Resolved CSS color string with leading `#`. */
+  color: string;
+}
+
+/**
  * A unique station on the system map. Stations shared by multiple lines have
  * `lineCount > 1` and are rendered with a larger interchange marker.
  */
@@ -45,6 +54,8 @@ export interface SystemStation {
   lon: number;
   /** Number of system-map lines serving this station. */
   lineCount: number;
+  /** Lines serving this station, for popup badges. */
+  lines: SystemStationLine[];
 }
 
 /**
@@ -158,6 +169,13 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       lat: s.lat,
       lon: s.lon,
       lineCount: s.routes.size,
+      lines: [...s.routes].map((routeId) => {
+        const route = routeMeta.get(routeId)!;
+        return {
+          routeShortName: route.routeShortName,
+          color: resolveLineColor(route),
+        };
+      }),
     }),
   );
 

@@ -92,18 +92,30 @@ const esriKey = import.meta.env.ESRI_KEY;
       // -----------------------------------------------------------------
       const stationFeatures: FeatureCollection<Point> = {
         type: "FeatureCollection",
-        features: data.stations.map((station) => ({
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: [station.lon, station.lat],
-          },
-          properties: {
-            lineCount: station.lineCount,
-            radius: station.lineCount > 1 ? 4 + station.lineCount * 1.75 : 4,
-            popupHtml: `<a href="/stops/${station.stationId}" style="font-weight:600">${station.stopName}</a>`,
-          },
-        })),
+        features: data.stations.map((station) => {
+          const lineBadges = station.lines
+            .map(
+              (l) =>
+                `<span style="background:${l.color};color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">${l.routeShortName}</span>`,
+            )
+            .join("");
+          return {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [station.lon, station.lat],
+            },
+            properties: {
+              lineCount: station.lineCount,
+              radius: station.lineCount > 1 ? 4 + station.lineCount * 1.75 : 4,
+              popupHtml:
+                `<a href="/stops/${station.stationId}" style="font-weight:600">${station.stopName}</a>` +
+                (lineBadges
+                  ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${lineBadges}</div>`
+                  : ""),
+            },
+          };
+        }),
       };
 
       // Wait for the map style to load before adding sources/layers.

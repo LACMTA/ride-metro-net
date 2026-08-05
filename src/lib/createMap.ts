@@ -48,18 +48,27 @@ export async function createMap(
     center: DEFAULT_CENTER,
     zoom: DEFAULT_ZOOM,
     minZoom: 2,
-    attributionControl: { compact: true },
+    // Disable MapLibre's built-in AttributionControl so it doesn't conflict
+    // with the ESRI plugin's own AttributionControl (added by
+    // `BasemapStyle.applyStyle` via `_setEsriAttribution`). The plugin's
+    // `canAdd` method throws if it finds a MapLibre AttributionControl whose
+    // `customAttribution` is undefined, so we let the plugin own attribution.
+    attributionControl: false,
   };
 
   const map = new maplibregl.Map(options);
 
   // Apply the custom Metro-branded ESRI Vector Tile Style by item ID.
   // The plugin fetches the style JSON + vector tile sources and applies
-  // Esri/data attribution automatically.
+  // Esri/data attribution automatically. We pass `attributionControl` here so
+  // the plugin's own AttributionControl is compact and starts collapsed,
+  // avoiding MapLibre's built-in control (disabled above) which would
+  // otherwise conflict with the plugin's `canAdd` check.
   BasemapStyle.applyStyle(map, {
     map,
     style: ESRI_BASEMAP_ENUM,
     token: esriKey,
+    attributionControl: { compact: true, collapsed: true },
   });
 
   // Add zoom/rotate controls.

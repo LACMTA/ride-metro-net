@@ -415,10 +415,14 @@ function getNearbyConnectionsQuery() {
  * database for each trip's shape geometry and ordered stops.
  *
  * @param routeId Numeric route ID prefix (e.g. "801", "720").
+ * @param options When `skipConnections` is `true`, skips the expensive
+ *   connecting-lines and nearby-connections queries. Use for contexts that
+ *   only need shape geometry + stop coordinates (e.g. the system map).
  * @returns GeoJSON FeatureCollection, or `null` if no config exists.
  */
 export default function getRouteShapes(
   routeId: string,
+  options?: { skipConnections?: boolean },
 ): RouteShapesGeoJSON | null {
   const trips = getLineMapTripList(routeId);
   if (!trips || trips.length === 0) {
@@ -516,34 +520,40 @@ export default function getRouteShapes(
   // Resolve connecting lines: for each parent station, find all other Metro
   // lines that serve any stop under that parent. The current route is then
   // filtered out in JS.
+  //
+  // Skipped when `skipConnections` is set — the system map doesn't need
+  // per-stop connections (it shows lines served in the station popup using
+  // route metadata already collected by the caller).
   // -----------------------------------------------------------------------
-  // Compute agency IDs once and reuse for both connection queries.
-  const agencyIdsJson = JSON.stringify(getAgencyIdsByFlag("buildLinePages"));
+  if (!options?.skipConnections) {
+    // Compute agency IDs once and reuse for both connection queries.
+    const agencyIdsJson = JSON.stringify(getAgencyIdsByFlag("buildLinePages"));
 
-  const connectionsByParent = buildConnectionsMap(
-    getConnectionsQuery(),
-    allParentIds,
-    agencyIdsJson,
-  );
+    const connectionsByParent = buildConnectionsMap(
+      getConnectionsQuery(),
+      allParentIds,
+      agencyIdsJson,
+    );
 
-  // Merge in radius-based nearby-stop connections (lines serving stops
-  // within CONNECTION_RADIUS_METERS of each stop on the route).
-  mergeNearbyConnections(
-    connectionsByParent,
-    getNearbyConnectionsQuery(),
-    stopCoords,
-    agencyIdsJson,
-  );
+    // Merge in radius-based nearby-stop connections (lines serving stops
+    // within CONNECTION_RADIUS_METERS of each stop on the route).
+    mergeNearbyConnections(
+      connectionsByParent,
+      getNearbyConnectionsQuery(),
+      stopCoords,
+      agencyIdsJson,
+    );
 
-  const routeIdPrefix = routeId.split("-")[0];
+    const routeIdPrefix = routeId.split("-")[0];
 
-  for (const feature of features) {
-    for (const stop of feature.properties.stops) {
-      const all = connectionsByParent.get(stop.parentStationId);
-      if (all) {
-        stop.connections = all
-          .filter((c) => c.routeId !== routeIdPrefix)
-          .sort((a, b) => connectionSortKey(a) - connectionSortKey(b));
+    for (const feature of features) {
+      for (const stop of feature.properties.stops) {
+        const all = connectionsByParent.get(stop.parentStationId);
+        if (all) {
+          stop.connections = all
+            .filter((c) => c.routeId !== routeIdPrefix)
+            .sort((a, b) => connectionSortKey(a) - connectionSortKey(b));
+        }
       }
     }
   }
