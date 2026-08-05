@@ -77,7 +77,7 @@ export function setDirectionId(directionId: number): void {
 
 /**
  * Returns the features from `geojson` that match the current selection's
- * service type, split-line number, and direction. Used by both the Leaflet
+ * service type, split-line number, and direction. Used by both the MapLibre
  * map script and the React stop list to derive the visible shapes/stops.
  */
 export function getFilteredShapes(

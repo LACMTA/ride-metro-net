@@ -3,59 +3,57 @@ import getRouteShapes, { type RouteShapeFeature } from "./getRouteShapes";
 import type { RouteWithInfo } from "./getRouteById";
 import { getLineMapTrips } from "./getLineMapTrips";
 import { isBuswayRoute } from "./routeShortNameOverrides";
+import {
+  processSystemShapes,
+  type RenderSegment,
+  type SystemShapeInput,
+} from "./processSystemShapes";
 
 /**
- * GeoJSON feature for the system-wide map. Each feature is a single route's
- * polyline (the first core direction), tagged with route metadata for styling
- * and linking.
+ * One route's render-ready line for the system-wide map. The geometry has
+ * been processed at build time (see {@link processSystemShapes}): snapped
+ * through stops, simplified, smoothed, and split into offset segments so
+ * co-running lines can be drawn side by side.
  */
-export interface SystemRouteFeature {
-  type: "Feature";
-  geometry: {
-    type: "LineString";
-    coordinates: [number, number][];
-  };
-  properties: {
-    routeId: string;
-    routeShortName: string;
-    /** GTFS route_color (hex without `#`), may be empty for bus. */
-    routeColor: string;
-    /** GTFS route_type. */
-    routeType: number;
-    /** `"rail"` or `"busway"` — used for styling decisions. */
-    mode: "rail" | "busway";
-    /** Resolved CSS color string with leading `#`. */
-    color: string;
-    /**
-     * Ordered list of stops served by this route's displayed shape. Only the
-     * fields needed for map rendering and linking are included — the
-     * `connections` field from {@link RouteStop} is stripped to keep the
-     * prerendered payload small.
-     */
-    stops: SystemStop[];
-  };
+export interface SystemRouteLine {
+  routeId: string;
+  routeShortName: string;
+  /** GTFS route_color (hex without `#`), may be empty for bus. */
+  routeColor: string;
+  /** GTFS route_type. */
+  routeType: number;
+  /** `"rail"` or `"busway"` — used for styling decisions. */
+  mode: "rail" | "busway";
+  /** Resolved CSS color string with leading `#`. */
+  color: string;
+  /**
+   * Drawable segments in travel order. Each carries an integer offset slot;
+   * the client multiplies it by a pixel spacing so co-running lines render
+   * next to each other at every zoom level.
+   */
+  segments: RenderSegment[];
 }
 
 /**
- * Minimal stop data for the system-wide map — enough to render a marker,
- * show a popup label, and link to the stop page. The heavier `connections`
- * field from {@link RouteStop} is intentionally omitted.
+ * A unique station on the system map. Stations shared by multiple lines have
+ * `lineCount > 1` and are rendered with a larger interchange marker.
  */
-export interface SystemStop {
-  stopId: string;
+export interface SystemStation {
+  stationId: string;
   stopName: string;
   lat: number;
   lon: number;
-  parentStationId: string;
+  /** Number of system-map lines serving this station. */
+  lineCount: number;
 }
 
 /**
- * GeoJSON FeatureCollection of all rail and busway route polylines for the
- * system-wide map. Each feature represents one route's primary direction shape.
+ * Complete prerendered payload for the system-wide map: one processed line
+ * per route plus a deduplicated list of stations.
  */
-export interface SystemRouteShapes {
-  type: "FeatureCollection";
-  features: SystemRouteFeature[];
+export interface SystemMapData {
+  lines: SystemRouteLine[];
+  stations: SystemStation[];
 }
 
 /**
@@ -72,17 +70,19 @@ function resolveLineColor(route: RouteWithInfo): string {
 }
 
 /**
- * Builds a {@link SystemRouteShapes} collection for all rail and busway routes
- * that have a `lineMapTrips` config. Each route contributes one feature: the
- * first "core" service shape (direction 0) from its configured trips.
+ * Builds the {@link SystemMapData} payload for all rail and busway routes
+ * that have a `lineMapTrips` config. Each route contributes one line: the
+ * first "core" service shape (direction 0) from its configured trips, run
+ * through the build-time geometry processor.
  *
  * Routes without a `lineMapTrips` config are silently skipped — `getRouteShapes`
  * returns `null` for those.
  */
-export default async function getAllRouteShapes(): Promise<SystemRouteShapes> {
+export default async function getAllRouteShapes(): Promise<SystemMapData> {
   const routes = await getAllRailBuswayRoutes();
 
-  const features: SystemRouteFeature[] = [];
+  const inputs: SystemShapeInput[] = [];
+  const routeMeta = new Map<string, RouteWithInfo>();
 
   for (const route of routes) {
     // Skip routes without a line-map config — no shape data available.
@@ -102,26 +102,35 @@ export default async function getAllRouteShapes(): Promise<SystemRouteShapes> {
     const feature: RouteShapeFeature =
       dir0 ?? coreFeatures[0] ?? shapes.features[0];
 
-    features.push({
-      type: "Feature",
-      geometry: feature.geometry,
-      properties: {
-        routeId: route.routeId,
-        routeShortName: route.routeShortName,
-        routeColor: route.routeColor,
-        routeType: route.routeType,
-        mode: isBuswayRoute(route.routeId) ? "busway" : "rail",
-        color: resolveLineColor(route),
-        stops: feature.properties.stops.map((s) => ({
-          stopId: s.stopId,
-          stopName: s.stopName,
-          lat: s.lat,
-          lon: s.lon,
-          parentStationId: s.parentStationId,
-        })),
-      },
+    routeMeta.set(route.routeId, route);
+    inputs.push({
+      routeId: route.routeId,
+      coordinates: feature.geometry.coordinates,
+      stops: feature.properties.stops.map((s) => ({
+        parentStationId: s.parentStationId,
+        stopName: s.stopName,
+        lat: s.lat,
+        lon: s.lon,
+      })),
     });
   }
 
-  return { type: "FeatureCollection", features };
+  // Build-time geometry processing: snap lines through stops, simplify,
+  // smooth, and compute side-by-side offsets for shared corridors.
+  const { segmentsByRoute, stations } = processSystemShapes(inputs);
+
+  const lines: SystemRouteLine[] = inputs.map((input) => {
+    const route = routeMeta.get(input.routeId)!;
+    return {
+      routeId: route.routeId,
+      routeShortName: route.routeShortName,
+      routeColor: route.routeColor,
+      routeType: route.routeType,
+      mode: isBuswayRoute(route.routeId) ? "busway" : "rail",
+      color: resolveLineColor(route),
+      segments: segmentsByRoute.get(input.routeId) ?? [],
+    };
+  });
+
+  return { lines, stations };
 }

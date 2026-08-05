@@ -41,14 +41,30 @@ const esriKey = import.meta.env.ESRI_KEY;
     getFilteredShapes,
   } from "../lib/lineMapStore";
   import { createMap } from "../lib/createMap";
+  import type { Map as MLMap } from "maplibre-gl";
+  import type { FeatureCollection, LineString, Point } from "geojson";
 
-  type LeafletModule = typeof import("leaflet");
+  /** Unique source/layer IDs for the line map. */
+  const SHAPES_SOURCE = "line-shapes";
+  const GHOST_LAYER = "line-ghost";
+  const SELECTED_LAYER = "line-selected";
+  const STOPS_SOURCE = "line-stops";
+  const STOPS_LAYER = "line-stops";
 
   interface MapState {
-    L: LeafletModule;
-    map: import("leaflet").Map;
-    shapeLayer: import("leaflet").LayerGroup | null;
-    stopsLayer: import("leaflet").LayerGroup | null;
+    map: MLMap;
+    maplibregl: typeof import("maplibre-gl");
+    loaded: boolean;
+    /** Pending data that arrived before `map.on("load")` fired. */
+    pendingRender: boolean;
+  }
+
+  function emptyLineCollection(): FeatureCollection<LineString> {
+    return { type: "FeatureCollection", features: [] };
+  }
+
+  function emptyPointCollection(): FeatureCollection<Point> {
+    return { type: "FeatureCollection", features: [] };
   }
 
   function initMap(container: HTMLElement): void {
@@ -62,14 +78,98 @@ const esriKey = import.meta.env.ESRI_KEY;
     let state: MapState | null = null;
 
     async function bootstrap() {
-      const { L, map } = await createMap(mapContainer, esriKey);
+      const { map, maplibregl } = await createMap(mapContainer, esriKey);
 
-      state = {
-        L,
-        map,
-        shapeLayer: null,
-        stopsLayer: null,
-      };
+      state = { map, maplibregl, loaded: false, pendingRender: false };
+
+      map.on("load", () => {
+        state!.loaded = true;
+
+        // --- Shape source (ghost + selected share one source) ---
+        map.addSource(SHAPES_SOURCE, {
+          type: "geojson",
+          data: emptyLineCollection(),
+        });
+
+        // Ghost layer: features that differ from the current selection in
+        // exactly one dimension — the unselected split-line side (same
+        // service type) or the unselected service type (same split-line,
+        // e.g. owl when core is selected). Rendered as a lightened tint at
+        // full opacity so overlapping ghost lines don't darken each other.
+        map.addLayer({
+          id: GHOST_LAYER,
+          type: "line",
+          source: SHAPES_SOURCE,
+          filter: ["==", ["get", "isGhost"], true],
+          paint: {
+            "line-color": lightenColor(lineColor, 0.5),
+            "line-width": 6,
+            "line-opacity": 1,
+          },
+        });
+
+        // Selected line layer — rendered on top of the ghost.
+        map.addLayer({
+          id: SELECTED_LAYER,
+          type: "line",
+          source: SHAPES_SOURCE,
+          filter: ["==", ["get", "isGhost"], false],
+          paint: {
+            "line-color": lineColor,
+            "line-width": 6,
+            "line-opacity": 0.9,
+          },
+        });
+
+        // --- Stops ---
+        map.addSource(STOPS_SOURCE, {
+          type: "geojson",
+          data: emptyPointCollection(),
+        });
+
+        map.addLayer({
+          id: STOPS_LAYER,
+          type: "circle",
+          source: STOPS_SOURCE,
+          paint: {
+            "circle-radius": 5,
+            "circle-color": "#ffffff",
+            "circle-stroke-color": lineColor,
+            "circle-stroke-width": 3,
+            "circle-opacity": 1,
+          },
+        });
+
+        // --- Stop popups ---
+        const popup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: true,
+        });
+
+        map.on("click", STOPS_LAYER, (e) => {
+          const feature = e.features?.[0];
+          if (!feature) return;
+          const stopName = feature.properties?.stopName;
+          if (typeof stopName === "string") {
+            popup.setHTML(`<strong>${stopName}</strong>`);
+            popup.setLngLat(e.lngLat);
+            popup.addTo(map);
+          }
+        });
+
+        map.on("mouseenter", STOPS_LAYER, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", STOPS_LAYER, () => {
+          map.getCanvas().style.cursor = "";
+        });
+
+        // Render any data that arrived while we were setting up.
+        if (state!.pendingRender) {
+          state!.pendingRender = false;
+          renderSelection();
+        }
+      });
 
       // If the GeoJSON has already been fetched (by the page script) before
       // the map finished initializing, render it now.
@@ -93,91 +193,80 @@ const esriKey = import.meta.env.ESRI_KEY;
       });
     }
 
-    function renderSelection() {
-      if (!state?.L || !state.map) return;
+    function renderSelection(): void {
+      if (!state?.map) return;
       const geojson = lineMapGeoJson.get();
       if (!geojson || geojson.features.length === 0) return;
-      const selection = lineMapSelection.get();
 
+      // Defer rendering until the map style has loaded.
+      if (!state.loaded) {
+        state.pendingRender = true;
+        return;
+      }
+
+      const selection = lineMapSelection.get();
       const filtered = getFilteredShapes(geojson, selection);
       if (filtered.length === 0) return;
 
       const feature = filtered[0];
-
-      // Remove previous shape and stop layers.
-      if (state.shapeLayer) {
-        state.shapeLayer.remove();
-        state.shapeLayer = null;
-      }
-      if (state.stopsLayer) {
-        state.stopsLayer.remove();
-        state.stopsLayer = null;
-      }
-
-      const ghostColor = lightenColor(lineColor, 0.5);
-      const L = state.L;
-      const map = state.map;
-
-      const shapeGroup = L.layerGroup().addTo(map);
-      state.shapeLayer = shapeGroup;
-
-      // Ghost layer: features that differ from the current selection in
-      // exactly one dimension — the unselected split-line side (same service
-      // type) or the unselected service type (same split-line, e.g. owl when
-      // core is selected). Rendered as a lightened tint at full opacity so
-      // overlapping ghost lines don't darken each other the way translucent
-      // (alpha-blended) lines do.
       const ghostFeatures = getGhostFeatures(geojson);
-      if (ghostFeatures.length > 0) {
-        L.geoJSON(
+
+      // --- Build shapes FeatureCollection ---
+      // Ghost features first (drawn beneath), then the selected feature.
+      const shapes: FeatureCollection<LineString> = {
+        type: "FeatureCollection",
+        features: [
+          ...ghostFeatures.map((f) => ({
+            type: "Feature" as const,
+            geometry: f.geometry,
+            properties: { isGhost: true },
+          })),
           {
-            type: "FeatureCollection",
-            features: ghostFeatures,
-          } as import("geojson").FeatureCollection,
-          {
-            style: { color: ghostColor, weight: 6, opacity: 1 },
+            type: "Feature" as const,
+            geometry: feature.geometry,
+            properties: { isGhost: false },
           },
-        ).addTo(shapeGroup);
+        ],
+      };
+
+      const shapesSource = state.map.getSource(SHAPES_SOURCE);
+      if (shapesSource) {
+        shapesSource.setData(shapes);
       }
 
-      // Selected feature layer — rendered on top of the ghost.
-      L.geoJSON(feature, {
-        style: { color: lineColor, weight: 6, opacity: 0.9 },
-      }).addTo(shapeGroup);
+      // --- Build stops FeatureCollection ---
+      const stops: FeatureCollection<Point> = {
+        type: "FeatureCollection",
+        features: feature.properties.stops.map((stop) => ({
+          type: "Feature" as const,
+          geometry: {
+            type: "Point" as const,
+            coordinates: [stop.lon, stop.lat] as [number, number],
+          },
+          properties: { stopName: stop.stopName },
+        })),
+      };
 
-      // Render a circle marker for each stop served by the selected shape.
-      const stopsGroup = L.layerGroup().addTo(map);
-      state.stopsLayer = stopsGroup;
-
-      for (const stop of feature.properties.stops) {
-        L.circleMarker([stop.lat, stop.lon], {
-          radius: 5,
-          color: lineColor,
-          weight: 3,
-          fillColor: "#fff",
-          fillOpacity: 1,
-        })
-          .bindPopup(`<strong>${stop.stopName}</strong>`)
-          .addTo(stopsGroup);
+      const stopsSource = state.map.getSource(STOPS_SOURCE);
+      if (stopsSource) {
+        stopsSource.setData(stops);
       }
 
-      // Fit the map to the selected feature AND the ghost (when present).
-      const allLatLngs: [number, number][] = [
-        ...feature.geometry.coordinates.map(
-          ([lon, lat]) => [lat, lon] as [number, number],
-        ),
-        ...feature.properties.stops.map(
-          (s) => [s.lat, s.lon] as [number, number],
-        ),
+      // --- Fit bounds to the selected feature + ghost features ---
+      const allCoords: [number, number][] = [
+        ...feature.geometry.coordinates,
+        ...ghostFeatures.flatMap((gf) => gf.geometry.coordinates),
       ];
 
-      for (const gf of getGhostFeatures(geojson)) {
-        for (const [lon, lat] of gf.geometry.coordinates) {
-          allLatLngs.push([lat, lon]);
+      if (allCoords.length > 0) {
+        const bounds = new state.maplibregl.LngLatBounds();
+        for (const coord of allCoords) {
+          bounds.extend(coord);
+        }
+        if (!bounds.isEmpty()) {
+          state.map.fitBounds(bounds, { padding: 20 });
         }
       }
-
-      map.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });
     }
 
     // Re-render the map whenever the selection store changes (user-driven

@@ -5,6 +5,11 @@
   "compilerOptions": {
     "types": ["node"],
     "jsx": "react-jsx",
-    "jsxImportSource": "react"
+    "jsxImportSource": "react",
+    "paths": {
+      "@esri/maplibre-arcgis": [
+        "./node_modules/@esri/maplibre-arcgis/dist/esm/types/src/MaplibreArcGIS.d.ts"
+      ]
+    }
   }
 }

@@ -1,16 +1,16 @@
 ---
 import DataInjector from "./DataInjector.astro";
-import type { SystemRouteShapes } from "../lib/getAllRouteShapes";
+import type { SystemMapData } from "../lib/getAllRouteShapes";
 
 interface Props {
-  shapes: SystemRouteShapes;
+  data: SystemMapData;
 }
 
-const { shapes } = Astro.props;
+const { data } = Astro.props;
 const esriKey = import.meta.env.ESRI_KEY;
 ---
 
-<DataInjector data={shapes} id="data-system-shapes" />
+<DataInjector data={data} id="data-system-map" />
 <div class="h-full w-full" data-system-map data-esri-key={esriKey}>
   <div
     class="h-full w-full"
@@ -24,8 +24,22 @@ const esriKey = import.meta.env.ESRI_KEY;
 <script>
   import { createMap } from "../lib/createMap";
   import { getData } from "../lib/getData";
-  import type { SystemRouteShapes } from "../lib/getAllRouteShapes";
+  import type { SystemMapData } from "../lib/getAllRouteShapes";
+  import type { FeatureCollection, LineString, Point } from "geojson";
   import { getLineSlug } from "../lib/routeShortNameOverrides";
+
+  /**
+   * Pixel spacing between adjacent side-by-side lines. Offset slots from the
+   * build-time processor are ±1, ±2, … in steps of 2, so the visual gap
+   * between two co-running 5px lines is `2 * OFFSET_STEP_PX`.
+   */
+  const OFFSET_STEP_PX = 3;
+
+  /** Unique source/layer IDs for the system map. */
+  const LINES_SOURCE = "system-lines";
+  const LINES_LAYER = "system-lines";
+  const STATIONS_SOURCE = "system-stations";
+  const STATIONS_LAYER = "system-stations";
 
   function initSystemMap(container: HTMLElement): void {
     const esriKey = container.dataset.esriKey!;
@@ -33,68 +47,162 @@ const esriKey = import.meta.env.ESRI_KEY;
       "[data-map-container]",
     ) as HTMLElement;
 
-    const shapes = getData("data-system-shapes") as SystemRouteShapes;
+    const data = getData("data-system-map") as SystemMapData;
 
     async function bootstrap() {
-      const { L, map } = await createMap(mapContainer, esriKey);
+      const { map, maplibregl } = await createMap(mapContainer, esriKey);
 
-      if (shapes.features.length === 0) return;
+      if (data.lines.length === 0) return;
 
-      const allLatLngs: [number, number][] = [];
+      // -----------------------------------------------------------------
+      // Build a GeoJSON FeatureCollection of LineStrings from all route
+      // segments. Each feature carries `color` and `offset` (in pixels)
+      // so the line layer can apply a data-driven `line-offset` and
+      // `line-color` — no third-party plugin needed.
+      // -----------------------------------------------------------------
+      const lineFeatures: FeatureCollection<LineString> = {
+        type: "FeatureCollection",
+        features: [],
+      };
 
-      for (const feature of shapes.features) {
-        const color = feature.properties.color;
-        const routeId = feature.properties.routeId;
-        const routeShortName = feature.properties.routeShortName;
+      for (const line of data.lines) {
+        const { color, routeId, routeShortName } = line;
         const slug = getLineSlug(routeId);
+        const popupHtml = `<a href="/lines/${slug}" style="font-weight:bold;color:${color}">${routeShortName} Line</a>`;
 
-        // Collect lat/lngs for bounds-fitting.
-        for (const [lon, lat] of feature.geometry.coordinates) {
-          allLatLngs.push([lat, lon]);
+        for (const segment of line.segments) {
+          lineFeatures.features.push({
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: segment.coordinates,
+            },
+            properties: {
+              color,
+              offset: segment.offset * OFFSET_STEP_PX,
+              popupHtml,
+            },
+          });
         }
+      }
 
-        // Render the route polyline, colored by line color.
-        L.geoJSON(feature, {
-          style: {
-            color,
-            weight: 5,
-            opacity: 0.9,
+      // -----------------------------------------------------------------
+      // Build a GeoJSON FeatureCollection of Points for stations.
+      // -----------------------------------------------------------------
+      const stationFeatures: FeatureCollection<Point> = {
+        type: "FeatureCollection",
+        features: data.stations.map((station) => ({
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [station.lon, station.lat],
           },
-        })
-          .bindPopup(
-            `<a href="/lines/${slug}" style="font-weight:bold;color:${color}">${routeShortName} Line</a>`,
-          )
-          .addTo(map);
-      }
+          properties: {
+            lineCount: station.lineCount,
+            radius: station.lineCount > 1 ? 4 + station.lineCount * 1.75 : 4,
+            popupHtml: `<a href="/stops/${station.stationId}" style="font-weight:600">${station.stopName}</a>`,
+          },
+        })),
+      };
 
-      // Render a circle marker for each unique station across all lines.
-      // Deduplicate by parentStationId so shared stations (e.g. Union Station)
-      // only appear once on the map.
-      const seenStations = new Set<string>();
-      for (const feature of shapes.features) {
-        for (const stop of feature.properties.stops ?? []) {
-          if (seenStations.has(stop.parentStationId)) continue;
-          seenStations.add(stop.parentStationId);
+      // Wait for the map style to load before adding sources/layers.
+      map.on("load", () => {
+        // --- Lines ---
+        map.addSource(LINES_SOURCE, {
+          type: "geojson",
+          data: lineFeatures,
+        });
 
-          L.circleMarker([stop.lat, stop.lon], {
-            radius: 4,
-            fillColor: "#ffffff",
-            color: "#1a1a1a",
-            weight: 1.5,
-            opacity: 1,
-            fillOpacity: 1,
-          })
-            .bindPopup(
-              `<a href="/stops/${stop.parentStationId}" style="font-weight:600">${stop.stopName}</a>`,
-            )
-            .addTo(map);
+        map.addLayer({
+          id: LINES_LAYER,
+          type: "line",
+          source: LINES_SOURCE,
+          paint: {
+            "line-color": ["get", "color"],
+            "line-width": 5,
+            "line-opacity": 0.9,
+            "line-offset": ["get", "offset"],
+          },
+        });
+
+        // --- Stations ---
+        map.addSource(STATIONS_SOURCE, {
+          type: "geojson",
+          data: stationFeatures,
+        });
+
+        map.addLayer({
+          id: STATIONS_LAYER,
+          type: "circle",
+          source: STATIONS_SOURCE,
+          paint: {
+            "circle-radius": ["get", "radius"],
+            "circle-color": "#ffffff",
+            "circle-stroke-color": "#1a1a1a",
+            "circle-stroke-width": [
+              "case",
+              [">", ["get", "lineCount"], 1],
+              2,
+              1.5,
+            ],
+            "circle-stroke-opacity": 1,
+            "circle-opacity": 1,
+          },
+        });
+
+        // --- Popups ---
+        const popup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: true,
+        });
+
+        map.on("click", LINES_LAYER, (e) => {
+          const feature = e.features?.[0];
+          if (!feature) return;
+          const html = feature.properties?.popupHtml;
+          if (typeof html === "string") {
+            popup.setHTML(html);
+            popup.setLngLat(e.lngLat);
+            popup.addTo(map);
+          }
+        });
+
+        map.on("click", STATIONS_LAYER, (e) => {
+          const feature = e.features?.[0];
+          if (!feature) return;
+          const html = feature.properties?.popupHtml;
+          if (typeof html === "string") {
+            popup.setHTML(html);
+            popup.setLngLat(e.lngLat);
+            popup.addTo(map);
+          }
+        });
+
+        // Cursor feedback.
+        map.on("mouseenter", LINES_LAYER, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", LINES_LAYER, () => {
+          map.getCanvas().style.cursor = "";
+        });
+        map.on("mouseenter", STATIONS_LAYER, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", STATIONS_LAYER, () => {
+          map.getCanvas().style.cursor = "";
+        });
+
+        // Fit bounds to all line coordinates.
+        const bounds = new maplibregl.LngLatBounds();
+        for (const feature of lineFeatures.features) {
+          for (const coord of feature.geometry.coordinates) {
+            bounds.extend(coord as [number, number]);
+          }
         }
-      }
-
-      // Fit the map to all route shapes.
-      if (allLatLngs.length > 0) {
-        map.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });
-      }
+        if (!bounds.isEmpty()) {
+          map.fitBounds(bounds, { padding: 20 });
+        }
+      });
     }
 
     bootstrap();

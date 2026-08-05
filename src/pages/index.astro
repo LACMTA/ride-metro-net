@@ -6,7 +6,7 @@ import { getLineSlug, isBuswayRoute } from "../lib/routeShortNameOverrides";
 
 export const prerender = true;
 
-const systemShapes = await getAllRouteShapes();
+const systemMapData = await getAllRouteShapes();
 ---
 
 <Layout title="Metro System Map" fullHeight>
@@ -22,9 +22,8 @@ const systemShapes = await getAllRouteShapes();
       <nav class="flex-1 px-4 pb-4">
         <ul class="space-y-2">
           {
-            systemShapes.features.map((feature) => {
-              const { routeId, routeShortName, routeType, color } =
-                feature.properties;
+            systemMapData.lines.map((line) => {
+              const { routeId, routeShortName, routeType, color } = line;
               const slug = getLineSlug(routeId);
               const isRail = routeType !== 3;
               const isBusway = isBuswayRoute(routeId);
@@ -65,7 +64,7 @@ const systemShapes = await getAllRouteShapes();
 
     <!-- Full-bleed map -->
     <div class="flex-1 overflow-hidden">
-      <SystemMap shapes={systemShapes} />
+      <SystemMap data={systemMapData} />
     </div>
   </div>
 </Layout>
