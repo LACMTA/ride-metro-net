@@ -37,6 +37,7 @@ const esriKey = import.meta.env.ESRI_KEY;
 
   /** Unique source/layer IDs for the system map. */
   const LINES_SOURCE = "system-lines";
+  const CASING_LAYER = "system-lines-casing";
   const LINES_LAYER = "system-lines";
   const STATIONS_SOURCE = "system-stations";
   const STATIONS_LAYER = "system-stations";
@@ -107,12 +108,31 @@ const esriKey = import.meta.env.ESRI_KEY;
 
       // Wait for the map style to load before adding sources/layers.
       map.on("load", () => {
-        // --- Lines ---
+        // --- Lines source (shared by casing + colored layers) ---
         map.addSource(LINES_SOURCE, {
           type: "geojson",
           data: lineFeatures,
         });
 
+        // White casing layer — drawn underneath for visual separation of
+        // overlapping lines.
+        map.addLayer({
+          id: CASING_LAYER,
+          type: "line",
+          source: LINES_SOURCE,
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": "#ffffff",
+            "line-width": 7,
+            "line-opacity": 1,
+            "line-offset": ["get", "offset"],
+          },
+        });
+
+        // Colored line layer — drawn on top of the casing.
         map.addLayer({
           id: LINES_LAYER,
           type: "line",

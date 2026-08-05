@@ -48,6 +48,7 @@ export async function createMap(
     center: DEFAULT_CENTER,
     zoom: DEFAULT_ZOOM,
     minZoom: 2,
+    attributionControl: { compact: true },
   };
 
   const map = new maplibregl.Map(options);

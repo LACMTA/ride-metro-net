@@ -4,16 +4,16 @@ import type { RouteWithInfo } from "./getRouteById";
 import { getLineMapTrips } from "./getLineMapTrips";
 import { isBuswayRoute } from "./routeShortNameOverrides";
 import {
-  processSystemShapes,
+  computeLineOffsets,
   type RenderSegment,
   type SystemShapeInput,
-} from "./processSystemShapes";
+} from "./computeLineOffsets";
 
 /**
  * One route's render-ready line for the system-wide map. The geometry has
- * been processed at build time (see {@link processSystemShapes}): snapped
- * through stops, simplified, smoothed, and split into offset segments so
- * co-running lines can be drawn side by side.
+ * been split into offset segments by {@link computeLineOffsets} so
+ * co-running lines can be drawn side by side. Visual simplification and
+ * corner rounding are handled at render time by MapLibre.
  */
 export interface SystemRouteLine {
   routeId: string;
@@ -72,8 +72,8 @@ function resolveLineColor(route: RouteWithInfo): string {
 /**
  * Builds the {@link SystemMapData} payload for all rail and busway routes
  * that have a `lineMapTrips` config. Each route contributes one line: the
- * first "core" service shape (direction 0) from its configured trips, run
- * through the build-time geometry processor.
+ * first "core" direction-0 shape from its configured trips, split into
+ * offset segments for side-by-side rendering of shared corridors.
  *
  * Routes without a `lineMapTrips` config are silently skipped — `getRouteShapes`
  * returns `null` for those.
@@ -83,6 +83,10 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
 
   const inputs: SystemShapeInput[] = [];
   const routeMeta = new Map<string, RouteWithInfo>();
+  const stationById = new Map<
+    string,
+    { stopName: string; lat: number; lon: number; routes: Set<string> }
+  >();
 
   for (const route of routes) {
     // Skip routes without a line-map config — no shape data available.
@@ -103,6 +107,22 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       dir0 ?? coreFeatures[0] ?? shapes.features[0];
 
     routeMeta.set(route.routeId, route);
+
+    // Register stations (deduplicated by parentStationId).
+    for (const stop of feature.properties.stops) {
+      let station = stationById.get(stop.parentStationId);
+      if (!station) {
+        station = {
+          stopName: stop.stopName,
+          lat: stop.lat,
+          lon: stop.lon,
+          routes: new Set(),
+        };
+        stationById.set(stop.parentStationId, station);
+      }
+      station.routes.add(route.routeId);
+    }
+
     inputs.push({
       routeId: route.routeId,
       coordinates: feature.geometry.coordinates,
@@ -115,9 +135,8 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
     });
   }
 
-  // Build-time geometry processing: snap lines through stops, simplify,
-  // smooth, and compute side-by-side offsets for shared corridors.
-  const { segmentsByRoute, stations } = processSystemShapes(inputs);
+  // Compute offset segments for side-by-side rendering of shared corridors.
+  const segmentsByRoute = computeLineOffsets(inputs);
 
   const lines: SystemRouteLine[] = inputs.map((input) => {
     const route = routeMeta.get(input.routeId)!;
@@ -131,6 +150,16 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       segments: segmentsByRoute.get(input.routeId) ?? [],
     };
   });
+
+  const stations: SystemStation[] = [...stationById.entries()].map(
+    ([stationId, s]) => ({
+      stationId,
+      stopName: s.stopName,
+      lat: s.lat,
+      lon: s.lon,
+      lineCount: s.routes.size,
+    }),
+  );
 
   return { lines, stations };
 }
