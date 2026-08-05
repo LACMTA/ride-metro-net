@@ -15,10 +15,10 @@
  *    geometry so overlaps are pixel-exact, and each route is assigned a
  *    side-by-side offset slot so co-running lines render next to each other
  *    instead of occluding one another.
- * 4. **Simplify + smooth** — each unique span geometry is simplified with
- *    Douglas–Peucker (dropping noisy GTFS shape points) and then rounded
- *    with Chaikin corner-cutting. Span endpoints are pinned stop
- *    coordinates and are never moved by either step.
+ * 4. **Simplify** — each unique span geometry is simplified with
+ *    Douglas–Peucker (dropping noisy GTFS shape points). Span endpoints
+ *    are pinned stop coordinates and are never moved. Visual corner
+ *    rounding is handled at render time by MapLibre's `line-join: "round"`.
  *
  * All of this runs at build time (the system map page is prerendered); the
  * client just draws the precomputed segments.
@@ -92,9 +92,6 @@ const COS_LAT = Math.cos((34.05 * Math.PI) / 180);
  * to strip jittery GTFS shape points, small enough to preserve real curves.
  */
 const SIMPLIFY_TOLERANCE_DEG = 15 / METERS_PER_DEG;
-
-/** Chaikin corner-cutting passes applied after simplification. */
-const CHAIKIN_ITERATIONS = 2;
 
 /**
  * If two routes connect the same station pair but their span geometries
@@ -179,7 +176,7 @@ function pinStops(
 }
 
 // ---------------------------------------------------------------------------
-// Simplification and smoothing
+// Simplification
 // ---------------------------------------------------------------------------
 
 /**
@@ -214,29 +211,6 @@ function simplify(coords: Coord[], toleranceDeg: number): Coord[] {
   return coords.filter((_, i) => keep[i]);
 }
 
-/**
- * Chaikin corner-cutting. Each pass replaces interior corners with quarter
- * points, rounding the line. First and last points are preserved exactly.
- */
-function chaikin(coords: Coord[], iterations: number): Coord[] {
-  let pts = coords;
-  for (let iter = 0; iter < iterations; iter++) {
-    if (pts.length < 3) return pts;
-    const out: Coord[] = [pts[0]];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i];
-      const b = pts[i + 1];
-      out.push(
-        [a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25],
-        [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75],
-      );
-    }
-    out.push(pts[pts.length - 1]);
-    pts = out;
-  }
-  return pts;
-}
-
 /** Rounds a coordinate to 6 decimal places (~0.11 m) to keep payloads small. */
 function roundCoord(c: Coord): Coord {
   return [Math.round(c[0] * 1e6) / 1e6, Math.round(c[1] * 1e6) / 1e6];
@@ -247,7 +221,7 @@ function roundCoord(c: Coord): Coord {
 // ---------------------------------------------------------------------------
 
 interface Corridor {
-  /** Canonical geometry (pinned, later smoothed), in canonical direction. */
+  /** Canonical geometry (pinned, simplified), in canonical direction. */
   coords: Coord[];
   /** Station ID at the start of the canonical direction. */
   fromStation: string;
@@ -385,14 +359,14 @@ export function processSystemShapes(
   }
 
   // -------------------------------------------------------------------------
-  // Phase 3: smooth each unique corridor geometry once (shared corridors are
-  // smoothed identically for every member route), then assign offset slots.
+  // Phase 3: simplify each unique corridor geometry once (shared corridors
+  // are simplified identically for every member route), then assign offset
+  // slots.
   // -------------------------------------------------------------------------
   for (const corridor of corridors.values()) {
-    corridor.coords = chaikin(
-      simplify(corridor.coords, SIMPLIFY_TOLERANCE_DEG),
-      CHAIKIN_ITERATIONS,
-    ).map(roundCoord);
+    corridor.coords = simplify(corridor.coords, SIMPLIFY_TOLERANCE_DEG).map(
+      roundCoord,
+    );
 
     // Symmetric slots around 0, sorted by route ID so the same set of routes
     // always gets the same ordering (prevents lines braiding between spans).

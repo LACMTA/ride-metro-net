@@ -117,6 +117,10 @@ const esriKey = import.meta.env.ESRI_KEY;
           id: LINES_LAYER,
           type: "line",
           source: LINES_SOURCE,
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
           paint: {
             "line-color": ["get", "color"],
             "line-width": 5,
