@@ -264,11 +264,21 @@ const esriKey = import.meta.env.ESRI_KEY;
                 stopName: string;
                 lat: number;
                 lon: number;
+                routes: {
+                  routeShortName: string;
+                  routeColor: string;
+                }[];
               }[];
             };
 
             for (const stop of json.stops) {
               if (busStopMap.has(stop.stopId)) continue;
+              const lineBadges = stop.routes
+                .map(
+                  (r) =>
+                    `<span style="background:${r.routeColor || "#333"};color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">${r.routeShortName}</span>`,
+                )
+                .join("");
               busStopMap.set(stop.stopId, {
                 type: "Feature",
                 geometry: {
@@ -276,7 +286,11 @@ const esriKey = import.meta.env.ESRI_KEY;
                   coordinates: [stop.lon, stop.lat],
                 },
                 properties: {
-                  popupHtml: `<a href="/stops/${stop.stopId}" style="font-weight:600">${stop.stopName}</a>`,
+                  popupHtml:
+                    `<a href="/stops/${stop.stopId}" style="font-weight:600">${stop.stopName}</a>` +
+                    (lineBadges
+                      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${lineBadges}</div>`
+                      : ""),
                 },
               });
             }
