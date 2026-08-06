@@ -1,5 +1,5 @@
 import { getGtfsDb } from "./gtfsConfig";
-import { getAgencyIdsByFlag } from "./agencies";
+import { buildStopPagesRouteCondition } from "./stopEligibility";
 
 /**
  * Shared `getStaticPaths` logic for stop pages (`/stops/[stopId]/*`).
@@ -13,8 +13,11 @@ import { getAgencyIdsByFlag } from "./agencies";
  */
 export async function getStopStaticPaths() {
   const db = getGtfsDb();
-  const agencyIds = getAgencyIdsByFlag("buildStopPages");
-  const placeholders = agencyIds.map(() => "?").join(", ");
+
+  // Shared condition: routes from buildStopPages agencies with non-empty
+  // route_long_name. Used in both halves of the UNION so that the set of
+  // built stop pages stays 1-1 with the stops shown on the system map.
+  const routeCond = buildStopPagesRouteCondition("r");
 
   const allStops = (await db
     .prepare(
@@ -25,8 +28,7 @@ export async function getStopStaticPaths() {
       JOIN trips t ON t.trip_id = st.trip_id
       JOIN routes r ON r.route_id = t.route_id
       WHERE (s.parent_station IS NULL OR s.parent_station = '')
-        AND r.route_long_name IS NOT NULL AND r.route_long_name != ''
-        AND r.agency_id IN (${placeholders})
+        AND ${routeCond.clause}
 
       UNION
 
@@ -36,11 +38,10 @@ export async function getStopStaticPaths() {
       JOIN trips t ON t.trip_id = st.trip_id
       JOIN routes r ON r.route_id = t.route_id
       WHERE s.parent_station IS NOT NULL AND s.parent_station != ''
-        AND r.route_long_name IS NOT NULL AND r.route_long_name != ''
-        AND r.agency_id IN (${placeholders})
+        AND ${routeCond.clause}
       `,
     )
-    .all(...agencyIds, ...agencyIds)) as { stop_id: string }[];
+    .all(...routeCond.params, ...routeCond.params)) as { stop_id: string }[];
 
   return allStops.map((stop) => ({
     params: { stopId: stop.stop_id },

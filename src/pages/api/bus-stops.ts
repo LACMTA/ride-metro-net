@@ -6,11 +6,17 @@ import {
   resolveRouteShortName,
 } from "../../lib/routeShortNameOverrides";
 import { prodCacheHeader } from "../../lib/prodCacheHeader";
+import { buildStopPagesRouteCondition } from "../../lib/stopEligibility";
 
 export interface BusRouteInfo {
+  routeId: string;
   routeShortName: string;
-  /** Hex color string with leading `#`, or empty string if unset in GTFS. */
+  /** GTFS route_type (always 3 for bus, but included for badge logic). */
+  routeType: number;
+  /** GTFS route_color (hex without `#`), may be empty. */
   routeColor: string;
+  /** GTFS route_text_color (hex without `#`), may be empty. */
+  routeTextColor: string;
 }
 
 export interface BusStop {
@@ -33,7 +39,9 @@ interface RouteRow {
   stop_id: string;
   route_id: string;
   route_short_name: string;
+  route_type: number;
   route_color: string;
+  route_text_color: string;
 }
 
 /**
@@ -71,12 +79,27 @@ export async function GET(context: import("astro").APIContext) {
 
   const db = getGtfsDb();
 
-  // Exclude stops served by busway routes (G / J Line) — those are already
-  // shown as stations on the system map and shouldn't appear as bus stops.
-  const buswayMatch = buswayRouteSqlCondition("r.route_id", true);
+  // Shared condition: routes from buildStopPages agencies with non-empty
+  // route_long_name. Keeps the system map 1-1 with built stop pages.
+  const routeCond = buildStopPagesRouteCondition("r");
+  if (routeCond.params.length === 0) {
+    return new Response(JSON.stringify({ stops: [] }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": prodCacheHeader(),
+      },
+    });
+  }
+
+  // Exclude busway routes (G / J Line) from the bus-stop route list — those
+  // are shown as rail-style stations on the system map.
   const buswayExclude = buswayRouteSqlCondition("r.route_id", false);
 
   // --- Query 1: qualifying stops in the bounding box ---
+  // A stop is included if it has at least one eligible (buildStopPages agency,
+  // non-empty route_long_name, non-busway) route serving it. We do NOT exclude
+  // stops that also happen to be served by busway routes — we just filter the
+  // busway routes out of the route list in Query 2.
   const stopRows = db
     .prepare(
       `
@@ -86,16 +109,17 @@ export async function GET(context: import("astro").APIContext) {
         AND stop_lon BETWEEN ? AND ?
         AND (location_type = 0 OR location_type IS NULL)
         AND parent_station IS NULL
-        AND NOT EXISTS (
+        AND EXISTS (
           SELECT 1 FROM stop_times st
           JOIN trips t ON t.trip_id = st.trip_id
           JOIN routes r ON r.route_id = t.route_id
           WHERE st.stop_id = stops.stop_id
-            AND ${buswayMatch}
+            AND ${routeCond.clause}
+            AND ${buswayExclude}
         )
       `,
     )
-    .all(south, north, west, east) as BusStopRow[];
+    .all(south, north, west, east, ...routeCond.params) as BusStopRow[];
 
   if (stopRows.length === 0) {
     return new Response(JSON.stringify({ stops: [] }), {
@@ -115,16 +139,17 @@ export async function GET(context: import("astro").APIContext) {
   const routeRows = db
     .prepare(
       `
-      SELECT st.stop_id, r.route_id, r.route_short_name, r.route_color
+      SELECT st.stop_id, r.route_id, r.route_short_name, r.route_type, r.route_color, r.route_text_color
       FROM stop_times st
       JOIN trips t ON t.trip_id = st.trip_id
       JOIN routes r ON r.route_id = t.route_id
       WHERE st.stop_id IN (${placeholders})
+        AND ${routeCond.clause}
         AND ${buswayExclude}
       GROUP BY st.stop_id, r.route_id
       `,
     )
-    .all(...stopIds) as RouteRow[];
+    .all(...stopIds, ...routeCond.params) as RouteRow[];
 
   // --- Merge: group routes by stop_id, dedup by route_short_name ---
   const routesByStop = new Map<string, BusRouteInfo[]>();
@@ -142,8 +167,13 @@ export async function GET(context: import("astro").APIContext) {
     if (seen.has(shortName)) continue;
     seen.add(shortName);
 
-    const color = row.route_color ? `#${row.route_color}` : "";
-    routes.push({ routeShortName: shortName, routeColor: color });
+    routes.push({
+      routeId: row.route_id,
+      routeShortName: shortName,
+      routeType: row.route_type,
+      routeColor: row.route_color ?? "",
+      routeTextColor: row.route_text_color ?? "",
+    });
   }
 
   const stops: BusStop[] = stopRows.map((row) => ({

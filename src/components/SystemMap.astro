@@ -27,6 +27,7 @@ const esriKey = import.meta.env.ESRI_KEY;
   import type { SystemMapData } from "../lib/getAllRouteShapes";
   import type { Feature, FeatureCollection, LineString, Point } from "geojson";
   import { getLineSlug } from "../lib/routeShortNameOverrides";
+  import { buildBadgeHtml } from "../lib/badgeStyles";
   import {
     makeCasingLayer,
     makeLineLayer,
@@ -123,9 +124,15 @@ const esriKey = import.meta.env.ESRI_KEY;
         type: "FeatureCollection",
         features: data.stations.map((station) => {
           const lineBadges = station.lines
-            .map(
-              (l) =>
-                `<span style="background:${l.color};color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">${l.routeShortName}</span>`,
+            .map((l) =>
+              buildBadgeHtml({
+                routeId: l.routeId,
+                routeType: l.routeType,
+                name: l.routeShortName,
+                color: l.routeColor,
+                textColor: l.routeTextColor,
+                size: "sm",
+              }),
             )
             .join("");
           return {
@@ -265,8 +272,11 @@ const esriKey = import.meta.env.ESRI_KEY;
                 lat: number;
                 lon: number;
                 routes: {
+                  routeId: string;
                   routeShortName: string;
+                  routeType: number;
                   routeColor: string;
+                  routeTextColor: string;
                 }[];
               }[];
             };
@@ -274,9 +284,15 @@ const esriKey = import.meta.env.ESRI_KEY;
             for (const stop of json.stops) {
               if (busStopMap.has(stop.stopId)) continue;
               const lineBadges = stop.routes
-                .map(
-                  (r) =>
-                    `<span style="background:${r.routeColor || "#333"};color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">${r.routeShortName}</span>`,
+                .map((r) =>
+                  buildBadgeHtml({
+                    routeId: r.routeId,
+                    routeType: r.routeType,
+                    name: r.routeShortName,
+                    color: r.routeColor,
+                    textColor: r.routeTextColor,
+                    size: "sm",
+                  }),
                 )
                 .join("");
               busStopMap.set(stop.stopId, {

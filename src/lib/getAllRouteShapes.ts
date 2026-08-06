@@ -38,7 +38,14 @@ export interface SystemRouteLine {
  * A line serving a station, for rendering colored route badges in popups.
  */
 export interface SystemStationLine {
+  routeId: string;
   routeShortName: string;
+  /** GTFS route_type. */
+  routeType: number;
+  /** GTFS route_color (hex without `#`), may be empty. */
+  routeColor: string;
+  /** GTFS route_text_color (hex without `#`), may be empty. */
+  routeTextColor: string;
   /** Resolved CSS color string with leading `#`. */
   color: string;
 }
@@ -172,7 +179,11 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       lines: [...s.routes].map((routeId) => {
         const route = routeMeta.get(routeId)!;
         return {
+          routeId: route.routeId,
           routeShortName: route.routeShortName,
+          routeType: route.routeType,
+          routeColor: route.routeColor,
+          routeTextColor: route.routeTextColor,
           color: resolveLineColor(route),
         };
       }),

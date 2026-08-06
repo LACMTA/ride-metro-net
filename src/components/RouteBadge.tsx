@@ -1,7 +1,7 @@
 import AlertIcon from "./AlertIcon";
-import { isBuswayRoute } from "../lib/routeShortNameOverrides";
+import { getBadgeStyle, badgeSizes, type BadgeSizes } from "../lib/badgeStyles";
 
-export type BadgeSizes = "sm" | "md" | "lg" | "xl";
+export type { BadgeSizes };
 
 interface Props {
   routeId: string;
@@ -23,58 +23,14 @@ interface Props {
   size?: BadgeSizes;
 }
 
-type RouteMode = "rail" | "busway" | "bus";
-
-function getRouteMode(routeId: string, routeType: number): RouteMode {
-  if (routeType !== 3) return "rail";
-  if (isBuswayRoute(routeId)) return "busway";
-  return "bus";
-}
-
-const sizes = {
-  sm: {
-    h: "h-6",
-    w: "w-6",
-    px: "px-2",
-    pxAlert: "pr-1.5",
-    text: "text-base",
-    alert: "h-4",
-    minW: "min-w-12",
-  },
-  md: {
-    h: "h-8",
-    w: "w-8",
-    px: "px-3",
-    pxAlert: "pr-2",
-    text: "text-xl",
-    alert: "h-5",
-    minW: "min-w-16",
-  },
-  lg: {
-    h: "h-10",
-    w: "w-10",
-    px: "px-4",
-    pxAlert: "pr-2.5",
-    text: "text-2xl",
-    alert: "h-6",
-    minW: "min-w-20",
-  },
-  xl: {
-    h: "h-14",
-    w: "w-14",
-    px: "px-5",
-    pxAlert: "pr-3",
-    text: "text-4xl",
-    alert: "h-8",
-    minW: "min-w-28",
-  },
-} as const;
-
 /**
  * Renders the correct badge for any route:
  *   - Rail (type !== 3)  → circular badge, GTFS inline color
  *   - Busway (G / J)     → square badge (no radius), GTFS inline color
  *   - Regular bus        → pill badge, fixed brand colors
+ *
+ * Styling logic (shape, colors, aria-label) is shared with map popups via
+ * {@link getBadgeStyle} in `src/lib/badgeStyles.ts`.
  */
 export default function RouteBadge({
   routeId,
@@ -88,28 +44,23 @@ export default function RouteBadge({
   busAlertBadge = false,
   size = "md",
 }: Props) {
-  const mode = getRouteMode(routeId, routeType);
-  const s = sizes[size];
+  const {
+    className: allClassName,
+    inlineStyle,
+    ariaLabel,
+  } = getBadgeStyle({
+    routeId,
+    routeType,
+    name,
+    color,
+    textColor,
+    size,
+    altBusColors,
+    busAlertBadge,
+    className,
+  });
 
-  const shapeClass =
-    mode === "bus"
-      ? `${s.minW} ${s.px} ${busAlertBadge && s.pxAlert} rounded-lg`
-      : `${s.w} ${mode === "rail" ? "rounded-full" : ""}`;
-  const busColorClass = altBusColors
-    ? "bg-gray-100 text-metro-text border-gray-300 border"
-    : "bg-bus-local text-background-white";
-  const colorClass = mode === "bus" ? busColorClass : "";
-  const colorStyle =
-    mode !== "bus"
-      ? { backgroundColor: `#${color}`, color: `#${textColor}` }
-      : undefined;
-  const ariaLabel =
-    mode === "bus"
-      ? `line ${name} bus`
-      : `${name} line ${mode === "busway" ? "busway" : "train"}`;
-
-  const allClassName =
-    `inline-flex ${s.h} shrink-0 items-center justify-center ${s.text} ${!altBusColors && "font-bold"} ${shapeClass} ${colorClass} ${className}`.trim();
+  const s = badgeSizes[size];
 
   const alertIcon = busAlertBadge && (
     <AlertIcon
@@ -123,7 +74,7 @@ export default function RouteBadge({
       <a
         href={href}
         className={allClassName}
-        style={colorStyle}
+        style={inlineStyle ?? undefined}
         aria-label={ariaLabel}
       >
         {name}
@@ -133,7 +84,11 @@ export default function RouteBadge({
   }
 
   return (
-    <span className={allClassName} style={colorStyle} aria-label={ariaLabel}>
+    <span
+      className={allClassName}
+      style={inlineStyle ?? undefined}
+      aria-label={ariaLabel}
+    >
       {name}
       {alertIcon}
     </span>
