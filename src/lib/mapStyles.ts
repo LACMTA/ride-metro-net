@@ -36,6 +36,15 @@ export const STOP_RADIUS = 5;
 /** Stroke width (px) of stop/station circles. */
 export const STOP_STROKE_WIDTH = 3;
 
+/** Radius (px) of bus stop circles (smaller than stations). */
+export const BUS_STOP_RADIUS = 3;
+
+/** Stroke width (px) of bus stop circles. */
+export const BUS_STOP_STROKE_WIDTH = 1.5;
+
+/** Stroke color for bus stop circles. */
+export const BUS_STOP_STROKE = "#666666";
+
 /** Padding (px) passed to `fitBounds`. */
 export const FIT_BOUNDS_PADDING = 20;
 
@@ -144,6 +153,35 @@ export function makeStopLayer(
       "circle-opacity": 1,
     },
   };
+}
+
+/**
+ * Create a bus stop circle layer — smaller and lighter than station circles.
+ * Uses `minzoom` so the layer is only rendered when zoomed in enough for
+ * individual stops to be meaningful.
+ */
+export function makeBusStopLayer(
+  id: string,
+  source: string,
+  options: { minzoom?: number } = {},
+): CircleLayerSpecification {
+  const layer: CircleLayerSpecification = {
+    id,
+    type: "circle",
+    source,
+    paint: {
+      "circle-radius": BUS_STOP_RADIUS as never,
+      "circle-color": WHITE,
+      "circle-stroke-color": BUS_STOP_STROKE as never,
+      "circle-stroke-width": BUS_STOP_STROKE_WIDTH as never,
+      "circle-stroke-opacity": 1,
+      "circle-opacity": 0.8,
+    },
+  };
+  if (options.minzoom !== undefined) {
+    layer.minzoom = options.minzoom;
+  }
+  return layer;
 }
 
 // ---------------------------------------------------------------------------

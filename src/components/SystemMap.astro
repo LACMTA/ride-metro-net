@@ -25,12 +25,13 @@ const esriKey = import.meta.env.ESRI_KEY;
   import { createMap } from "../lib/createMap";
   import { getData } from "../lib/getData";
   import type { SystemMapData } from "../lib/getAllRouteShapes";
-  import type { FeatureCollection, LineString, Point } from "geojson";
+  import type { Feature, FeatureCollection, LineString, Point } from "geojson";
   import { getLineSlug } from "../lib/routeShortNameOverrides";
   import {
     makeCasingLayer,
     makeLineLayer,
     makeStopLayer,
+    makeBusStopLayer,
     makePopupOptions,
     attachPopupHandlers,
     fitBoundsToCoords,
@@ -50,6 +51,25 @@ const esriKey = import.meta.env.ESRI_KEY;
   const LINES_LAYER = "system-lines";
   const STATIONS_SOURCE = "system-stations";
   const STATIONS_LAYER = "system-stations";
+  const BUS_STOPS_SOURCE = "bus-stops";
+  const BUS_STOPS_LAYER = "bus-stops";
+
+  /**
+   * Bus stops are only fetched and displayed at or above this zoom level.
+   */
+  const BUS_STOP_MIN_ZOOM = 13;
+
+  /**
+   * Grid size (in degrees) for snapping bus-stop bounding-box queries. The
+   * client rounds viewport bounds to this grid so the same geographic area
+   * always produces the same URL, enabling browser HTTP cache hits.
+   * 0.005° ≈ 550 m at LA's latitude — small enough that each tile stays
+   * well under any reasonable stop count even in dense areas.
+   */
+  const BUS_STOP_GRID_SIZE = 0.005;
+
+  /** Debounce delay (ms) for bus-stop fetches on map move/zoom. */
+  const BUS_STOP_DEBOUNCE_MS = 300;
 
   function initSystemMap(container: HTMLElement): void {
     const esriKey = container.dataset.esriKey!;
@@ -168,6 +188,150 @@ const esriKey = import.meta.env.ESRI_KEY;
           .flatMap((f) => f.geometry.coordinates)
           .map(([lng, lat]) => [lng, lat]);
         fitBoundsToCoords(map, maplibregl, allCoords);
+
+        // ---------------------------------------------------------------
+        // Bus stops — loaded on-demand from the API when zoomed in.
+        // The viewport is broken into small grid tiles, each fetched
+        // independently so that dense areas don't block sparse ones.
+        // Tile URLs are stable for HTTP caching, and a Map<stopId, Feature>
+        // provides client-side deduplication so panning back to a
+        // previously-visited area doesn't re-add duplicates.
+        // ---------------------------------------------------------------
+        map.addSource(BUS_STOPS_SOURCE, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+
+        map.addLayer(
+          makeBusStopLayer(BUS_STOPS_LAYER, BUS_STOPS_SOURCE, {
+            minzoom: BUS_STOP_MIN_ZOOM,
+          }),
+        );
+
+        attachPopupHandlers(map, BUS_STOPS_LAYER, popup);
+
+        // Accumulated bus stop features, keyed by stop_id for deduplication.
+        const busStopMap = new Map<
+          string,
+          Feature<Point, { popupHtml: string }>
+        >();
+
+        /** Grid tiles already fetched, keyed `"gridX,gridY"` to avoid
+         * re-requesting the same tile on pan. Cleared on zoom change. */
+        const fetchedTiles = new Set<string>();
+
+        /** Update the GeoJSON source with all accumulated bus stops. */
+        function syncBusStopSource(): void {
+          const source = map.getSource(BUS_STOPS_SOURCE);
+          if (source && source.type === "geojson") {
+            (source as maplibregl.GeoJSONSource).setData({
+              type: "FeatureCollection",
+              features: [...busStopMap.values()],
+            });
+          }
+        }
+
+        /**
+         * Snap a coordinate down to the grid cell boundary.
+         */
+        function snapToGrid(value: number): number {
+          return Math.floor(value / BUS_STOP_GRID_SIZE) * BUS_STOP_GRID_SIZE;
+        }
+
+        /**
+         * Fetch bus stops for a single grid tile and merge results into
+         * `busStopMap`. The tile key is recorded in `fetchedTiles` so it
+         * won't be re-requested.
+         */
+        async function fetchTile(
+          tileWest: number,
+          tileSouth: number,
+          tileKey: string,
+        ): Promise<void> {
+          if (fetchedTiles.has(tileKey)) return;
+          fetchedTiles.add(tileKey);
+
+          const tileEast = tileWest + BUS_STOP_GRID_SIZE;
+          const tileNorth = tileSouth + BUS_STOP_GRID_SIZE;
+          const bbox = `${tileWest.toFixed(4)},${tileSouth.toFixed(4)},${tileEast.toFixed(4)},${tileNorth.toFixed(4)}`;
+
+          try {
+            const res = await fetch(`/api/bus-stops?bbox=${bbox}`);
+            if (!res.ok) return;
+            const json = (await res.json()) as {
+              stops: {
+                stopId: string;
+                stopName: string;
+                lat: number;
+                lon: number;
+              }[];
+            };
+
+            for (const stop of json.stops) {
+              if (busStopMap.has(stop.stopId)) continue;
+              busStopMap.set(stop.stopId, {
+                type: "Feature",
+                geometry: {
+                  type: "Point",
+                  coordinates: [stop.lon, stop.lat],
+                },
+                properties: {
+                  popupHtml: `<a href="/stops/${stop.stopId}" style="font-weight:600">${stop.stopName}</a>`,
+                },
+              });
+            }
+          } catch {
+            // Network errors are non-fatal — bus stops are supplementary.
+            // Remove the tile key so it can be retried on the next pan.
+            fetchedTiles.delete(tileKey);
+          }
+        }
+
+        /**
+         * Fetch bus stops for every grid tile intersecting the current
+         * viewport. Each tile is fetched independently so that dense areas
+         * don't block sparse ones, and tile URLs are stable for HTTP
+         * caching. Previously-fetched tiles are skipped.
+         */
+        async function fetchBusStops(): Promise<void> {
+          if (map.getZoom() < BUS_STOP_MIN_ZOOM) return;
+
+          const bounds = map.getBounds();
+          const west = snapToGrid(bounds.getWest());
+          const south = snapToGrid(bounds.getSouth());
+          const east = snapToGrid(bounds.getEast()) + BUS_STOP_GRID_SIZE;
+          const north = snapToGrid(bounds.getNorth()) + BUS_STOP_GRID_SIZE;
+
+          const tilePromises: Promise<void>[] = [];
+
+          for (let lon = west; lon < east; lon += BUS_STOP_GRID_SIZE) {
+            for (let lat = south; lat < north; lat += BUS_STOP_GRID_SIZE) {
+              const gridX = Math.round(lon / BUS_STOP_GRID_SIZE);
+              const gridY = Math.round(lat / BUS_STOP_GRID_SIZE);
+              const tileKey = `${gridX},${gridY}`;
+              tilePromises.push(fetchTile(lon, lat, tileKey));
+            }
+          }
+
+          await Promise.allSettled(tilePromises);
+          syncBusStopSource();
+        }
+
+        // Clear fetched-tiles cache on zoom — tile composition changes
+        // and we want fresh coverage of the new viewport.
+        map.on("zoomstart", () => {
+          fetchedTiles.clear();
+        });
+
+        // Debounced fetch on map movement.
+        let fetchTimer: ReturnType<typeof setTimeout> | null = null;
+        map.on("moveend", () => {
+          if (fetchTimer) clearTimeout(fetchTimer);
+          fetchTimer = setTimeout(fetchBusStops, BUS_STOP_DEBOUNCE_MS);
+        });
+
+        // Initial fetch in case the map starts zoomed in.
+        fetchBusStops();
       });
     }
 
