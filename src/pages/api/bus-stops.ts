@@ -2,6 +2,7 @@ export const prerender = false;
 
 import { getGtfsDb } from "../../lib/gtfsConfig";
 import { buswayRouteSqlCondition } from "../../lib/routeShortNameOverrides";
+import { prodCacheHeader } from "../../lib/prodCacheHeader";
 
 export interface BusStop {
   stopId: string;
@@ -85,7 +86,7 @@ export async function GET(context: import("astro").APIContext) {
   return new Response(JSON.stringify({ stops }), {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": prodCacheHeader(),
     },
   });
 }
