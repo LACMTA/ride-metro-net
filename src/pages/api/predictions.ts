@@ -1,6 +1,7 @@
 export const prerender = false;
 
 import { getGtfsDb } from "../../lib/gtfsConfig";
+import { prodCacheHeader } from "../../lib/prodCacheHeader";
 
 /**
  * Grace period (in seconds) after a predicted arrival/departure time has
@@ -237,7 +238,7 @@ export async function GET(context: import("astro").APIContext) {
   return new Response(JSON.stringify([...byRoute.values()]), {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "public, max-age=60",
+      "Cache-Control": prodCacheHeader(60),
     },
   });
 }
