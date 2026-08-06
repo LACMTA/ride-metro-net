@@ -1,6 +1,7 @@
 export const prerender = false;
 
 import { getGtfsDb } from "../../lib/gtfsConfig";
+import { buswayRouteSqlCondition } from "../../lib/routeShortNameOverrides";
 
 export interface BusStop {
   stopId: string;
@@ -50,6 +51,10 @@ export async function GET(context: import("astro").APIContext) {
 
   const db = getGtfsDb();
 
+  // Exclude stops served by busway routes (G / J Line) — those are already
+  // shown as stations on the system map and shouldn't appear as bus stops.
+  const buswayMatch = buswayRouteSqlCondition("r.route_id", true);
+
   const rows = db
     .prepare(
       `
@@ -59,6 +64,13 @@ export async function GET(context: import("astro").APIContext) {
         AND stop_lon BETWEEN ? AND ?
         AND (location_type = 0 OR location_type IS NULL)
         AND parent_station IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM stop_times st
+          JOIN trips t ON t.trip_id = st.trip_id
+          JOIN routes r ON r.route_id = t.route_id
+          WHERE st.stop_id = stops.stop_id
+            AND ${buswayMatch}
+        )
       `,
     )
     .all(south, north, west, east) as BusStopRow[];

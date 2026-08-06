@@ -1,5 +1,8 @@
 import { getGtfsDb } from "./gtfsConfig";
-import { resolveRouteShortName } from "./routeShortNameOverrides";
+import {
+  resolveRouteShortName,
+  buswayRouteSqlCondition,
+} from "./routeShortNameOverrides";
 import { getAgencyIdsByFlag, getAgencySettings } from "./agencies";
 import type { RouteWithInfo } from "./getRouteById";
 
@@ -40,8 +43,7 @@ export default async function getAllBusRoutes(): Promise<RouteWithInfo[]> {
       JOIN trips t ON t.route_id = r.route_id
       WHERE r.agency_id IN (${placeholders})
         AND r.route_type = 3
-        AND r.route_id NOT LIKE '901%'
-        AND r.route_id NOT LIKE '910%'
+        AND ${buswayRouteSqlCondition("r.route_id", false)}
         AND r.route_short_name GLOB '[0-9/]*'
         AND LENGTH(r.route_short_name) > 0
       ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name

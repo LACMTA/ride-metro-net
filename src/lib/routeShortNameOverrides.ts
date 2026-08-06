@@ -55,6 +55,30 @@ export function isBuswayRoute(routeId: string): boolean {
 }
 
 /**
+ * Generates a SQL WHERE-clause fragment that matches (or excludes) busway
+ * route IDs — both the bare prefix ("901") and suffixed forms ("901-13196").
+ * Derives from {@link BUSWAY_ROUTE_PREFIXES} so there's a single source of
+ * truth. Values are constants (not user input), so string interpolation is
+ * safe.
+ *
+ * @param column - SQL column name to match against (e.g. `"r.route_id"`).
+ * @param include - `true` to match busway routes, `false` to exclude them.
+ * @returns A SQL fragment like `(r.route_id = '901' OR r.route_id LIKE '901-%' OR ...)`
+ *   or `NOT (r.route_id = '901' OR ...)` when `include` is false.
+ */
+export function buswayRouteSqlCondition(
+  column: string,
+  include: boolean,
+): string {
+  const conditions = [...BUSWAY_ROUTE_PREFIXES].flatMap((prefix) => [
+    `${column} = '${prefix}'`,
+    `${column} LIKE '${prefix}-%'`,
+  ]);
+  const joined = conditions.join(" OR ");
+  return include ? `(${joined})` : `NOT (${joined})`;
+}
+
+/**
  * Resolves a display short name from a route_id and raw route_short_name.
  * If the raw name is empty, uses the ROUTE_SHORT_NAME_OVERRIDES map.
  */

@@ -1,5 +1,8 @@
 import { getGtfsDb } from "./gtfsConfig";
-import { resolveRouteShortName } from "./routeShortNameOverrides";
+import {
+  resolveRouteShortName,
+  buswayRouteSqlCondition,
+} from "./routeShortNameOverrides";
 import { getAgencyIdsByFlag, getAgencySettings } from "./agencies";
 import type { RouteWithInfo } from "./getRouteById";
 
@@ -45,8 +48,7 @@ export default async function getAllRailBuswayRoutes(): Promise<
       WHERE r.agency_id IN (${placeholders})
         AND (
           r.route_type != 3
-          OR r.route_id LIKE '901%'
-          OR r.route_id LIKE '910%'
+          OR ${buswayRouteSqlCondition("r.route_id", true)}
         )
       ORDER BY r.route_id
       `,
