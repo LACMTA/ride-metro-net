@@ -11,7 +11,7 @@ export interface RouteWithInfo {
   routeType: number;
   routeColor: string;
   routeTextColor: string;
-  /** Agency-level default line color (hex without `#`), or `""` if unset. */
+  /** Agency-level default line color (hex with leading `#`), or `""` if unset. */
   defaultLineColor: string;
 }
 

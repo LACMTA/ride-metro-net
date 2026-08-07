@@ -36,14 +36,23 @@ export const STOP_RADIUS = 5;
 /** Stroke width (px) of stop/station circles. */
 export const STOP_STROKE_WIDTH = 3;
 
-/** Radius (px) of bus stop circles (smaller than stations). */
+/** Base radius (px) of bus stop circles at low zoom. */
 export const BUS_STOP_RADIUS = 3;
 
-/** Stroke width (px) of bus stop circles. */
+/** Max radius (px) of bus stop circles when zoomed in (larger tap target). */
+export const BUS_STOP_RADIUS_MAX = 8;
+
+/** Base stroke width (px) of bus stop circles at low zoom. */
 export const BUS_STOP_STROKE_WIDTH = 1.5;
 
-/** Stroke color for bus stop circles. */
-export const BUS_STOP_STROKE = "#666666";
+/** Max stroke width (px) of bus stop circles when zoomed in. */
+export const BUS_STOP_STROKE_WIDTH_MAX = 3;
+
+/** Minimum zoom level at which bus stops are rendered. */
+export const BUS_STOP_MIN_ZOOM = 13;
+
+/** Zoom level at which bus stop circles reach their maximum size. */
+export const BUS_STOP_MAX_ZOOM = 16;
 
 /** Padding (px) passed to `fitBounds`. */
 export const FIT_BOUNDS_PADDING = 20;
@@ -156,24 +165,47 @@ export function makeStopLayer(
 }
 
 /**
- * Create a bus stop circle layer — smaller and lighter than station circles.
+ * Create a bus stop circle layer — orange fill with a white outline.
  * Uses `minzoom` so the layer is only rendered when zoomed in enough for
  * individual stops to be meaningful.
+ *
+ * The `color` option controls the fill color (defaults to a bus-orange that
+ * matches `--color-bus-local` / `--color-burnt-orange` from the Tailwind theme).
+ * The stroke is always white for a clear outline.
+ *
+ * `circle-radius` and `circle-stroke-width` are zoom-interpolated so markers
+ * grow larger when zoomed in, providing bigger tap/click targets.
  */
 export function makeBusStopLayer(
   id: string,
   source: string,
-  options: { minzoom?: number } = {},
+  options: { minzoom?: number; color?: string } = {},
 ): CircleLayerSpecification {
   const layer: CircleLayerSpecification = {
     id,
     type: "circle",
     source,
     paint: {
-      "circle-radius": BUS_STOP_RADIUS as never,
-      "circle-color": WHITE,
-      "circle-stroke-color": BUS_STOP_STROKE as never,
-      "circle-stroke-width": BUS_STOP_STROKE_WIDTH as never,
+      "circle-radius": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        BUS_STOP_MIN_ZOOM,
+        BUS_STOP_RADIUS,
+        BUS_STOP_MAX_ZOOM,
+        BUS_STOP_RADIUS_MAX,
+      ] as never,
+      "circle-color": (options.color ?? "#e16710") as never,
+      "circle-stroke-color": WHITE as never,
+      "circle-stroke-width": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        BUS_STOP_MIN_ZOOM,
+        BUS_STOP_STROKE_WIDTH,
+        BUS_STOP_MAX_ZOOM,
+        BUS_STOP_STROKE_WIDTH_MAX,
+      ] as never,
       "circle-stroke-opacity": 1,
       "circle-opacity": 0.8,
     },

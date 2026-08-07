@@ -83,7 +83,7 @@ function resolveLineColor(route: RouteWithInfo): string {
   return route.routeColor
     ? `#${route.routeColor}`
     : route.defaultLineColor
-      ? `#${route.defaultLineColor}`
+      ? route.defaultLineColor
       : "#000";
 }
 

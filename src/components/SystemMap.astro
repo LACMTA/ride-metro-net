@@ -1,6 +1,7 @@
 ---
 import DataInjector from "./DataInjector.astro";
 import type { SystemMapData } from "../lib/getAllRouteShapes";
+import { getAgencySettings } from "../lib/agencies";
 
 interface Props {
   data: SystemMapData;
@@ -8,10 +9,21 @@ interface Props {
 
 const { data } = Astro.props;
 const esriKey = import.meta.env.ESRI_KEY;
+
+// Bus stop marker color — uses the LA Metro Bus agency default line color
+// (which matches --color-bus-local / --color-burnt-orange from the Tailwind
+// theme). Passed to the client via a data attribute since agencies.ts has
+// server-side side effects and can't be imported in the browser.
+const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
 ---
 
 <DataInjector data={data} id="data-system-map" />
-<div class="h-full w-full" data-system-map data-esri-key={esriKey}>
+<div
+  class="h-full w-full"
+  data-system-map
+  data-esri-key={esriKey}
+  data-bus-stop-color={busStopColor}
+>
   <div
     class="h-full w-full"
     aria-label="Map of Metro rail and busway lines"
@@ -37,6 +49,7 @@ const esriKey = import.meta.env.ESRI_KEY;
     attachPopupHandlers,
     fitBoundsToCoords,
     STOP_STROKE_DARK,
+    BUS_STOP_MIN_ZOOM,
   } from "../lib/mapStyles";
 
   /**
@@ -56,11 +69,6 @@ const esriKey = import.meta.env.ESRI_KEY;
   const BUS_STOPS_LAYER = "bus-stops";
 
   /**
-   * Bus stops are only fetched and displayed at or above this zoom level.
-   */
-  const BUS_STOP_MIN_ZOOM = 13;
-
-  /**
    * Grid size (in degrees) for snapping bus-stop bounding-box queries. The
    * client rounds viewport bounds to this grid so the same geographic area
    * always produces the same URL, enabling browser HTTP cache hits.
@@ -74,6 +82,7 @@ const esriKey = import.meta.env.ESRI_KEY;
 
   function initSystemMap(container: HTMLElement): void {
     const esriKey = container.dataset.esriKey!;
+    const busStopColor = container.dataset.busStopColor ?? "#e16710";
     const mapContainer = container.querySelector(
       "[data-map-container]",
     ) as HTMLElement;
@@ -212,6 +221,7 @@ const esriKey = import.meta.env.ESRI_KEY;
         map.addLayer(
           makeBusStopLayer(BUS_STOPS_LAYER, BUS_STOPS_SOURCE, {
             minzoom: BUS_STOP_MIN_ZOOM,
+            color: busStopColor,
           }),
         );
 
