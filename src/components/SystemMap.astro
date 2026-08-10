@@ -213,6 +213,13 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
         // provides client-side deduplication so panning back to a
         // previously-visited area doesn't re-add duplicates.
         // ---------------------------------------------------------------
+
+        // Set of station IDs already rendered as rail/busway station markers.
+        // Bus stops that are also stations are skipped to avoid duplicate
+        // markers — the station marker (with busway line badges) is the
+        // primary marker for such stops.
+        const stationIds = new Set(data.stations.map((s) => s.stationId));
+
         map.addSource(BUS_STOPS_SOURCE, {
           type: "geojson",
           data: { type: "FeatureCollection", features: [] },
@@ -293,6 +300,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
 
             for (const stop of json.stops) {
               if (busStopMap.has(stop.stopId)) continue;
+              if (stationIds.has(stop.stopId)) continue;
               const lineBadges = stop.routes
                 .map((r) =>
                   buildBadgeHtml({

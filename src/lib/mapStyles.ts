@@ -30,11 +30,23 @@ export const WHITE = "#ffffff";
 /** Dark stroke color for stops on multi-line maps (e.g. SystemMap). */
 export const STOP_STROKE_DARK = "#1a1a1a";
 
-/** Radius (px) of stop/station circles. */
+/** Base radius (px) of stop/station circles at low zoom. */
 export const STOP_RADIUS = 5;
 
-/** Stroke width (px) of stop/station circles. */
+/** Max radius (px) of stop/station circles when zoomed in. */
+export const STOP_RADIUS_MAX = 12;
+
+/** Base stroke width (px) of stop/station circles at low zoom. */
 export const STOP_STROKE_WIDTH = 3;
+
+/** Max stroke width (px) of stop/station circles when zoomed in. */
+export const STOP_STROKE_WIDTH_MAX = 5;
+
+/** Zoom level at which station circles start growing. */
+export const STOP_MIN_ZOOM = 10;
+
+/** Zoom level at which station circles reach their maximum size. */
+export const STOP_MAX_ZOOM = 16;
 
 /** Base radius (px) of bus stop circles at low zoom. */
 export const BUS_STOP_RADIUS = 3;
@@ -138,6 +150,10 @@ export function makeLineLayer(
 
 /**
  * Create a stop/station circle layer with a white fill.
+ *
+ * By default, `circle-radius` and `circle-stroke-width` are zoom-interpolated
+ * so markers grow larger when zoomed in, providing bigger tap/click targets.
+ * Callers can override with explicit `radius` / `strokeWidth` expressions.
  */
 export function makeStopLayer(
   id: string,
@@ -153,11 +169,26 @@ export function makeStopLayer(
     type: "circle",
     source,
     paint: {
-      "circle-radius": (options.radius ?? STOP_RADIUS) as never,
+      "circle-radius": (options.radius ?? [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        STOP_MIN_ZOOM,
+        STOP_RADIUS,
+        STOP_MAX_ZOOM,
+        STOP_RADIUS_MAX,
+      ]) as never,
       "circle-color": WHITE,
       "circle-stroke-color": options.strokeColor as never,
-      "circle-stroke-width": (options.strokeWidth ??
-        STOP_STROKE_WIDTH) as never,
+      "circle-stroke-width": (options.strokeWidth ?? [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        STOP_MIN_ZOOM,
+        STOP_STROKE_WIDTH,
+        STOP_MAX_ZOOM,
+        STOP_STROKE_WIDTH_MAX,
+      ]) as never,
       "circle-stroke-opacity": 1,
       "circle-opacity": 1,
     },
