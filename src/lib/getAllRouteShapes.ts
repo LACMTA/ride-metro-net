@@ -2,7 +2,13 @@ import getAllRailBuswayRoutes from "./getAllRailBuswayRoutes";
 import getRouteShapes, { type RouteShapeFeature } from "./getRouteShapes";
 import type { RouteWithInfo } from "./getRouteById";
 import { getLineMapTrips } from "./getLineMapTrips";
-import { isBuswayRoute } from "./routeShortNameOverrides";
+import {
+  isBuswayRoute,
+  buswayRouteSqlCondition,
+  resolveRouteShortName,
+} from "./routeShortNameOverrides";
+import { buildStopPagesRouteCondition } from "./stopEligibility";
+import { getGtfsDb } from "./gtfsConfig";
 import {
   computeLineOffsets,
   type RenderSegment,
@@ -63,6 +69,13 @@ export interface SystemStation {
   lineCount: number;
   /** Lines serving this station, for popup badges. */
   lines: SystemStationLine[];
+  /**
+   * Regular bus routes (non-busway) serving this station's stop ID. Only
+   * populated for busway stations — rail stations never share a stop ID
+   * with bus routes, so this is always `[]` for rail. Used to show bus
+   * route badges in station popups alongside the rail/busway line badges.
+   */
+  busRoutes: SystemStationLine[];
 }
 
 /**
@@ -169,6 +182,18 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
     };
   });
 
+  // Identify busway station IDs — only those need bus-route enrichment.
+  const buswayStationIds = [...stationById.keys()].filter((stationId) =>
+    [...stationById.get(stationId)!.routes].some((routeId) =>
+      isBuswayRoute(routeId),
+    ),
+  );
+
+  // Query non-busway bus routes serving those busway station stop IDs.
+  // Uses the same eligibility and busway-exclusion logic as the bus-stops
+  // API endpoint so the system map stays consistent with stop pages.
+  const busRoutesByStation = queryBusRoutesForStations(buswayStationIds);
+
   const stations: SystemStation[] = [...stationById.entries()].map(
     ([stationId, s]) => ({
       stationId,
@@ -187,8 +212,92 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
           color: resolveLineColor(route),
         };
       }),
+      busRoutes: busRoutesByStation.get(stationId) ?? [],
     }),
   );
 
   return { lines, stations };
+}
+
+/**
+ * Queries non-busway bus routes (route_type = 3) serving the given stop IDs.
+ * Mirrors the logic in `/api/bus-stops` — uses `buildStopPagesRouteCondition`
+ * for agency eligibility and `buswayRouteSqlCondition` to exclude busway
+ * routes (G / J Line). Returns routes in `SystemStationLine` shape for
+ * direct use in station popups.
+ *
+ * Only called for busway station IDs, so the query set is small (≤ ~60).
+ */
+function queryBusRoutesForStations(
+  stationIds: string[],
+): Map<string, SystemStationLine[]> {
+  const result = new Map<string, SystemStationLine[]>();
+  if (stationIds.length === 0) return result;
+
+  const routeCond = buildStopPagesRouteCondition("r");
+  if (routeCond.params.length === 0) return result;
+
+  const db = getGtfsDb();
+  const buswayExclude = buswayRouteSqlCondition("r.route_id", false);
+  const placeholders = stationIds.map(() => "?").join(",");
+
+  const rows = db
+    .prepare(
+      `
+      SELECT DISTINCT
+        st.stop_id AS stop_id,
+        r.route_id AS route_id,
+        r.route_short_name AS route_short_name,
+        r.route_type AS route_type,
+        COALESCE(r.route_color, '') AS route_color,
+        COALESCE(r.route_text_color, '') AS route_text_color
+      FROM stop_times st
+      JOIN trips t ON t.trip_id = st.trip_id
+      JOIN routes r ON r.route_id = t.route_id
+      WHERE st.stop_id IN (${placeholders})
+        AND ${routeCond.clause}
+        AND r.route_type = 3
+        AND ${buswayExclude}
+      GROUP BY st.stop_id, r.route_id
+      `,
+    )
+    .all(...stationIds, ...routeCond.params) as BusRouteRow[];
+
+  const seen = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const shortName = resolveRouteShortName(row.route_id, row.route_short_name);
+    const prefix = row.route_id.split("-")[0];
+    let dedupSet = seen.get(row.stop_id);
+    if (!dedupSet) {
+      dedupSet = new Set();
+      seen.set(row.stop_id, dedupSet);
+    }
+    if (dedupSet.has(shortName)) continue;
+    dedupSet.add(shortName);
+
+    let list = result.get(row.stop_id);
+    if (!list) {
+      list = [];
+      result.set(row.stop_id, list);
+    }
+    list.push({
+      routeId: prefix,
+      routeShortName: shortName,
+      routeType: row.route_type,
+      routeColor: row.route_color,
+      routeTextColor: row.route_text_color,
+      color: row.route_color ? `#${row.route_color}` : "#e16710",
+    });
+  }
+
+  return result;
+}
+
+interface BusRouteRow {
+  stop_id: string;
+  route_id: string;
+  route_short_name: string;
+  route_type: number;
+  route_color: string;
+  route_text_color: string;
 }

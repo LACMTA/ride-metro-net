@@ -132,7 +132,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
       const stationFeatures: FeatureCollection<Point> = {
         type: "FeatureCollection",
         features: data.stations.map((station) => {
-          const lineBadges = station.lines
+          const lineBadges = [...station.lines, ...station.busRoutes]
             .map((l) =>
               buildBadgeHtml({
                 routeId: l.routeId,
