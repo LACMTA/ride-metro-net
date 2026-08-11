@@ -124,7 +124,7 @@ export function getBadgeStyle(input: BadgeStyleInput): BadgeStyleResult {
   const inlineStyle =
     mode !== "bus" && color
       ? {
-          "background-color": `#${color}`,
+          backgroundColor: `#${color}`,
           color: `#${textColor ?? "FFFFFF"}`,
         }
       : null;
@@ -153,7 +153,10 @@ export function buildBadgeHtml(input: BadgeStyleInput): string {
   const { className, inlineStyle, ariaLabel } = getBadgeStyle(input);
   const styleStr = inlineStyle
     ? Object.entries(inlineStyle)
-        .map(([k, v]) => `${k}:${v}`)
+        .map(
+          ([k, v]) =>
+            `${k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}:${v}`,
+        )
         .join(";")
     : "";
   const styleAttr = styleStr ? ` style="${styleStr}"` : "";
