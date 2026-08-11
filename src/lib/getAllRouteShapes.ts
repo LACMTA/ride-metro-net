@@ -154,6 +154,32 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       station.routes.add(route.routeId);
     }
 
+    // For busway routes, also register stations from other core features
+    // (other directions and splits). Unlike rail, busway stops have no
+    // parent_station — each direction has distinct stop IDs at different
+    // physical locations (often on opposite sides of the busway). Only
+    // registering the primary feature's stops would miss half the stops.
+    // Rail routes share parent stations across directions, so this is
+    // busway-only to avoid creating duplicate markers.
+    if (isBuswayRoute(route.routeId)) {
+      for (const otherFeature of coreFeatures) {
+        if (otherFeature === feature) continue;
+        for (const stop of otherFeature.properties.stops) {
+          const existing = stationById.get(stop.parentStationId);
+          if (existing) {
+            existing.routes.add(route.routeId);
+          } else {
+            stationById.set(stop.parentStationId, {
+              stopName: stop.stopName,
+              lat: stop.lat,
+              lon: stop.lon,
+              routes: new Set([route.routeId]),
+            });
+          }
+        }
+      }
+    }
+
     inputs.push({
       routeId: route.routeId,
       coordinates: feature.geometry.coordinates,
