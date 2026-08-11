@@ -1960,12 +1960,12 @@
   "803": {
     "trips": [
       {
-        "tripId": "64204710",
+        "tripId": "64685757",
         "directionId": 0,
         "serviceType": "core"
       },
       {
-        "tripId": "64204712",
+        "tripId": "64685759",
         "directionId": 1,
         "serviceType": "core"
       }
@@ -2002,12 +2002,12 @@
   "807": {
     "trips": [
       {
-        "tripId": "64204877",
+        "tripId": "64685925",
         "directionId": 0,
         "serviceType": "core"
       },
       {
-        "tripId": "64204876",
+        "tripId": "64685923",
         "directionId": 1,
         "serviceType": "core"
       }
