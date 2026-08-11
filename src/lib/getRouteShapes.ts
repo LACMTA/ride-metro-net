@@ -446,9 +446,16 @@ export default function getRouteShapes(
   // radius-based nearby-stop query.
   const stopCoords = new Map<string, { lat: number; lon: number }>();
 
+  // Track canonical trip IDs from lineMapTrips.json that are missing from
+  // the database (or have empty shapes). These are data-integrity errors:
+  // the config has gone stale and needs to be regenerated with
+  // `npx tsx scripts/seed-line-map-trips.ts`.
+  const missingTrips: string[] = [];
+
   for (const tripConfig of trips) {
     const tripRow = tripQuery.get(tripConfig.tripId) as TripRow | undefined;
     if (!tripRow || !tripRow.shape_id) {
+      missingTrips.push(tripConfig.tripId);
       continue;
     }
 
@@ -456,6 +463,7 @@ export default function getRouteShapes(
       tripRow.shape_id,
     ) as ShapePointRow[];
     if (shapePoints.length === 0) {
+      missingTrips.push(tripConfig.tripId);
       continue;
     }
 
@@ -514,6 +522,21 @@ export default function getRouteShapes(
     };
 
     features.push(feature);
+  }
+
+  // Fail loudly when canonical trip IDs are missing from the database so
+  // stale lineMapTrips.json configs are caught early. In dev, log a warning
+  // so the server keeps running; in production (build), throw to break the
+  // build with a clear, actionable error message.
+  if (missingTrips.length > 0) {
+    const detail =
+      `Missing trip(s) for route ${routeId}: ${missingTrips.join(", ")}. ` +
+      `Regenerate the config with: npx tsx scripts/seed-line-map-trips.ts`;
+    if (import.meta.env.DEV) {
+      console.warn(`[getRouteShapes] ${detail}`);
+    } else {
+      throw new Error(`[getRouteShapes] ${detail}`);
+    }
   }
 
   // -----------------------------------------------------------------------
