@@ -18,6 +18,10 @@ export const gtfsConfig: Config = {
   // Give realtime rows a real TTL so `expiration_timestamp > now` filters work.
   // We poll every minute, so 10 minutes is a comfortable buffer.
   gtfsRealtimeExpirationSeconds: 600,
+  // `import.meta.env` is undefined when this module is loaded outside Vite's
+  // transform context (e.g. during the Astro integration's startup GTFS import),
+  // so fall back to `process.env.NODE_ENV` for the dev-mode check.
+  ignoreErrors: import.meta.env?.DEV ?? process.env.NODE_ENV !== "production",
 };
 
 /**
