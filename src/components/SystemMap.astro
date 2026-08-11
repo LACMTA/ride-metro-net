@@ -39,7 +39,6 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
   import type { SystemMapData } from "../lib/getAllRouteShapes";
   import type { Feature, FeatureCollection, LineString, Point } from "geojson";
   import { getLineSlug } from "../lib/routeShortNameOverrides";
-  import { buildBadgeHtml } from "../lib/badgeStyles";
   import {
     makeCasingLayer,
     makeLineLayer,
@@ -48,6 +47,8 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     makePopupOptions,
     attachPopupHandlers,
     fitBoundsToCoords,
+    buildStopPopupHtml,
+    buildLinePopupHtml,
     STOP_STROKE_DARK,
     BUS_STOP_MIN_ZOOM,
   } from "../lib/mapStyles";
@@ -108,7 +109,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
       for (const line of data.lines) {
         const { color, routeId, routeShortName } = line;
         const slug = getLineSlug(routeId);
-        const popupHtml = `<a href="/lines/${slug}" style="font-weight:bold;color:${color}">${routeShortName} Line</a>`;
+        const popupHtml = buildLinePopupHtml({ slug, routeShortName, color });
 
         for (const segment of line.segments) {
           lineFeatures.features.push({
@@ -131,34 +132,20 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
       // -----------------------------------------------------------------
       const stationFeatures: FeatureCollection<Point> = {
         type: "FeatureCollection",
-        features: data.stations.map((station) => {
-          const lineBadges = [...station.lines, ...station.busRoutes]
-            .map((l) =>
-              buildBadgeHtml({
-                routeId: l.routeId,
-                routeType: l.routeType,
-                name: l.routeShortName,
-                color: l.routeColor,
-                textColor: l.routeTextColor,
-                size: "sm",
-              }),
-            )
-            .join("");
-          return {
-            type: "Feature",
-            geometry: {
-              type: "Point",
-              coordinates: [station.lon, station.lat],
-            },
-            properties: {
-              popupHtml:
-                `<a href="/stops/${station.stationId}" style="font-weight:600">${station.stopName}</a>` +
-                (lineBadges
-                  ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${lineBadges}</div>`
-                  : ""),
-            },
-          };
-        }),
+        features: data.stations.map((station) => ({
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [station.lon, station.lat],
+          },
+          properties: {
+            popupHtml: buildStopPopupHtml({
+              stopId: station.stationId,
+              stopName: station.stopName,
+              badges: [...station.lines, ...station.busRoutes],
+            }),
+          },
+        })),
       };
 
       // Wait for the map style to load before adding sources/layers.
@@ -301,18 +288,6 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
             for (const stop of json.stops) {
               if (busStopMap.has(stop.stopId)) continue;
               if (stationIds.has(stop.stopId)) continue;
-              const lineBadges = stop.routes
-                .map((r) =>
-                  buildBadgeHtml({
-                    routeId: r.routeId,
-                    routeType: r.routeType,
-                    name: r.routeShortName,
-                    color: r.routeColor,
-                    textColor: r.routeTextColor,
-                    size: "sm",
-                  }),
-                )
-                .join("");
               busStopMap.set(stop.stopId, {
                 type: "Feature",
                 geometry: {
@@ -320,11 +295,11 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
                   coordinates: [stop.lon, stop.lat],
                 },
                 properties: {
-                  popupHtml:
-                    `<a href="/stops/${stop.stopId}" style="font-weight:600">${stop.stopName}</a>` +
-                    (lineBadges
-                      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${lineBadges}</div>`
-                      : ""),
+                  popupHtml: buildStopPopupHtml({
+                    stopId: stop.stopId,
+                    stopName: stop.stopName,
+                    badges: stop.routes,
+                  }),
                 },
               });
             }

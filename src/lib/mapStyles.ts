@@ -10,6 +10,7 @@ import type {
   Map as MLMap,
   Popup as MLPopup,
 } from "maplibre-gl";
+import { buildBadgeHtml } from "./badgeStyles";
 
 // ---------------------------------------------------------------------------
 // Visual constants
@@ -306,4 +307,71 @@ export function fitBoundsToCoords(
   if (!bounds.isEmpty()) {
     map.fitBounds(bounds, { padding });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Popup HTML builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Route info needed to render a badge inside a map popup. Shared by
+ * station popups (rail/busway + co-located bus routes) and bus-stop
+ * popups so both paths produce identical badge rows.
+ */
+export interface PopupBadgeInfo {
+  routeId: string;
+  routeType: number;
+  routeShortName: string;
+  routeColor: string;
+  routeTextColor: string;
+}
+
+/**
+ * Build a flex-wrapped row of route badges from an array of route info.
+ * Returns an empty string when `badges` is empty so callers can inline
+ * the result without producing an empty wrapper `<div>`.
+ */
+export function buildBadgeRow(badges: PopupBadgeInfo[]): string {
+  if (badges.length === 0) return "";
+  const html = badges
+    .map((b) =>
+      buildBadgeHtml({
+        routeId: b.routeId,
+        routeType: b.routeType,
+        name: b.routeShortName,
+        color: b.routeColor,
+        textColor: b.routeTextColor,
+        size: "sm",
+      }),
+    )
+    .join("");
+  return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${html}</div>`;
+}
+
+/**
+ * Build the popup HTML for a stop (station or bus stop): a bold link to
+ * the stop page followed by an optional flex-wrapped badge row. Used by
+ * both rail/busway station markers and bus-stop markers so their popups
+ * share identical formatting.
+ */
+export function buildStopPopupHtml(opts: {
+  stopId: string;
+  stopName: string;
+  badges?: PopupBadgeInfo[];
+}): string {
+  const link = `<a href="/stops/${opts.stopId}" style="font-weight:600">${opts.stopName}</a>`;
+  const badgeRow = opts.badges ? buildBadgeRow(opts.badges) : "";
+  return badgeRow ? link + badgeRow : link;
+}
+
+/**
+ * Build the popup HTML for a rail/busway line: a bold, colored link to
+ * the line's detail page.
+ */
+export function buildLinePopupHtml(opts: {
+  slug: string;
+  routeShortName: string;
+  color: string;
+}): string {
+  return `<a href="/lines/${opts.slug}" style="font-weight:bold;color:${opts.color}">${opts.routeShortName} Line</a>`;
 }
