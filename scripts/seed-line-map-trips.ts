@@ -9,7 +9,7 @@
 import { getGtfsDb } from "../src/lib/gtfsConfig";
 import { getAgencyIdsByFlag } from "../src/lib/agencies";
 import type Database from "better-sqlite3";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
 // ---------------------------------------------------------------------------
 // SQL constants
@@ -583,28 +583,62 @@ function processRoute(
 // Main
 // ---------------------------------------------------------------------------
 
-const agencyIds = getAgencyIdsByFlag("buildLinePages");
-const allRoutes = stmts.allRoutes.all.apply(
-  stmts.allRoutes,
-  agencyIds,
-) as unknown as { route_id: string }[];
-
-const uniquePrefixes = [
-  ...new Set(allRoutes.map((route) => route.route_id.split("-")[0])),
-];
+const cliArgs = process.argv.slice(2);
+const outputPath = "src/data/lineMapTrips.json";
 
 const config: Record<string, { trips: TripConfigEntry[] }> = {};
 
-for (const numericPrefix of uniquePrefixes) {
-  const result = processRoute(numericPrefix);
-  if (result && result.trips.length > 0) {
-    config[numericPrefix] = { trips: result.trips };
+if (cliArgs.length > 0) {
+  // --- Partial update: process only the specified route IDs ---
+
+  // Derive numeric prefixes from the provided route IDs (e.g. "10-1" -> "10")
+  const uniquePrefixes = [...new Set(cliArgs.map((id) => id.split("-")[0]))];
+
+  // Load existing config so we can merge without losing other routes
+  if (existsSync(outputPath)) {
+    const existing = JSON.parse(readFileSync(outputPath, "utf-8"));
+    Object.assign(config, existing);
   }
+
+  for (const numericPrefix of uniquePrefixes) {
+    const result = processRoute(numericPrefix);
+    if (result && result.trips.length > 0) {
+      config[numericPrefix] = { trips: result.trips };
+    } else {
+      // Remove routes that no longer have trips
+      delete config[numericPrefix];
+    }
+  }
+
+  writeFileSync(outputPath, JSON.stringify(config, null, 2) + "\n");
+
+  console.log(
+    `Updated ${uniquePrefixes.length} route(s) [${uniquePrefixes.join(", ")}] — ` +
+      `${Object.keys(config).length} total route configs in ${outputPath}`,
+  );
+} else {
+  // --- Full rebuild: process all routes (original behavior) ---
+
+  const agencyIds = getAgencyIdsByFlag("buildLinePages");
+  const allRoutes = stmts.allRoutes.all.apply(
+    stmts.allRoutes,
+    agencyIds,
+  ) as unknown as { route_id: string }[];
+
+  const uniquePrefixes = [
+    ...new Set(allRoutes.map((route) => route.route_id.split("-")[0])),
+  ];
+
+  for (const numericPrefix of uniquePrefixes) {
+    const result = processRoute(numericPrefix);
+    if (result && result.trips.length > 0) {
+      config[numericPrefix] = { trips: result.trips };
+    }
+  }
+
+  writeFileSync(outputPath, JSON.stringify(config, null, 2) + "\n");
+
+  console.log(
+    `Wrote ${Object.keys(config).length} route configs to ${outputPath}`,
+  );
 }
-
-const outputPath = "src/data/lineMapTrips.json";
-writeFileSync(outputPath, JSON.stringify(config, null, 2) + "\n");
-
-console.log(
-  `Wrote ${Object.keys(config).length} route configs to ${outputPath}`,
-);

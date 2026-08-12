@@ -529,9 +529,12 @@ export default function getRouteShapes(
   // so the server keeps running; in production (build), throw to break the
   // build with a clear, actionable error message.
   if (missingTrips.length > 0) {
-    const detail =
-      `Missing trip(s) for route ${routeId}: ${missingTrips.join(", ")}. ` +
-      `Regenerate the config with: npx tsx scripts/seed-line-map-trips.ts`;
+    const detail = `
+      Missing trip(s) for route ${routeId}: ${missingTrips.join(", ")}.
+      Manually replace with correct trips in src/data/lineMapTrips.json,
+      Or use npx tsx scripts/seed-line-map-trips.ts [route_ids]
+      to generate a best guess. Do NOT push to production without
+      checking system map and line pages for effected routes.`;
     if (import.meta.env.DEV) {
       console.warn(`[getRouteShapes] ${detail}`);
     } else {
