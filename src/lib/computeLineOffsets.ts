@@ -29,6 +29,13 @@ export interface SystemShapeStopInput {
 
 export interface SystemShapeInput {
   routeId: string;
+  /**
+   * Unique key for this shape within a route. When a route contributes
+   * multiple shapes (e.g. splitline sides), each gets a distinct
+   * `shapeKey` so offset computation tracks them independently. When
+   * omitted, `routeId` is used.
+   */
+  shapeKey?: string;
   /** Raw shape coordinates in `[lon, lat]` GeoJSON order. */
   coordinates: Coord[];
   /** Stops in travel order along the shape. */
@@ -125,11 +132,12 @@ export function computeLineOffsets(
   const splitCoordsByRoute = new Map<string, Coord[][]>();
 
   for (const input of inputs) {
+    const key = input.shapeKey ?? input.routeId;
     const refs: SpanRef[] = [];
-    spanRefsByRoute.set(input.routeId, refs);
+    spanRefsByRoute.set(key, refs);
 
     if (input.coordinates.length < 2) {
-      splitCoordsByRoute.set(input.routeId, []);
+      splitCoordsByRoute.set(key, []);
       continue;
     }
 
@@ -143,13 +151,13 @@ export function computeLineOffsets(
 
     // Routes without enough stations render as a single unshared span.
     if (stationIds.length < 2) {
-      const key = `route:${input.routeId}`;
-      corridors.set(key, {
+      const corridorKey = `route:${input.routeId}`;
+      corridors.set(corridorKey, {
         fromStation: "",
         routeIds: [input.routeId],
       });
-      refs.push({ corridorKey: key, reversed: false });
-      splitCoordsByRoute.set(input.routeId, [input.coordinates]);
+      refs.push({ corridorKey: corridorKey, reversed: false });
+      splitCoordsByRoute.set(key, [input.coordinates]);
       continue;
     }
 
@@ -178,7 +186,7 @@ export function computeLineOffsets(
         validK.push(k);
       }
     }
-    splitCoordsByRoute.set(input.routeId, spans);
+    splitCoordsByRoute.set(key, spans);
 
     // Register each valid span in the corridor registry.
     for (const k of validK) {
@@ -214,17 +222,22 @@ export function computeLineOffsets(
   }
 
   // -------------------------------------------------------------------------
-  // Phase 4: reassemble each route as render segments, merging consecutive
-  // spans with the same offset.
+  // Phase 4: reassemble each shape as render segments, merging consecutive
+  // spans with the same offset. Segments are tracked per shapeKey (not per
+  // routeId) so that splitline sides — which share a routeId but are
+  // separate polylines — don't get connected by the merge logic. After
+  // all shapes are processed, per-shape segments are concatenated into a
+  // single array per routeId.
   // -------------------------------------------------------------------------
-  const segmentsByRoute = new Map<string, RenderSegment[]>();
+  const segmentsByShape = new Map<string, RenderSegment[]>();
 
   for (const input of inputs) {
+    const key = input.shapeKey ?? input.routeId;
     const segments: RenderSegment[] = [];
-    segmentsByRoute.set(input.routeId, segments);
+    segmentsByShape.set(key, segments);
 
-    const spans = splitCoordsByRoute.get(input.routeId) ?? [];
-    const refs = spanRefsByRoute.get(input.routeId) ?? [];
+    const spans = splitCoordsByRoute.get(key) ?? [];
+    const refs = spanRefsByRoute.get(key) ?? [];
 
     for (let i = 0; i < spans.length; i++) {
       const ref = refs[i];
@@ -245,6 +258,21 @@ export function computeLineOffsets(
         segments.push({ coordinates: coords.slice(), offset });
       }
     }
+  }
+
+  // Merge per-shape segments into per-route arrays. Multiple shapes with
+  // the same routeId (splitline sides) are concatenated without connecting
+  // their endpoints.
+  const segmentsByRoute = new Map<string, RenderSegment[]>();
+  for (const input of inputs) {
+    const key = input.shapeKey ?? input.routeId;
+    const shapeSegments = segmentsByShape.get(key) ?? [];
+    let routeSegments = segmentsByRoute.get(input.routeId);
+    if (!routeSegments) {
+      routeSegments = [];
+      segmentsByRoute.set(input.routeId, routeSegments);
+    }
+    routeSegments.push(...shapeSegments);
   }
 
   return segmentsByRoute;

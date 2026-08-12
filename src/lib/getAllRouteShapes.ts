@@ -102,9 +102,12 @@ function resolveLineColor(route: RouteWithInfo): string {
 
 /**
  * Builds the {@link SystemMapData} payload for all rail and busway routes
- * that have a `lineMapTrips` config. Each route contributes one line: the
- * first "core" direction-0 shape from its configured trips, split into
- * offset segments for side-by-side rendering of shared corridors.
+ * that have a `lineMapTrips` config. Each route contributes one line with
+ * offset segments for side-by-side rendering of shared corridors. For
+ * splitline routes (e.g. J-line 910/950), all core features are rendered
+ * so both sides of the split are drawn. For non-splitline routes, a single
+ * core direction-0 shape is used (the reverse direction typically traces
+ * the same path).
  *
  * Routes without a `lineMapTrips` config are silently skipped — `getRouteShapes`
  * returns `null` for those.
@@ -126,44 +129,62 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
     const shapes = getRouteShapes(route.routeId);
     if (!shapes || shapes.features.length === 0) continue;
 
-    // Prefer the first "core" direction-0 feature; fall back to any core
-    // feature, then any feature at all.
+    // For splitline routes, render all core features so both sides of
+    // the split are drawn. For non-splitline routes, prefer a single
+    // core direction-0 feature (the reverse direction typically traces
+    // the same path, so rendering both is redundant). Fall back to any
+    // core feature, then any feature at all.
     const coreFeatures = shapes.features.filter(
       (f) => f.properties.serviceType === "core",
     );
-    const dir0 = coreFeatures.find(
-      (f) => (f.properties.directionIds[0] ?? 0) === 0,
-    );
-    const feature: RouteShapeFeature =
-      dir0 ?? coreFeatures[0] ?? shapes.features[0];
+    const isSplitline = shapes.isSplitline;
+    let featuresToRender: RouteShapeFeature[];
+    if (isSplitline && coreFeatures.length > 0) {
+      featuresToRender = coreFeatures;
+    } else {
+      const dir0 = coreFeatures.find(
+        (f) => (f.properties.directionIds[0] ?? 0) === 0,
+      );
+      featuresToRender = [dir0 ?? coreFeatures[0] ?? shapes.features[0]];
+    }
 
     routeMeta.set(route.routeId, route);
 
-    // Register stations (deduplicated by parentStationId).
-    for (const stop of feature.properties.stops) {
-      let station = stationById.get(stop.parentStationId);
-      if (!station) {
-        station = {
-          stopName: stop.stopName,
-          lat: stop.lat,
-          lon: stop.lon,
-          routes: new Set(),
-        };
-        stationById.set(stop.parentStationId, station);
+    // Register stations from all rendered features (deduplicated by
+    // parentStationId). For splitline routes, each side has its own set
+    // of stops, so we need all features to capture every station.
+    // For rail, parent stations are shared across directions, so the
+    // deduplication naturally handles this. For busway, each direction
+    // and splitline side has distinct stop IDs at different physical
+    // locations.
+    for (const feature of featuresToRender) {
+      for (const stop of feature.properties.stops) {
+        const existing = stationById.get(stop.parentStationId);
+        if (existing) {
+          existing.routes.add(route.routeId);
+        } else {
+          stationById.set(stop.parentStationId, {
+            stopName: stop.stopName,
+            lat: stop.lat,
+            lon: stop.lon,
+            routes: new Set([route.routeId]),
+          });
+        }
       }
-      station.routes.add(route.routeId);
     }
 
-    // For busway routes, also register stations from other core features
-    // (other directions and splits). Unlike rail, busway stops have no
-    // parent_station — each direction has distinct stop IDs at different
-    // physical locations (often on opposite sides of the busway). Only
-    // registering the primary feature's stops would miss half the stops.
-    // Rail routes share parent stations across directions, so this is
-    // busway-only to avoid creating duplicate markers.
-    if (isBuswayRoute(route.routeId)) {
+    // For non-splitline busway routes, also register stations from other
+    // core features not being rendered (other directions). Unlike rail,
+    // busway stops have no parent_station — each direction has distinct
+    // stop IDs at different physical locations (often on opposite sides
+    // of the busway). Only registering the primary feature's stops would
+    // miss half the stops. Rail routes share parent stations across
+    // directions, so this is busway-only to avoid creating duplicate
+    // markers. (For splitline routes this is already handled above since
+    // all core features are rendered.)
+    if (!isSplitline && isBuswayRoute(route.routeId)) {
       for (const otherFeature of coreFeatures) {
-        if (otherFeature === feature) continue;
+        if (featuresToRender.includes(otherFeature)) continue;
         for (const stop of otherFeature.properties.stops) {
           const existing = stationById.get(stop.parentStationId);
           if (existing) {
@@ -180,23 +201,36 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       }
     }
 
-    inputs.push({
-      routeId: route.routeId,
-      coordinates: feature.geometry.coordinates,
-      stops: feature.properties.stops.map((s) => ({
-        parentStationId: s.parentStationId,
-        stopName: s.stopName,
-        lat: s.lat,
-        lon: s.lon,
-      })),
-    });
+    // Push one SystemShapeInput per rendered feature. For non-splitline
+    // routes this is a single feature (the first core direction-0). For
+    // splitline routes, this includes all sides so both branches render.
+    // Each input gets a unique shapeKey so computeLineOffsets tracks them
+    // independently while all segments end up under the same routeId.
+    for (const feature of featuresToRender) {
+      const shapeKey =
+        featuresToRender.length > 1
+          ? `${route.routeId}:${feature.properties.splitLineNumber ?? feature.properties.directionIds[0] ?? 0}`
+          : undefined;
+
+      inputs.push({
+        routeId: route.routeId,
+        ...(shapeKey !== undefined && { shapeKey }),
+        coordinates: feature.geometry.coordinates,
+        stops: feature.properties.stops.map((s) => ({
+          parentStationId: s.parentStationId,
+          stopName: s.stopName,
+          lat: s.lat,
+          lon: s.lon,
+        })),
+      });
+    }
   }
 
   // Compute offset segments for side-by-side rendering of shared corridors.
   const segmentsByRoute = computeLineOffsets(inputs);
 
-  const lines: SystemRouteLine[] = inputs.map((input) => {
-    const route = routeMeta.get(input.routeId)!;
+  const lines: SystemRouteLine[] = [...routeMeta.keys()].map((routeId) => {
+    const route = routeMeta.get(routeId)!;
     return {
       routeId: route.routeId,
       routeShortName: route.routeShortName,
@@ -204,7 +238,7 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       routeType: route.routeType,
       mode: isBuswayRoute(route.routeId) ? "busway" : "rail",
       color: resolveLineColor(route),
-      segments: segmentsByRoute.get(input.routeId) ?? [],
+      segments: segmentsByRoute.get(routeId) ?? [],
     };
   });
 
