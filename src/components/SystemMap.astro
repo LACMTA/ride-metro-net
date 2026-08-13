@@ -19,7 +19,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
 
 <DataInjector data={data} id="data-system-map" />
 <div
-  class="h-full w-full"
+  class="relative h-full w-full"
   data-system-map
   data-esri-key={esriKey}
   data-bus-stop-color={busStopColor}
@@ -30,6 +30,15 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     role="img"
     data-map-container
   >
+  </div>
+  <div
+    class="pointer-events-none absolute left-3 bottom-3 z-10 rounded bg-white/90 px-3 py-1.5 text-sm text-gray-600 shadow-sm"
+    role="status"
+    aria-live="polite"
+    data-bus-stop-info
+    hidden
+  >
+    <span data-bus-stop-info-text></span>
   </div>
 </div>
 
@@ -89,6 +98,12 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     ) as HTMLElement;
 
     const data = getData("data-system-map") as SystemMapData;
+    const infoEl = container.querySelector(
+      "[data-bus-stop-info]",
+    ) as HTMLElement;
+    const infoText = container.querySelector(
+      "[data-bus-stop-info-text]",
+    ) as HTMLElement;
 
     async function bootstrap() {
       const { map, maplibregl } = await createMap(mapContainer, esriKey);
@@ -200,6 +215,25 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
         // provides client-side deduplication so panning back to a
         // previously-visited area doesn't re-add duplicates.
         // ---------------------------------------------------------------
+
+        // --- Bus stop info overlay ---
+        // Toggles a small status badge over the map to indicate when bus
+        // stops are hidden (zoom too low) or loading. Uses an HTML overlay
+        // rather than a MapLibre layer for accessibility (aria-live) and
+        // code simplicity.
+        let busStopsFetching = false;
+
+        function updateBusStopInfo(): void {
+          if (map.getZoom() < BUS_STOP_MIN_ZOOM) {
+            infoText.textContent = "Zoom in to see bus stops";
+            infoEl.hidden = false;
+          } else if (busStopsFetching) {
+            infoText.textContent = "Bus stops loading…";
+            infoEl.hidden = false;
+          } else {
+            infoEl.hidden = true;
+          }
+        }
 
         // Set of station IDs already rendered as rail/busway station markers.
         // Bus stops that are also stations are skipped to avoid duplicate
@@ -317,7 +351,13 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
          * caching. Previously-fetched tiles are skipped.
          */
         async function fetchBusStops(): Promise<void> {
-          if (map.getZoom() < BUS_STOP_MIN_ZOOM) return;
+          if (map.getZoom() < BUS_STOP_MIN_ZOOM) {
+            updateBusStopInfo();
+            return;
+          }
+
+          busStopsFetching = true;
+          updateBusStopInfo();
 
           const bounds = map.getBounds();
           const west = snapToGrid(bounds.getWest());
@@ -338,6 +378,9 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
 
           await Promise.allSettled(tilePromises);
           syncBusStopSource();
+
+          busStopsFetching = false;
+          updateBusStopInfo();
         }
 
         // Clear fetched-tiles cache on zoom — tile composition changes
@@ -349,6 +392,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
         // Debounced fetch on map movement.
         let fetchTimer: ReturnType<typeof setTimeout> | null = null;
         map.on("moveend", () => {
+          updateBusStopInfo();
           if (fetchTimer) clearTimeout(fetchTimer);
           fetchTimer = setTimeout(fetchBusStops, BUS_STOP_DEBOUNCE_MS);
         });
