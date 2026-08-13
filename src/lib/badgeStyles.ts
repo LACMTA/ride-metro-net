@@ -3,7 +3,9 @@
  * map popup HTML builders (plain string). Keeping the shape/color/aria
  * decisions in one place ensures visual consistency across the site.
  */
-import { isBuswayRoute } from "./routeShortNameOverrides";
+import { isBuswayRoute, getLineSlug } from "./routeShortNameOverrides";
+
+export { getLineSlug };
 
 export type BadgeSizes = "sm" | "md" | "lg" | "xl";
 
@@ -81,6 +83,8 @@ export interface BadgeStyleInput {
   busAlertBadge?: boolean;
   /** Extra className to append. */
   className?: string;
+  /** If provided, renders the badge as an `<a>` linking to this URL. */
+  href?: string;
 }
 
 export interface BadgeStyleResult {
@@ -160,5 +164,11 @@ export function buildBadgeHtml(input: BadgeStyleInput): string {
         .join(";")
     : "";
   const styleAttr = styleStr ? ` style="${styleStr}"` : "";
+  if (input.href) {
+    const linkStyle = styleStr
+      ? `${styleStr};text-decoration:none`
+      : "text-decoration:none";
+    return `<a href="${input.href}" class="${className}" style="${linkStyle}" aria-label="${ariaLabel}">${input.name}</a>`;
+  }
   return `<span class="${className}"${styleAttr} aria-label="${ariaLabel}">${input.name}</span>`;
 }

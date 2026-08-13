@@ -10,7 +10,7 @@ import type {
   Map as MLMap,
   Popup as MLPopup,
 } from "maplibre-gl";
-import { buildBadgeHtml } from "./badgeStyles";
+import { buildBadgeHtml, getLineSlug } from "./badgeStyles";
 
 // ---------------------------------------------------------------------------
 // Visual constants
@@ -342,6 +342,7 @@ export function buildBadgeRow(badges: PopupBadgeInfo[]): string {
         color: b.routeColor,
         textColor: b.routeTextColor,
         size: "sm",
+        href: `/lines/${getLineSlug(b.routeId)}`,
       }),
     )
     .join("");
