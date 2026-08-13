@@ -216,7 +216,7 @@ function nearestIndex(
  * This is especially important for the split-line mixed-trip fallback, where
  * the full shape covers both sub-lines but only one sub-line's stops are shown.
  */
-function trimCoordinates(
+export function trimCoordinates(
   allCoords: [number, number][],
   stops: RouteStop[],
 ): [number, number][] {

@@ -1,5 +1,8 @@
 import getAllRailBuswayRoutes from "./getAllRailBuswayRoutes";
-import getRouteShapes, { type RouteShapeFeature } from "./getRouteShapes";
+import getRouteShapes, {
+  type RouteShapeFeature,
+  trimCoordinates,
+} from "./getRouteShapes";
 import type { RouteWithInfo } from "./getRouteById";
 import { getLineMapTrips } from "./getLineMapTrips";
 import {
@@ -101,13 +104,85 @@ function resolveLineColor(route: RouteWithInfo): string {
 }
 
 /**
+ * Trims a {@link RouteShapeFeature} to only the contiguous portion
+ * containing stops whose `parentStationId` is not in `renderedStations`,
+ * extended by one shared stop on each end for connectivity. Used to render
+ * loop segments (e.g. the A-line Long Beach loop) that only appear in one
+ * direction's shape without drawing the entire reverse path.
+ *
+ * Returns `null` if the feature has no unique stops.
+ */
+function trimToUniquePortion(
+  feature: RouteShapeFeature,
+  renderedStations: Set<string>,
+): RouteShapeFeature | null {
+  const stops = feature.properties.stops;
+
+  // Find indices of stops with unique parent stations.
+  const uniqueIndices: number[] = [];
+  for (let i = 0; i < stops.length; i++) {
+    if (!renderedStations.has(stops[i].parentStationId)) {
+      uniqueIndices.push(i);
+    }
+  }
+  if (uniqueIndices.length === 0) return null;
+
+  // Extend the range to include the nearest shared stop on each side
+  // so the trimmed shape connects to the existing line.
+  let startIdx = uniqueIndices[0];
+  if (
+    startIdx > 0 &&
+    renderedStations.has(stops[startIdx - 1].parentStationId)
+  ) {
+    startIdx--;
+  }
+  let endIdx = uniqueIndices[uniqueIndices.length - 1];
+  if (
+    endIdx < stops.length - 1 &&
+    renderedStations.has(stops[endIdx + 1].parentStationId)
+  ) {
+    endIdx++;
+  }
+
+  const trimmedStops = stops.slice(startIdx, endIdx + 1);
+
+  // Trim coordinates to match the first and last stops using the shared
+  // `trimCoordinates` utility from getRouteShapes.
+  const trimmedCoords = trimCoordinates(
+    feature.geometry.coordinates,
+    trimmedStops,
+  );
+
+  return {
+    type: "Feature",
+    geometry: { type: "LineString", coordinates: trimmedCoords },
+    properties: {
+      ...feature.properties,
+      stops: trimmedStops,
+    },
+  };
+}
+
+/**
  * Builds the {@link SystemMapData} payload for all rail and busway routes
  * that have a `lineMapTrips` config. Each route contributes one line with
- * offset segments for side-by-side rendering of shared corridors. For
- * splitline routes (e.g. J-line 910/950), all core features are rendered
- * so both sides of the split are drawn. For non-splitline routes, a single
- * core direction-0 shape is used (the reverse direction typically traces
- * the same path).
+ * offset segments for side-by-side rendering of shared corridors.
+ *
+ * **Shape rendering**: For splitline routes (e.g. J-line 910/950), all core
+ * features are rendered so both sides of the split are drawn. For
+ * non-splitline routes, a single core direction-0 shape is used (the
+ * reverse direction typically traces the same path). However, if a
+ * non-rendered core feature has stops not covered by the rendered
+ * features — e.g. the A-line (801) loop in Long Beach where direction-1
+ * serves stops not on direction-0 — that feature is trimmed to just the
+ * unique portion and rendered so its shape segments are drawn without
+ * duplicating the shared path.
+ *
+ * **Station registration**: Stations are registered from **all** core
+ * features (not just the rendered ones). For rail, parent stations are
+ * shared across directions, so deduplication by `parentStationId` prevents
+ * duplicate markers. For busway, each direction has distinct stop IDs at
+ * different physical locations.
  *
  * Routes without a `lineMapTrips` config are silently skipped — `getRouteShapes`
  * returns `null` for those.
@@ -148,16 +223,37 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       featuresToRender = [dir0 ?? coreFeatures[0] ?? shapes.features[0]];
     }
 
+    // For non-splitline routes, check if any non-rendered core features
+    // have stops not covered by the rendered features (e.g. the A-line
+    // loop where direction-1 serves stops not on direction-0). If so,
+    // trim that feature to just the unique portion and add it so the
+    // unique shape segments are drawn — without duplicating the shared
+    // path that both directions trace.
+    if (!isSplitline) {
+      const renderedStations = new Set<string>();
+      for (const f of featuresToRender) {
+        for (const s of f.properties.stops) {
+          renderedStations.add(s.parentStationId);
+        }
+      }
+      for (const f of coreFeatures) {
+        if (featuresToRender.includes(f)) continue;
+        const trimmed = trimToUniquePortion(f, renderedStations);
+        if (trimmed) {
+          featuresToRender.push(trimmed);
+        }
+      }
+    }
+
     routeMeta.set(route.routeId, route);
 
-    // Register stations from all rendered features (deduplicated by
-    // parentStationId). For splitline routes, each side has its own set
-    // of stops, so we need all features to capture every station.
-    // For rail, parent stations are shared across directions, so the
-    // deduplication naturally handles this. For busway, each direction
-    // and splitline side has distinct stop IDs at different physical
-    // locations.
-    for (const feature of featuresToRender) {
+    // Register stations from ALL core features (not just rendered ones).
+    // For rail, parent stations are shared across directions, so
+    // deduplication by parentStationId prevents duplicate markers. For
+    // busway, each direction has distinct stop IDs at different physical
+    // locations. (For splitline routes, all core features are already
+    // rendered so this covers all stops.)
+    for (const feature of coreFeatures) {
       for (const stop of feature.properties.stops) {
         const existing = stationById.get(stop.parentStationId);
         if (existing) {
@@ -169,34 +265,6 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
             lon: stop.lon,
             routes: new Set([route.routeId]),
           });
-        }
-      }
-    }
-
-    // For non-splitline busway routes, also register stations from other
-    // core features not being rendered (other directions). Unlike rail,
-    // busway stops have no parent_station — each direction has distinct
-    // stop IDs at different physical locations (often on opposite sides
-    // of the busway). Only registering the primary feature's stops would
-    // miss half the stops. Rail routes share parent stations across
-    // directions, so this is busway-only to avoid creating duplicate
-    // markers. (For splitline routes this is already handled above since
-    // all core features are rendered.)
-    if (!isSplitline && isBuswayRoute(route.routeId)) {
-      for (const otherFeature of coreFeatures) {
-        if (featuresToRender.includes(otherFeature)) continue;
-        for (const stop of otherFeature.properties.stops) {
-          const existing = stationById.get(stop.parentStationId);
-          if (existing) {
-            existing.routes.add(route.routeId);
-          } else {
-            stationById.set(stop.parentStationId, {
-              stopName: stop.stopName,
-              lat: stop.lat,
-              lon: stop.lon,
-              routes: new Set([route.routeId]),
-            });
-          }
         }
       }
     }
