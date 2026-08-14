@@ -238,7 +238,7 @@ export async function GET(context: import("astro").APIContext) {
   return new Response(JSON.stringify([...byRoute.values()]), {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": prodCacheHeader(60),
+      "Cache-Control": prodCacheHeader(50, 50),
     },
   });
 }
