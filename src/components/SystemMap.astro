@@ -1,13 +1,15 @@
 ---
 import DataInjector from "./DataInjector.astro";
 import type { SystemMapData } from "../lib/getAllRouteShapes";
+import type { ServiceAreaBbox } from "../lib/getBusStopsForBbox";
 import { getAgencySettings } from "../lib/agencies";
 
 interface Props {
   data: SystemMapData;
+  serviceAreaBbox: ServiceAreaBbox;
 }
 
-const { data } = Astro.props;
+const { data, serviceAreaBbox } = Astro.props;
 const esriKey = import.meta.env.ESRI_KEY;
 
 // Bus stop marker color — uses the LA Metro Bus agency default line color
@@ -23,6 +25,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
   data-system-map
   data-esri-key={esriKey}
   data-bus-stop-color={busStopColor}
+  data-service-area-bbox={`${serviceAreaBbox.minLon},${serviceAreaBbox.minLat},${serviceAreaBbox.maxLon},${serviceAreaBbox.maxLat}`}
 >
   <div
     class="h-full w-full"
@@ -61,6 +64,13 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     STOP_STROKE_DARK,
     BUS_STOP_MIN_ZOOM,
   } from "../lib/mapStyles";
+  import {
+    BUS_STOP_GRID_SIZE,
+    BUS_STOP_PREFETCH_TILES,
+    snapToGrid,
+    gridXForLon,
+    gridYForLat,
+  } from "../lib/busStopTiles";
 
   /**
    * Pixel spacing between adjacent side-by-side lines. Offset slots from the
@@ -78,21 +88,14 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
   const BUS_STOPS_SOURCE = "bus-stops";
   const BUS_STOPS_LAYER = "bus-stops";
 
-  /**
-   * Grid size (in degrees) for snapping bus-stop bounding-box queries. The
-   * client rounds viewport bounds to this grid so the same geographic area
-   * always produces the same URL, enabling browser HTTP cache hits.
-   * 0.005° ≈ 550 m at LA's latitude — small enough that each tile stays
-   * well under any reasonable stop count even in dense areas.
-   */
-  const BUS_STOP_GRID_SIZE = 0.005;
-
-  /** Number of grid tiles to prefetch beyond the viewport in each direction. */
-  const BUS_STOP_PREFETCH_TILES = 1;
-
   function initSystemMap(container: HTMLElement): void {
     const esriKey = container.dataset.esriKey!;
     const busStopColor = container.dataset.busStopColor ?? "#e16710";
+
+    // Service area bounding box — tiles outside this area are never fetched.
+    const bboxStr = container.dataset.serviceAreaBbox;
+    const serviceArea = bboxStr ? bboxStr.split(",").map(Number) : null;
+
     const mapContainer = container.querySelector(
       "[data-map-container]",
     ) as HTMLElement;
@@ -278,13 +281,6 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
         }
 
         /**
-         * Snap a coordinate down to the grid cell boundary.
-         */
-        function snapToGrid(value: number): number {
-          return Math.floor(value / BUS_STOP_GRID_SIZE) * BUS_STOP_GRID_SIZE;
-        }
-
-        /**
          * Fetch bus stops for a single grid tile and merge results into
          * `busStopMap`. The tile key is recorded in `fetchedTiles` so it
          * won't be re-requested.
@@ -300,14 +296,10 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
           busStopsInFlight++;
           updateBusStopInfo();
 
-          const tileEast = tileWest + BUS_STOP_GRID_SIZE;
-          const tileNorth = tileSouth + BUS_STOP_GRID_SIZE;
-          const bbox = `${tileWest.toFixed(4)},${tileSouth.toFixed(4)},${tileEast.toFixed(4)},${tileNorth.toFixed(4)}`;
-
           let addedAny = false;
 
           try {
-            const res = await fetch(`/api/bus-stops?bbox=${bbox}`);
+            const res = await fetch(`/api/bus-stops/${tileKey}.json`);
             if (!res.ok) return;
             const json = (await res.json()) as {
               stops: {
@@ -381,9 +373,20 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
 
           for (let lon = west; lon < east; lon += BUS_STOP_GRID_SIZE) {
             for (let lat = south; lat < north; lat += BUS_STOP_GRID_SIZE) {
-              const gridX = Math.round(lon / BUS_STOP_GRID_SIZE);
-              const gridY = Math.round(lat / BUS_STOP_GRID_SIZE);
-              const tileKey = `${gridX},${gridY}`;
+              // Skip tiles outside the service area — no fetch, no 404.
+              // Mark them as fetched so they're not retried on pan.
+              if (
+                serviceArea &&
+                (lon < serviceArea[0] ||
+                  lat < serviceArea[1] ||
+                  lon > serviceArea[2] ||
+                  lat > serviceArea[3])
+              ) {
+                const tileKey = `${gridXForLon(lon)},${gridYForLat(lat)}`;
+                fetchedTiles.add(tileKey);
+                continue;
+              }
+              const tileKey = `${gridXForLon(lon)},${gridYForLat(lat)}`;
               fetchTile(lon, lat, tileKey);
             }
           }

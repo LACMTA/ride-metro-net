@@ -4,8 +4,8 @@ import { getAgencyIdsByFlag } from "./agencies";
  * Shared SQL condition + bind params that identify routes from agencies
  * where `buildStopPages` is enabled and whose `route_long_name` is non-empty.
  *
- * Used by both `getStopStaticPaths` (built stop pages) and the `bus-stops`
- * API (system map) so that the set of stops shown on the map stays 1-1 with
+ * Used by both `getStopStaticPaths` (built stop pages) and the prerendered
+ * bus-stops tile API (system map) so that the set of stops shown on the map stays 1-1 with
  * the set of stops that have generated pages.
  *
  * @param routeAlias - The SQL alias/column reference for `route_id`, e.g. `"r.route_id"`.

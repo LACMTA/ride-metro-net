@@ -318,8 +318,8 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
   );
 
   // Query non-busway bus routes serving those busway station stop IDs.
-  // Uses the same eligibility and busway-exclusion logic as the bus-stops
-  // API endpoint so the system map stays consistent with stop pages.
+  // Uses the same eligibility and busway-exclusion logic as the prerendered
+  // bus-stops tile API so the system map stays consistent with stop pages.
   const busRoutesByStation = queryBusRoutesForStations(buswayStationIds);
 
   const stations: SystemStation[] = [...stationById.entries()].map(
@@ -349,7 +349,7 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
 
 /**
  * Queries non-busway bus routes (route_type = 3) serving the given stop IDs.
- * Mirrors the logic in `/api/bus-stops` — uses `buildStopPagesRouteCondition`
+ * Mirrors the logic in the prerendered bus-stops tile API — uses `buildStopPagesRouteCondition`
  * for agency eligibility and `buswayRouteSqlCondition` to exclude busway
  * routes (G / J Line). Returns routes in `SystemStationLine` shape for
  * direct use in station popups.

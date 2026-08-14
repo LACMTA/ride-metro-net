@@ -2,14 +2,16 @@
 import Layout from "../layouts/Layout.astro";
 import SystemMap from "../components/SystemMap.astro";
 import getAllRouteShapes from "../lib/getAllRouteShapes";
+import { getBusStopServiceAreaBbox } from "../lib/getBusStopsForBbox";
 
 export const prerender = true;
 
 const systemMapData = await getAllRouteShapes();
+const serviceAreaBbox = getBusStopServiceAreaBbox();
 ---
 
 <Layout title="Metro System Map" fullHeight>
   <div class="h-full overflow-hidden">
-    <SystemMap data={systemMapData} />
+    <SystemMap data={systemMapData} serviceAreaBbox={serviceAreaBbox} />
   </div>
 </Layout>
