@@ -32,7 +32,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
   >
   </div>
   <div
-    class="pointer-events-none absolute left-3 bottom-3 z-10 rounded bg-white/90 px-3 py-1.5 text-sm text-gray-600 shadow-sm"
+    class="pointer-events-none absolute bottom-3 left-3 z-10 rounded bg-white/90 px-3 py-1.5 text-sm text-gray-600 shadow-sm"
     role="status"
     aria-live="polite"
     data-bus-stop-info
@@ -87,8 +87,8 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
    */
   const BUS_STOP_GRID_SIZE = 0.005;
 
-  /** Debounce delay (ms) for bus-stop fetches on map move/zoom. */
-  const BUS_STOP_DEBOUNCE_MS = 300;
+  /** Number of grid tiles to prefetch beyond the viewport in each direction. */
+  const BUS_STOP_PREFETCH_TILES = 1;
 
   function initSystemMap(container: HTMLElement): void {
     const esriKey = container.dataset.esriKey!;
@@ -221,13 +221,14 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
         // stops are hidden (zoom too low) or loading. Uses an HTML overlay
         // rather than a MapLibre layer for accessibility (aria-live) and
         // code simplicity.
-        let busStopsFetching = false;
+        /** Count of in-flight tile fetches, for the loading indicator. */
+        let busStopsInFlight = 0;
 
         function updateBusStopInfo(): void {
           if (map.getZoom() < BUS_STOP_MIN_ZOOM) {
             infoText.textContent = "Zoom in to see bus stops";
             infoEl.hidden = false;
-          } else if (busStopsFetching) {
+          } else if (busStopsInFlight > 0) {
             infoText.textContent = "Bus stops loading…";
             infoEl.hidden = false;
           } else {
@@ -262,7 +263,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
         >();
 
         /** Grid tiles already fetched, keyed `"gridX,gridY"` to avoid
-         * re-requesting the same tile on pan. Cleared on zoom change. */
+         * re-requesting the same tile on pan. Persists across zoom/pan. */
         const fetchedTiles = new Set<string>();
 
         /** Update the GeoJSON source with all accumulated bus stops. */
@@ -296,9 +297,14 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
           if (fetchedTiles.has(tileKey)) return;
           fetchedTiles.add(tileKey);
 
+          busStopsInFlight++;
+          updateBusStopInfo();
+
           const tileEast = tileWest + BUS_STOP_GRID_SIZE;
           const tileNorth = tileSouth + BUS_STOP_GRID_SIZE;
           const bbox = `${tileWest.toFixed(4)},${tileSouth.toFixed(4)},${tileEast.toFixed(4)},${tileNorth.toFixed(4)}`;
+
+          let addedAny = false;
 
           try {
             const res = await fetch(`/api/bus-stops?bbox=${bbox}`);
@@ -336,65 +342,58 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
                   }),
                 },
               });
+              addedAny = true;
             }
           } catch {
             // Network errors are non-fatal — bus stops are supplementary.
             // Remove the tile key so it can be retried on the next pan.
             fetchedTiles.delete(tileKey);
+          } finally {
+            // Incremental rendering — push new stops to the map as soon
+            // as this tile resolves, rather than waiting for all tiles.
+            if (addedAny) syncBusStopSource();
+            busStopsInFlight--;
+            updateBusStopInfo();
           }
         }
 
         /**
-         * Fetch bus stops for every grid tile intersecting the current
-         * viewport. Each tile is fetched independently so that dense areas
-         * don't block sparse ones, and tile URLs are stable for HTTP
-         * caching. Previously-fetched tiles are skipped.
+         * Kick off tile fetches for every grid tile intersecting the current
+         * viewport (plus a prefetch margin). Each tile is fetched independently
+         * and renders incrementally as it resolves. Previously-fetched tiles
+         * are skipped via `fetchedTiles`, so calling this on every `move` event
+         * does not create redundant requests — just like basemap tile loading.
          */
-        async function fetchBusStops(): Promise<void> {
+        function fetchBusStops(): void {
           if (map.getZoom() < BUS_STOP_MIN_ZOOM) {
             updateBusStopInfo();
             return;
           }
 
-          busStopsFetching = true;
-          updateBusStopInfo();
-
           const bounds = map.getBounds();
-          const west = snapToGrid(bounds.getWest());
-          const south = snapToGrid(bounds.getSouth());
-          const east = snapToGrid(bounds.getEast()) + BUS_STOP_GRID_SIZE;
-          const north = snapToGrid(bounds.getNorth()) + BUS_STOP_GRID_SIZE;
-
-          const tilePromises: Promise<void>[] = [];
+          const margin = BUS_STOP_GRID_SIZE * BUS_STOP_PREFETCH_TILES;
+          const west = snapToGrid(bounds.getWest()) - margin;
+          const south = snapToGrid(bounds.getSouth()) - margin;
+          const east =
+            snapToGrid(bounds.getEast()) + BUS_STOP_GRID_SIZE + margin;
+          const north =
+            snapToGrid(bounds.getNorth()) + BUS_STOP_GRID_SIZE + margin;
 
           for (let lon = west; lon < east; lon += BUS_STOP_GRID_SIZE) {
             for (let lat = south; lat < north; lat += BUS_STOP_GRID_SIZE) {
               const gridX = Math.round(lon / BUS_STOP_GRID_SIZE);
               const gridY = Math.round(lat / BUS_STOP_GRID_SIZE);
               const tileKey = `${gridX},${gridY}`;
-              tilePromises.push(fetchTile(lon, lat, tileKey));
+              fetchTile(lon, lat, tileKey);
             }
           }
-
-          await Promise.allSettled(tilePromises);
-          syncBusStopSource();
-
-          busStopsFetching = false;
-          updateBusStopInfo();
         }
 
-        // Clear fetched-tiles cache on zoom — tile composition changes
-        // and we want fresh coverage of the new viewport.
-        map.on("zoomstart", () => {
-          fetchedTiles.clear();
-        });
-
-        // Debounced fetch on map movement.
-        let fetchTimer: ReturnType<typeof setTimeout> | null = null;
-        map.on("moveend", () => {
-          updateBusStopInfo();
-          if (fetchTimer) clearTimeout(fetchTimer);
-          fetchTimer = setTimeout(fetchBusStops, BUS_STOP_DEBOUNCE_MS);
+        // Fetch bus stops on map movement — no debounce needed since
+        // `fetchedTiles` prevents redundant requests. New tiles start
+        // loading as soon as they enter the viewport, like basemap tiles.
+        map.on("move", () => {
+          fetchBusStops();
         });
 
         // Initial fetch in case the map starts zoomed in.
