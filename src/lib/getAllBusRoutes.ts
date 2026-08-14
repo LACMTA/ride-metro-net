@@ -1,9 +1,10 @@
 import { getGtfsDb } from "./gtfsConfig";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
-import { getAgencyIdsByFlag } from "./agencies";
+import { getAgencyIdsByFlag, getAgencySettings } from "./agencies";
 import type { RouteWithInfo } from "./getRouteById";
 
 interface DbRow {
+  agency_id: string;
   route_id: string;
   route_short_name: string;
   route_long_name: string;
@@ -28,6 +29,7 @@ export default async function getAllBusRoutes(): Promise<RouteWithInfo[]> {
     .prepare(
       `
       SELECT
+        r.agency_id,
         r.route_id,
         r.route_short_name,
         r.route_long_name,
@@ -71,6 +73,7 @@ export default async function getAllBusRoutes(): Promise<RouteWithInfo[]> {
       routeType: row.route_type,
       routeColor: row.route_color,
       routeTextColor: row.route_text_color,
+      defaultLineColor: getAgencySettings(row.agency_id)?.lineColor ?? "",
     };
   });
 }
