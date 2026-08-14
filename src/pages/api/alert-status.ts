@@ -141,7 +141,7 @@ export async function GET() {
   return new Response(JSON.stringify(body), {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": prodCacheHeader(900),
+      "Cache-Control": prodCacheHeader(60, 60),
     },
   });
 }

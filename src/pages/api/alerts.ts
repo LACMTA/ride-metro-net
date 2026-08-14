@@ -59,7 +59,7 @@ export async function GET(context: import("astro").APIContext) {
   return new Response(JSON.stringify(alerts.map(makeConciseAlert)), {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": prodCacheHeader(900),
+      "Cache-Control": prodCacheHeader(60, 60),
     },
   });
 }
