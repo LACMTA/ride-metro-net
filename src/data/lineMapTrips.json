@@ -1932,12 +1932,12 @@
   "801": {
     "trips": [
       {
-        "tripId": "64155042",
+        "tripId": "64214381",
         "directionId": 0,
         "serviceType": "core"
       },
       {
-        "tripId": "64155045",
+        "tripId": "64214425",
         "directionId": 1,
         "serviceType": "core"
       }
