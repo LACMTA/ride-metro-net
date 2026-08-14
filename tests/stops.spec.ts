@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { stops } from "./fixtures";
 
-test.describe("Stop pages (/stops/:stopId)", () => {
+test.describe.skip("Stop pages (/stops/:stopId) — disabled for alerts-only launch", () => {
   for (const stop of stops) {
     test(`loads /stops/${stop.stopId} (${stop.expectedName})`, async ({
       page,

@@ -66,6 +66,19 @@ export function getGtfsDb(): Database.Database {
       -- instead of scanning the full ~3.5M-row stop_times table.
       CREATE INDEX IF NOT EXISTS idx_stop_times_stop_id
         ON stop_times (stop_id);
+
+      -- Allow the correlated has_stops_after subquery in getStopWithRoutes to
+      -- look up the max stop_sequence per trip_id via an index seek instead of
+      -- a full table scan (without this, every row in the materialized stop_data
+      -- CTE triggers a scan of the entire stop_times table).
+      CREATE INDEX IF NOT EXISTS idx_stop_times_trip_id
+        ON stop_times (trip_id, stop_sequence);
+
+      -- Support bounding-box proximity scans in getRouteShapes (nearby-stop
+      -- connecting lines query). Without this, the radius query would do a
+      -- full table scan of stops on every route-shape API request.
+      CREATE INDEX IF NOT EXISTS idx_stops_latlon
+        ON stops (stop_lat, stop_lon);
     `);
   }
   return dbInstance;

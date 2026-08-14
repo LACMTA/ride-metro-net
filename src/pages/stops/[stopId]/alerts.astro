@@ -9,11 +9,10 @@ import PageHeader from "../../../components/PageHeader";
 import Column from "../../../components/Column";
 import { getStopStaticPaths } from "../../../lib/getStopStaticPaths";
 
-export const prerender = true;
+export const prerender = false;
 
-export async function getStaticPaths() {
-  return getStopStaticPaths();
-}
+// Alerts-only launch: stop alerts pages are disabled.
+return new Response(null, { status: 404 });
 
 const { stopId } = Astro.params;
 

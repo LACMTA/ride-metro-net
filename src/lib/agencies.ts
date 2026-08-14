@@ -33,6 +33,12 @@ export interface AgencyConfig {
     buildStopPages?: boolean;
     /** Brand color (hex) for the agency, used on screen displays. */
     color?: string;
+    /**
+     * Default line color (hex without leading `#`) for routes whose GTFS
+     * `route_color` is empty. When GTFS provides a `route_color`, it takes
+     * precedence over this value.
+     */
+    lineColor?: string;
     /** Filename of the agency logo stored under `/public/agency-logos/`. */
     logoFile?: string;
   }[];
@@ -88,6 +94,7 @@ export const agencyConfigs: AgencyConfig[] = [
         buildLinePages: true,
         buildStopPages: true,
         color: "#121212",
+        lineColor: "e16710",
         logoFile: "metro.svg",
       },
     ],
@@ -123,6 +130,7 @@ export const agencyConfigs: AgencyConfig[] = [
         buildLinePages: true,
         buildStopPages: true,
         color: "#121212",
+        lineColor: "e16710",
         logoFile: "metro.svg",
       },
     ],

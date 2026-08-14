@@ -18,6 +18,10 @@ export default defineConfig({
         context: "server",
         access: "secret",
       }),
+      ESRI_KEY: envField.string({
+        context: "client",
+        access: "public",
+      }),
     },
   },
   vite: {
