@@ -2,6 +2,7 @@ import { getServiceAlertsFromDb } from "../../lib/getServiceAlerts";
 import type { Alert } from "../../lib/getServiceAlerts";
 import { makeConciseAlert } from "../../lib/makeConciseAlert";
 import { getChildStopIds } from "../../lib/stopHierarchyLookup";
+import { prodCacheHeader } from "../../lib/prodCacheHeader";
 
 export const prerender = false;
 
@@ -58,7 +59,7 @@ export async function GET(context: import("astro").APIContext) {
   return new Response(JSON.stringify(alerts.map(makeConciseAlert)), {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "public, max-age=900",
+      "Cache-Control": prodCacheHeader(60, 60),
     },
   });
 }

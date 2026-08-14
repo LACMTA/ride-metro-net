@@ -1,0 +1,414 @@
+---
+import DataInjector from "./DataInjector.astro";
+import type { SystemMapData } from "../lib/getAllRouteShapes";
+import type { ServiceAreaBbox } from "../lib/getBusStopsForBbox";
+import { getAgencySettings } from "../lib/agencies";
+
+interface Props {
+  data: SystemMapData;
+  serviceAreaBbox: ServiceAreaBbox;
+}
+
+const { data, serviceAreaBbox } = Astro.props;
+const esriKey = import.meta.env.ESRI_KEY;
+
+// Bus stop marker color — uses the LA Metro Bus agency default line color
+// (which matches --color-bus-local / --color-burnt-orange from the Tailwind
+// theme). Passed to the client via a data attribute since agencies.ts has
+// server-side side effects and can't be imported in the browser.
+const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
+---
+
+<DataInjector data={data} id="data-system-map" />
+<div
+  class="relative h-full w-full"
+  data-system-map
+  data-esri-key={esriKey}
+  data-bus-stop-color={busStopColor}
+  data-service-area-bbox={`${serviceAreaBbox.minLon},${serviceAreaBbox.minLat},${serviceAreaBbox.maxLon},${serviceAreaBbox.maxLat}`}
+>
+  <div
+    class="h-full w-full"
+    aria-label="Map of Metro rail and busway lines"
+    role="img"
+    data-map-container
+  >
+  </div>
+  <div
+    class="pointer-events-none absolute bottom-3 left-3 z-10 rounded bg-white/90 px-3 py-1.5 text-sm text-gray-600 shadow-sm"
+    role="status"
+    aria-live="polite"
+    data-bus-stop-info
+    hidden
+  >
+    <span data-bus-stop-info-text></span>
+  </div>
+</div>
+
+<script>
+  import { createMap } from "../lib/createMap";
+  import { getData } from "../lib/getData";
+  import type { SystemMapData } from "../lib/getAllRouteShapes";
+  import type { Feature, FeatureCollection, LineString, Point } from "geojson";
+  import { getLineSlug } from "../lib/routeShortNameOverrides";
+  import {
+    makeCasingLayer,
+    makeLineLayer,
+    makeStopLayer,
+    makeBusStopLayer,
+    makePopupOptions,
+    attachPopupHandlers,
+    fitBoundsToCoords,
+    buildStopPopupHtml,
+    buildLinePopupHtml,
+    STOP_STROKE_DARK,
+    BUS_STOP_MIN_ZOOM,
+  } from "../lib/mapStyles";
+  import {
+    BUS_STOP_GRID_SIZE,
+    BUS_STOP_PREFETCH_TILES,
+    snapToGrid,
+    gridXForLon,
+    gridYForLat,
+  } from "../lib/busStopTiles";
+
+  /**
+   * Pixel spacing between adjacent side-by-side lines. Offset slots from the
+   * build-time processor are ±1, ±2, … in steps of 2, so the visual gap
+   * between two co-running 6px lines is `2 * OFFSET_STEP_PX`.
+   */
+  const OFFSET_STEP_PX = 3;
+
+  /** Unique source/layer IDs for the system map. */
+  const LINES_SOURCE = "system-lines";
+  const CASING_LAYER = "system-lines-casing";
+  const LINES_LAYER = "system-lines";
+  const STATIONS_SOURCE = "system-stations";
+  const STATIONS_LAYER = "system-stations";
+  const BUS_STOPS_SOURCE = "bus-stops";
+  const BUS_STOPS_LAYER = "bus-stops";
+
+  function initSystemMap(container: HTMLElement): void {
+    const esriKey = container.dataset.esriKey!;
+    const busStopColor = container.dataset.busStopColor ?? "#e16710";
+
+    // Service area bounding box — tiles outside this area are never fetched.
+    const bboxStr = container.dataset.serviceAreaBbox;
+    const serviceArea = bboxStr ? bboxStr.split(",").map(Number) : null;
+
+    const mapContainer = container.querySelector(
+      "[data-map-container]",
+    ) as HTMLElement;
+
+    const data = getData("data-system-map") as SystemMapData;
+    const infoEl = container.querySelector(
+      "[data-bus-stop-info]",
+    ) as HTMLElement;
+    const infoText = container.querySelector(
+      "[data-bus-stop-info-text]",
+    ) as HTMLElement;
+
+    async function bootstrap() {
+      const { map, maplibregl } = await createMap(mapContainer, esriKey);
+
+      if (data.lines.length === 0) return;
+
+      // -----------------------------------------------------------------
+      // Build a GeoJSON FeatureCollection of LineStrings from all route
+      // segments. Each feature carries `color` and `offset` (in pixels)
+      // so the line layer can apply a data-driven `line-offset` and
+      // `line-color` — no third-party plugin needed.
+      // -----------------------------------------------------------------
+      const lineFeatures: FeatureCollection<LineString> = {
+        type: "FeatureCollection",
+        features: [],
+      };
+
+      for (const line of data.lines) {
+        const { color, routeId, routeShortName } = line;
+        const slug = getLineSlug(routeId);
+        const popupHtml = buildLinePopupHtml({ slug, routeShortName, color });
+
+        for (const segment of line.segments) {
+          lineFeatures.features.push({
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: segment.coordinates,
+            },
+            properties: {
+              color,
+              offset: segment.offset * OFFSET_STEP_PX,
+              popupHtml,
+            },
+          });
+        }
+      }
+
+      // -----------------------------------------------------------------
+      // Build a GeoJSON FeatureCollection of Points for stations.
+      // -----------------------------------------------------------------
+      const stationFeatures: FeatureCollection<Point> = {
+        type: "FeatureCollection",
+        features: data.stations.map((station) => ({
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [station.lon, station.lat],
+          },
+          properties: {
+            popupHtml: buildStopPopupHtml({
+              stopId: station.stationId,
+              stopName: station.stopName,
+              badges: [...station.lines, ...station.busRoutes],
+            }),
+          },
+        })),
+      };
+
+      // Wait for the map style to load before adding sources/layers.
+      map.on("load", () => {
+        // --- Lines source (shared by casing + colored layers) ---
+        map.addSource(LINES_SOURCE, {
+          type: "geojson",
+          data: lineFeatures,
+        });
+
+        // White casing layer — drawn underneath for visual separation of
+        // overlapping lines.
+        map.addLayer(makeCasingLayer(CASING_LAYER, LINES_SOURCE));
+
+        // Colored line layer — drawn on top of the casing.
+        map.addLayer(
+          makeLineLayer(LINES_LAYER, LINES_SOURCE, {
+            color: ["get", "color"],
+            offset: ["get", "offset"],
+          }),
+        );
+
+        // --- Stations ---
+        map.addSource(STATIONS_SOURCE, {
+          type: "geojson",
+          data: stationFeatures,
+        });
+
+        map.addLayer(
+          makeStopLayer(STATIONS_LAYER, STATIONS_SOURCE, {
+            strokeColor: STOP_STROKE_DARK,
+          }),
+        );
+
+        // --- Popups ---
+        const popup = new maplibregl.Popup(makePopupOptions());
+
+        attachPopupHandlers(map, LINES_LAYER, popup);
+        attachPopupHandlers(map, STATIONS_LAYER, popup);
+
+        // Fit bounds to all line coordinates.
+        const allCoords: [number, number][] = lineFeatures.features
+          .flatMap((f) => f.geometry.coordinates)
+          .map(([lng, lat]) => [lng, lat]);
+        fitBoundsToCoords(map, maplibregl, allCoords);
+
+        // ---------------------------------------------------------------
+        // Bus stops — loaded on-demand from the API when zoomed in.
+        // The viewport is broken into small grid tiles, each fetched
+        // independently so that dense areas don't block sparse ones.
+        // Tile URLs are stable for HTTP caching, and a Map<stopId, Feature>
+        // provides client-side deduplication so panning back to a
+        // previously-visited area doesn't re-add duplicates.
+        // ---------------------------------------------------------------
+
+        // --- Bus stop info overlay ---
+        // Toggles a small status badge over the map to indicate when bus
+        // stops are hidden (zoom too low) or loading. Uses an HTML overlay
+        // rather than a MapLibre layer for accessibility (aria-live) and
+        // code simplicity.
+        /** Count of in-flight tile fetches, for the loading indicator. */
+        let busStopsInFlight = 0;
+
+        function updateBusStopInfo(): void {
+          if (map.getZoom() < BUS_STOP_MIN_ZOOM) {
+            infoText.textContent = "Zoom in to see bus stops";
+            infoEl.hidden = false;
+          } else if (busStopsInFlight > 0) {
+            infoText.textContent = "Bus stops loading…";
+            infoEl.hidden = false;
+          } else {
+            infoEl.hidden = true;
+          }
+        }
+
+        // Set of station IDs already rendered as rail/busway station markers.
+        // Bus stops that are also stations are skipped to avoid duplicate
+        // markers — the station marker (with busway line badges) is the
+        // primary marker for such stops.
+        const stationIds = new Set(data.stations.map((s) => s.stationId));
+
+        map.addSource(BUS_STOPS_SOURCE, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+
+        map.addLayer(
+          makeBusStopLayer(BUS_STOPS_LAYER, BUS_STOPS_SOURCE, {
+            minzoom: BUS_STOP_MIN_ZOOM,
+            color: busStopColor,
+          }),
+        );
+
+        attachPopupHandlers(map, BUS_STOPS_LAYER, popup);
+
+        // Accumulated bus stop features, keyed by stop_id for deduplication.
+        const busStopMap = new Map<
+          string,
+          Feature<Point, { popupHtml: string }>
+        >();
+
+        /** Grid tiles already fetched, keyed `"gridX,gridY"` to avoid
+         * re-requesting the same tile on pan. Persists across zoom/pan. */
+        const fetchedTiles = new Set<string>();
+
+        /** Update the GeoJSON source with all accumulated bus stops. */
+        function syncBusStopSource(): void {
+          const source = map.getSource(BUS_STOPS_SOURCE);
+          if (source && source.type === "geojson") {
+            (source as maplibregl.GeoJSONSource).setData({
+              type: "FeatureCollection",
+              features: [...busStopMap.values()],
+            });
+          }
+        }
+
+        /**
+         * Fetch bus stops for a single grid tile and merge results into
+         * `busStopMap`. The tile key is recorded in `fetchedTiles` so it
+         * won't be re-requested.
+         */
+        async function fetchTile(
+          tileWest: number,
+          tileSouth: number,
+          tileKey: string,
+        ): Promise<void> {
+          if (fetchedTiles.has(tileKey)) return;
+          fetchedTiles.add(tileKey);
+
+          busStopsInFlight++;
+          updateBusStopInfo();
+
+          let addedAny = false;
+
+          try {
+            const res = await fetch(`/api/bus-stops/${tileKey}.json`);
+            if (!res.ok) return;
+            const json = (await res.json()) as {
+              stops: {
+                stopId: string;
+                stopName: string;
+                lat: number;
+                lon: number;
+                routes: {
+                  routeId: string;
+                  routeShortName: string;
+                  routeType: number;
+                  routeColor: string;
+                  routeTextColor: string;
+                }[];
+              }[];
+            };
+
+            for (const stop of json.stops) {
+              if (busStopMap.has(stop.stopId)) continue;
+              if (stationIds.has(stop.stopId)) continue;
+              busStopMap.set(stop.stopId, {
+                type: "Feature",
+                geometry: {
+                  type: "Point",
+                  coordinates: [stop.lon, stop.lat],
+                },
+                properties: {
+                  popupHtml: buildStopPopupHtml({
+                    stopId: stop.stopId,
+                    stopName: stop.stopName,
+                    badges: stop.routes,
+                  }),
+                },
+              });
+              addedAny = true;
+            }
+          } catch {
+            // Network errors are non-fatal — bus stops are supplementary.
+            // Remove the tile key so it can be retried on the next pan.
+            fetchedTiles.delete(tileKey);
+          } finally {
+            // Incremental rendering — push new stops to the map as soon
+            // as this tile resolves, rather than waiting for all tiles.
+            if (addedAny) syncBusStopSource();
+            busStopsInFlight--;
+            updateBusStopInfo();
+          }
+        }
+
+        /**
+         * Kick off tile fetches for every grid tile intersecting the current
+         * viewport (plus a prefetch margin). Each tile is fetched independently
+         * and renders incrementally as it resolves. Previously-fetched tiles
+         * are skipped via `fetchedTiles`, so calling this on every `move` event
+         * does not create redundant requests — just like basemap tile loading.
+         */
+        function fetchBusStops(): void {
+          if (map.getZoom() < BUS_STOP_MIN_ZOOM) {
+            updateBusStopInfo();
+            return;
+          }
+
+          const bounds = map.getBounds();
+          const margin = BUS_STOP_GRID_SIZE * BUS_STOP_PREFETCH_TILES;
+          const west = snapToGrid(bounds.getWest()) - margin;
+          const south = snapToGrid(bounds.getSouth()) - margin;
+          const east =
+            snapToGrid(bounds.getEast()) + BUS_STOP_GRID_SIZE + margin;
+          const north =
+            snapToGrid(bounds.getNorth()) + BUS_STOP_GRID_SIZE + margin;
+
+          for (let lon = west; lon < east; lon += BUS_STOP_GRID_SIZE) {
+            for (let lat = south; lat < north; lat += BUS_STOP_GRID_SIZE) {
+              // Skip tiles outside the service area — no fetch, no 404.
+              // Mark them as fetched so they're not retried on pan.
+              if (
+                serviceArea &&
+                (lon < serviceArea[0] ||
+                  lat < serviceArea[1] ||
+                  lon > serviceArea[2] ||
+                  lat > serviceArea[3])
+              ) {
+                const tileKey = `${gridXForLon(lon)},${gridYForLat(lat)}`;
+                fetchedTiles.add(tileKey);
+                continue;
+              }
+              const tileKey = `${gridXForLon(lon)},${gridYForLat(lat)}`;
+              fetchTile(lon, lat, tileKey);
+            }
+          }
+        }
+
+        // Fetch bus stops on map movement — no debounce needed since
+        // `fetchedTiles` prevents redundant requests. New tiles start
+        // loading as soon as they enter the viewport, like basemap tiles.
+        map.on("move", () => {
+          fetchBusStops();
+        });
+
+        // Initial fetch in case the map starts zoomed in.
+        fetchBusStops();
+      });
+    }
+
+    bootstrap();
+  }
+
+  // Initialise all system map containers on the page.
+  document.querySelectorAll("[data-system-map]").forEach((el) => {
+    initSystemMap(el as HTMLElement);
+  });
+</script>

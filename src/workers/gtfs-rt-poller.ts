@@ -14,7 +14,9 @@ export function startRealtimePoller(): void {
 
   cron.schedule("* * * * *", async () => {
     if (isUpdating) {
-      console.log("[gtfs-rt] Previous update still running, skipping this tick");
+      console.log(
+        "[gtfs-rt] Previous update still running, skipping this tick",
+      );
       return;
     }
 

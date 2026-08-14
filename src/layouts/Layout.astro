@@ -7,7 +7,7 @@ import SystemWideAlert from "../components/SystemWideAlert";
 import "../styles/fonts.css";
 import "../styles/global.css";
 
-const { title, screen = false } = Astro.props;
+const { title, screen = false, fullHeight = false } = Astro.props;
 const includeAnalytics = import.meta.env.PROD && !screen;
 ---
 
@@ -28,11 +28,25 @@ const includeAnalytics = import.meta.env.PROD && !screen;
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>
-  <body class={screen ? 'bg-black text-white font-sans' : 'font-sans'}>
+  <body
+    class={screen
+      ? "bg-black text-white font-sans"
+      : fullHeight
+        ? "font-sans flex flex-col h-dvh overflow-hidden"
+        : "font-sans"}
+  >
     {includeAnalytics && <AnalyticsBody />}
     {!screen && <Header />}
     {!screen && <SystemWideAlert client:load />}
-    <slot />
-    {!screen && <Footer />}
+    {
+      fullHeight ? (
+        <div class="flex-1 overflow-hidden">
+          <slot />
+        </div>
+      ) : (
+        <slot />
+      )
+    }
+    {!screen && !fullHeight && <Footer />}
   </body>
 </html>

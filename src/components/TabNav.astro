@@ -20,8 +20,8 @@ const { tabs, activeTab } = Astro.props;
 
 const renderedSlots = Object.fromEntries(
   await Promise.all(
-    tabs.map(async (tab) => [tab.key, await Astro.slots.render(tab.key)])
-  )
+    tabs.map(async (tab) => [tab.key, await Astro.slots.render(tab.key)]),
+  ),
 );
 
 const baseClass =

@@ -17,7 +17,9 @@ export default function StopAlertsBadge({ stopIds }: Props) {
 
   const stopIdSet = new Set(stopIds);
   const alertCount = $alerts.filter((alert) =>
-    alert.informedEntities.some((e) => e.stopId != null && stopIdSet.has(e.stopId)),
+    alert.informedEntities.some(
+      (e) => e.stopId != null && stopIdSet.has(e.stopId),
+    ),
   ).length;
 
   return (

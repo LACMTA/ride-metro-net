@@ -1,6 +1,7 @@
 export const prerender = false;
 
 import { getGtfsDb } from "../../lib/gtfsConfig";
+import { prodCacheHeader } from "../../lib/prodCacheHeader";
 
 /**
  * Grace period (in seconds) after a predicted arrival/departure time has
@@ -215,8 +216,11 @@ export async function GET(context: import("astro").APIContext) {
 
     routePred.destinations = [];
     for (const dirDests of byDirection.values()) {
-      const all: { time: number; dest: (typeof dirDests)[0]; pred: Prediction }[] =
-        [];
+      const all: {
+        time: number;
+        dest: (typeof dirDests)[0];
+        pred: Prediction;
+      }[] = [];
       for (const dest of dirDests)
         for (const pred of dest.predictions)
           all.push({ time: pred.time, dest, pred });
@@ -237,7 +241,7 @@ export async function GET(context: import("astro").APIContext) {
   return new Response(JSON.stringify([...byRoute.values()]), {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "public, max-age=60",
+      "Cache-Control": prodCacheHeader(50, 50),
     },
   });
 }

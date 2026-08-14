@@ -5,6 +5,7 @@ import { getStopInfo } from "../../lib/stopHierarchyLookup";
 import { isCurrent } from "../../lib/isCurrent";
 import { getAgencyIdsByFlag } from "../../lib/agencies";
 import type { ConciseAlert } from "./alerts";
+import { prodCacheHeader } from "../../lib/prodCacheHeader";
 
 export const prerender = false;
 
@@ -140,7 +141,7 @@ export async function GET() {
   return new Response(JSON.stringify(body), {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "public, max-age=900",
+      "Cache-Control": prodCacheHeader(60, 60),
     },
   });
 }

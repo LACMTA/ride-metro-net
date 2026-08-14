@@ -1,0 +1,272 @@
+---
+import LineMapControls from "./LineMapControls";
+
+interface Props {
+  /** Numeric route ID prefix (e.g. "801", "720") for the API endpoint. */
+  routeId: string;
+  /** Resolved line color as a CSS hex string (e.g. `"#E47525"`). */
+  lineColor: string;
+}
+
+const { routeId, lineColor } = Astro.props;
+const esriKey = import.meta.env.ESRI_KEY;
+---
+
+<div
+  class="bg-background-white mb-8 rounded-lg"
+  data-line-map
+  data-route-id={routeId}
+  data-line-color={lineColor}
+  data-esri-key={esriKey}
+>
+  <LineMapControls client:load />
+  <div
+    class="h-96 w-full overflow-hidden"
+    aria-label="Map of Metro line route"
+    role="img"
+    data-map-container
+  >
+  </div>
+</div>
+
+<script>
+  import type {
+    RouteShapesGeoJSON,
+    RouteShapeFeature,
+  } from "../lib/getRouteShapes";
+  import { lightenColor } from "../lib/lightenColor";
+  import {
+    lineMapGeoJson,
+    lineMapSelection,
+    getFilteredShapes,
+  } from "../lib/lineMapStore";
+  import { createMap } from "../lib/createMap";
+  import {
+    makeCasingLayer,
+    makeLineLayer,
+    makeStopLayer,
+    makePopupOptions,
+    attachPopupHandlers,
+    fitBoundsToCoords,
+  } from "../lib/mapStyles";
+  import type { Map as MLMap } from "maplibre-gl";
+  import type { FeatureCollection, LineString, Point } from "geojson";
+
+  /** Unique source/layer IDs for the line map. */
+  const SHAPES_SOURCE = "line-shapes";
+  const CASING_LAYER = "line-casing";
+  const GHOST_LAYER = "line-ghost";
+  const SELECTED_LAYER = "line-selected";
+  const STOPS_SOURCE = "line-stops";
+  const STOPS_LAYER = "line-stops";
+
+  interface MapState {
+    map: MLMap;
+    maplibregl: typeof import("maplibre-gl");
+    loaded: boolean;
+    /** Pending data that arrived before `map.on("load")` fired. */
+    pendingRender: boolean;
+  }
+
+  function emptyLineCollection(): FeatureCollection<LineString> {
+    return { type: "FeatureCollection", features: [] };
+  }
+
+  function emptyPointCollection(): FeatureCollection<Point> {
+    return { type: "FeatureCollection", features: [] };
+  }
+
+  function initMap(container: HTMLElement): void {
+    const lineColor = container.dataset.lineColor!;
+    const esriKey = container.dataset.esriKey!;
+
+    const mapContainer = container.querySelector(
+      "[data-map-container]",
+    ) as HTMLElement;
+
+    let state: MapState | null = null;
+
+    async function bootstrap() {
+      const { map, maplibregl } = await createMap(mapContainer, esriKey);
+
+      state = { map, maplibregl, loaded: false, pendingRender: false };
+
+      map.on("load", () => {
+        state!.loaded = true;
+
+        // --- Shape source (casing + ghost + selected share one source) ---
+        map.addSource(SHAPES_SOURCE, {
+          type: "geojson",
+          data: emptyLineCollection(),
+        });
+
+        // White casing layer — drawn beneath both ghost and selected lines
+        // for visual separation of overlapping segments, consistent with
+        // the system map.
+        map.addLayer(
+          makeCasingLayer(CASING_LAYER, SHAPES_SOURCE, { offset: null }),
+        );
+
+        // Ghost layer: features that differ from the current selection in
+        // exactly one dimension — the unselected split-line side (same
+        // service type) or the unselected service type (same split-line,
+        // e.g. owl when core is selected). Rendered as a lightened tint at
+        // full opacity so overlapping ghost lines don't darken each other.
+        map.addLayer(
+          makeLineLayer(GHOST_LAYER, SHAPES_SOURCE, {
+            color: lightenColor(lineColor, 0.5),
+            filter: ["==", ["get", "isGhost"], true],
+            opacity: 1,
+          }),
+        );
+
+        // Selected line layer — rendered on top of the ghost.
+        map.addLayer(
+          makeLineLayer(SELECTED_LAYER, SHAPES_SOURCE, {
+            color: lineColor,
+            filter: ["==", ["get", "isGhost"], false],
+          }),
+        );
+
+        // --- Stops ---
+        map.addSource(STOPS_SOURCE, {
+          type: "geojson",
+          data: emptyPointCollection(),
+        });
+
+        map.addLayer(
+          makeStopLayer(STOPS_LAYER, STOPS_SOURCE, {
+            strokeColor: lineColor,
+          }),
+        );
+
+        // --- Stop popups ---
+        const popup = new maplibregl.Popup(makePopupOptions());
+
+        attachPopupHandlers(map, STOPS_LAYER, popup);
+
+        // Render any data that arrived while we were setting up.
+        if (state!.pendingRender) {
+          state!.pendingRender = false;
+          renderSelection();
+        }
+      });
+
+      // If the GeoJSON has already been fetched (by the page script) before
+      // the map finished initializing, render it now.
+      renderSelection();
+    }
+
+    function getGhostFeatures(
+      geojson: RouteShapesGeoJSON,
+    ): RouteShapeFeature[] {
+      const selection = lineMapSelection.get();
+      const splitNum = selection.splitLineNumber;
+      const serviceType = selection.serviceType;
+      return geojson.features.filter((f) => {
+        const fSplit = f.properties.splitLineNumber;
+        const sameSplit =
+          splitNum === null ? fSplit === undefined : fSplit === splitNum;
+        const diffSplit = !sameSplit;
+        const diffService = f.properties.serviceType !== serviceType;
+        // Exactly one dimension differs.
+        return diffService !== diffSplit && (diffService || diffSplit);
+      });
+    }
+
+    function renderSelection(): void {
+      if (!state?.map) return;
+      const geojson = lineMapGeoJson.get();
+      if (!geojson || geojson.features.length === 0) return;
+
+      // Defer rendering until the map style has loaded.
+      if (!state.loaded) {
+        state.pendingRender = true;
+        return;
+      }
+
+      const selection = lineMapSelection.get();
+      const filtered = getFilteredShapes(geojson, selection);
+      if (filtered.length === 0) return;
+
+      const feature = filtered[0];
+      const ghostFeatures = getGhostFeatures(geojson);
+
+      // --- Build shapes FeatureCollection ---
+      // Ghost features first (drawn beneath), then the selected feature.
+      const shapes: FeatureCollection<LineString> = {
+        type: "FeatureCollection",
+        features: [
+          ...ghostFeatures.map((f) => ({
+            type: "Feature" as const,
+            geometry: f.geometry,
+            properties: { isGhost: true },
+          })),
+          {
+            type: "Feature" as const,
+            geometry: feature.geometry,
+            properties: { isGhost: false },
+          },
+        ],
+      };
+
+      const shapesSource = state.map.getSource(SHAPES_SOURCE);
+      if (shapesSource) {
+        shapesSource.setData(shapes);
+      }
+
+      // --- Build stops FeatureCollection ---
+      const stops: FeatureCollection<Point> = {
+        type: "FeatureCollection",
+        features: feature.properties.stops.map((stop) => ({
+          type: "Feature" as const,
+          geometry: {
+            type: "Point" as const,
+            coordinates: [stop.lon, stop.lat] as [number, number],
+          },
+          properties: { stopName: stop.stopName },
+        })),
+      };
+
+      const stopsSource = state.map.getSource(STOPS_SOURCE);
+      if (stopsSource) {
+        stopsSource.setData(stops);
+      }
+
+      // --- Fit bounds to the selected feature + ghost features ---
+      const allCoords: [number, number][] = [
+        ...feature.geometry.coordinates,
+        ...ghostFeatures.flatMap((gf) => gf.geometry.coordinates),
+      ];
+
+      if (allCoords.length > 0) {
+        const bounds = new state.maplibregl.LngLatBounds();
+        for (const coord of allCoords) {
+          bounds.extend(coord);
+        }
+        if (!bounds.isEmpty()) {
+          state.map.fitBounds(bounds, { padding: 20 });
+        }
+      }
+    }
+
+    // Re-render the map whenever the selection store changes (user-driven
+    // control changes from LineMapControls or any other store consumer).
+    lineMapSelection.listen(() => {
+      renderSelection();
+    });
+
+    // Re-render when the GeoJSON data arrives (the page script fetches it
+    // independently of the map initialization).
+    lineMapGeoJson.listen(() => {
+      renderSelection();
+    });
+
+    bootstrap();
+  }
+
+  // Initialise all line map containers on the page.
+  document.querySelectorAll("[data-line-map]").forEach((el) => {
+    initMap(el as HTMLElement);
+  });
+</script>

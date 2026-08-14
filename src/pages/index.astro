@@ -1,13 +1,17 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import SystemMap from "../components/SystemMap.astro";
+import getAllRouteShapes from "../lib/getAllRouteShapes";
+import { getBusStopServiceAreaBbox } from "../lib/getBusStopsForBbox";
 
-Astro.response.status = 404;
-export const prerender = false;
+export const prerender = true;
+
+const systemMapData = await getAllRouteShapes();
+const serviceAreaBbox = getBusStopServiceAreaBbox();
 ---
 
-<Layout title="404 - Page Not Found">
-  <main class="flex flex-col items-center justify-center gap-4 py-24">
-    <h1 class="text-3xl font-bold text-black">Page not found</h1>
-    <a class="text-link" href="https://www.metro.net">Return to Metro.net</a>
-  </main>
+<Layout title="Metro System Map" fullHeight>
+  <div class="h-full overflow-hidden">
+    <SystemMap data={systemMapData} serviceAreaBbox={serviceAreaBbox} />
+  </div>
 </Layout>

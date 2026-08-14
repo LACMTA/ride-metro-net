@@ -8,9 +8,13 @@ import LineAlertsBadge from "../../../components/LineAlertsBadge";
 import PageHeader from "../../../components/PageHeader";
 import LineOverview from "../../../components/LineOverview";
 import getRouteOverview from "../../../lib/getRouteOverview";
+import getRouteShapes from "../../../lib/getRouteShapes";
 import pdfSchedules from "../../../data/pdf-schedules.json";
 import { getLineStaticPaths } from "../../../lib/getLineStaticPaths";
 import Column from "../../../components/Column";
+import LineMap from "../../../components/LineMap.astro";
+import StopList from "../../../components/StopList";
+import { getLineMapTrips } from "../../../lib/getLineMapTrips";
 
 export const prerender = true;
 
@@ -31,13 +35,44 @@ const title =
 const routeOverview = await getRouteOverview(route.routeId);
 const pdfUrl =
   (pdfSchedules as Record<string, string>)[numericId ?? routeId] ?? null;
+
+// Verify that a map config exists for this route. If not, throw at build time
+// so the developer knows to add an entry to src/data/lineMapTrips.json.
+const mapConfig = getLineMapTrips(route.routeId);
+if (!mapConfig) {
+  throw new Error(
+    `No lineMapTrips config found for route ${route.routeId}. ` +
+      `Add an entry to src/data/lineMapTrips.json.`,
+  );
+}
+
+// Pre-build the route shape GeoJSON at build time.
+const routeShapes = getRouteShapes(route.routeId);
+if (!routeShapes) {
+  throw new Error(
+    `No route shapes found for route ${route.routeId}. ` +
+      `Check the lineMapTrips config and GTFS shapes data.`,
+  );
+}
+
+// Resolve the line color once: GTFS route_color takes precedence, then the
+// agency-level default line color, then a black fallback.
+const lineColor = route.routeColor
+  ? `#${route.routeColor}`
+  : route.defaultLineColor
+    ? route.defaultLineColor
+    : "#000";
 ---
 
 <DataInjector data={route} id="data-route" />
+<DataInjector data={routeShapes} id="data-route-shape" />
 <script>
   import { getData } from "../../../lib/getData";
   import type { RouteWithInfo } from "../../../lib/getRouteById";
+  import type { RouteShapesGeoJSON } from "../../../lib/getRouteShapes";
   import watchAlerts from "../../../lib/watchAlerts";
+  import { setLineMapGeoJson } from "../../../lib/lineMapStore";
+  import { hydrationGate } from "../../../lib/hydrationGate";
 
   const route = getData("data-route") as RouteWithInfo;
 
@@ -47,11 +82,27 @@ const pdfUrl =
       routeIds: [route.routeId],
     },
   ]);
+
+  // Populate the shared nanostore from the build-time-inlined route shape
+  // GeoJSON. As with watchAlerts/watchPredictions/watchAlertStatus, the store
+  // write is deferred until the hydration gate opens to prevent an immediate
+  // write from updating the store while React is still reconciling SSR HTML,
+  // which would cause a hydration mismatch in LineMapControls and StopList.
+  const routeShapes = getData("data-route-shape") as RouteShapesGeoJSON;
+  (async () => {
+    await hydrationGate;
+    setLineMapGeoJson(routeShapes);
+  })();
 </script>
 
 <Layout title={title}>
   <main>
-    <PageHeader routes={[route]} title={title} badgeSize="xl" />
+    <PageHeader
+      routes={[route]}
+      title={title}
+      badgeSize="xl"
+      linkBadges={false}
+    />
     <section>
       <TabNav
         tabs={[
@@ -68,6 +119,9 @@ const pdfUrl =
       </TabNav>
       <div class="bg-background-gray pt-3 pb-10">
         <Column>
+          <h2 class="mb-6 text-2xl font-bold">{title} Map</h2>
+          <LineMap routeId={route.routeId} lineColor={lineColor} />
+          <StopList client:load lineColor={lineColor} />
           <LineOverview
             lineTitle={title}
             routeOverview={routeOverview}
