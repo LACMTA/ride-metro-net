@@ -9,6 +9,7 @@ import type {
   SystemStationLine,
 } from "../lib/getAllRouteShapes";
 import type { BusStop } from "../lib/getBusStopsForBbox";
+import { flyToLocation } from "../lib/systemMapStore";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -191,7 +192,7 @@ export default function SystemMapSidebar({
   // -------------------------------------------------------------------------
 
   const fetchSearch = useCallback(async (q: string) => {
-    if (q.trim().length < 2) {
+    if (q.trim().length < 1) {
       setResults(null);
       setLoading(false);
       setMode("browse");
@@ -260,6 +261,10 @@ export default function SystemMapSidebar({
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+
+        // Pan and zoom the system map to the user's location.
+        flyToLocation(longitude, latitude);
+
         abortRef.current?.abort();
         const controller = new AbortController();
         abortRef.current = controller;

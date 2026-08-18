@@ -4,7 +4,7 @@ import type { BusStop } from "../../lib/getBusStopsForBbox";
 
 export const prerender = false;
 
-const MIN_QUERY_LENGTH = 2;
+const MIN_QUERY_LENGTH = 1;
 
 interface SearchResponse {
   lines: RouteWithInfo[];
@@ -17,7 +17,8 @@ interface SearchResponse {
  * Searches Metro routes and stops by name. Returns matching lines (rail,
  * busway, and bus) and stops (with their serving routes for badge rendering).
  *
- * Queries shorter than 2 characters return empty arrays.
+ * Empty queries return empty arrays. Single-character queries are allowed so
+ * that short route names (e.g. bus "2") can be searched.
  */
 export async function GET(context: import("astro").APIContext) {
   const query = context.url.searchParams.get("q") ?? "";

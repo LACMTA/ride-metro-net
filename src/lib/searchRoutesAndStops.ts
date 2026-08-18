@@ -11,6 +11,54 @@ import type { BusStop, BusRouteInfo } from "./getBusStopsForBbox";
 import { getBusStopServiceAreaBbox } from "./getBusStopsForBbox";
 
 // ---------------------------------------------------------------------------
+// Eligible-stops temp table
+// ---------------------------------------------------------------------------
+//
+// The stop-eligibility check (buildStopPages agencies + non-empty
+// route_long_name + busway exclusion) requires joining stop_times → trips →
+// routes for *every* candidate stop. As a correlated EXISTS subquery this is
+// O(stops × stop_times) — ~2.3 s for a short LIKE query.
+//
+// To avoid that, we materialize the set of eligible stop_ids into a per-
+// connection temp table once per process lifetime (the DB connection is
+// cached in gtfsConfig). Subsequent searches JOIN against this table in
+// O(stops) with an index seek, dropping the worst-case query to ~14 ms.
+
+let eligibleStopsReady = false;
+
+/**
+ * Creates (if needed) a per-connection temp table of stop_ids that have at
+ * least one eligible route, and indexes it. Idempotent — calls after the
+ * first are no-ops.
+ */
+function ensureEligibleStopsTable(db: ReturnType<typeof getGtfsDb>): void {
+  if (eligibleStopsReady) return;
+
+  const routeCond = buildStopPagesRouteCondition("r");
+  if (routeCond.params.length === 0) {
+    eligibleStopsReady = true;
+    return;
+  }
+
+  const buswayExclude = buswayRouteSqlCondition("r.route_id", false);
+
+  db.exec(`
+    CREATE TEMP TABLE IF NOT EXISTS _eligible_stops AS
+      SELECT DISTINCT st.stop_id
+      FROM stop_times st
+      JOIN trips t ON t.trip_id = st.trip_id
+      JOIN routes r ON r.route_id = t.route_id
+      WHERE ${routeCond.clause}
+        AND ${buswayExclude};
+  `);
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx__eligible_stops ON _eligible_stops(stop_id);",
+  );
+
+  eligibleStopsReady = true;
+}
+
+// ---------------------------------------------------------------------------
 // Route search
 // ---------------------------------------------------------------------------
 
@@ -66,8 +114,8 @@ export function searchRoutes(query: string, limit = 50): RouteWithInfo[] {
         COALESCE(r.route_color, '')      AS route_color,
         COALESCE(r.route_text_color, '') AS route_text_color
       FROM routes r
-      JOIN trips t ON t.route_id = r.route_id
       WHERE r.agency_id IN (${placeholders})
+        AND EXISTS (SELECT 1 FROM trips t WHERE t.route_id = r.route_id)
         AND (r.route_short_name LIKE @like ESCAPE '\\'
              OR r.route_long_name LIKE @like ESCAPE '\\'
              ${overrideCond})
@@ -216,30 +264,23 @@ export function searchStops(query: string, limit = 30): BusStop[] {
   const routeCond = buildStopPagesRouteCondition("r");
   if (routeCond.params.length === 0) return [];
 
-  const buswayExclude = buswayRouteSqlCondition("r.route_id", false);
+  ensureEligibleStopsTable(db);
   const likeQuery = `%${query.replace(/[%_]/g, (m) => "\\" + m)}%`;
 
   const stopRows = db
     .prepare(
       `
-      SELECT stop_id, stop_name, stop_lat, stop_lon
-      FROM stops
-      WHERE (location_type = 0 OR location_type IS NULL)
-        AND parent_station IS NULL
-        AND stop_name LIKE @like ESCAPE '\\'
-        AND EXISTS (
-          SELECT 1 FROM stop_times st
-          JOIN trips t ON t.trip_id = st.trip_id
-          JOIN routes r ON r.route_id = t.route_id
-          WHERE st.stop_id = stops.stop_id
-            AND ${routeCond.clause}
-            AND ${buswayExclude}
-        )
-      ORDER BY stop_name
+      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+      FROM stops s
+      JOIN _eligible_stops es ON es.stop_id = s.stop_id
+      WHERE (s.location_type = 0 OR s.location_type IS NULL)
+        AND s.parent_station IS NULL
+        AND s.stop_name LIKE @like ESCAPE '\\'
+      ORDER BY s.stop_name
       LIMIT @limit
       `,
     )
-    .all({ like: likeQuery, limit }, ...routeCond.params) as StopSearchRow[];
+    .all({ like: likeQuery, limit }) as StopSearchRow[];
 
   return enrichStopsWithRoutes(stopRows, db);
 }
@@ -267,48 +308,38 @@ export function findNearbyStops(
   const routeCond = buildStopPagesRouteCondition("r");
   if (routeCond.params.length === 0) return [];
 
-  const buswayExclude = buswayRouteSqlCondition("r.route_id", false);
+  ensureEligibleStopsTable(db);
   const bbox = getBusStopServiceAreaBbox();
 
-  // Over-fetch by 3x so we have candidates after the EXISTS filter, then
+  // Over-fetch by 3x so we have candidates after the eligibility filter, then
   // trim to the requested limit after ordering by distance.
   const fetchLimit = limit * 3;
 
   const stopRows = db
     .prepare(
       `
-      SELECT stop_id, stop_name, stop_lat, stop_lon,
-             ((stop_lat - @lat) * (stop_lat - @lat)
-              + (stop_lon - @lon) * (stop_lon - @lon)) AS dist_sq
-      FROM stops
-      WHERE (location_type = 0 OR location_type IS NULL)
-        AND parent_station IS NULL
-        AND stop_lat BETWEEN @south AND @north
-        AND stop_lon BETWEEN @west AND @east
-        AND EXISTS (
-          SELECT 1 FROM stop_times st
-          JOIN trips t ON t.trip_id = st.trip_id
-          JOIN routes r ON r.route_id = t.route_id
-          WHERE st.stop_id = stops.stop_id
-            AND ${routeCond.clause}
-            AND ${buswayExclude}
-        )
+      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon,
+             ((s.stop_lat - @lat) * (s.stop_lat - @lat)
+              + (s.stop_lon - @lon) * (s.stop_lon - @lon)) AS dist_sq
+      FROM stops s
+      JOIN _eligible_stops es ON es.stop_id = s.stop_id
+      WHERE (s.location_type = 0 OR s.location_type IS NULL)
+        AND s.parent_station IS NULL
+        AND s.stop_lat BETWEEN @south AND @north
+        AND s.stop_lon BETWEEN @west AND @east
       ORDER BY dist_sq ASC
       LIMIT @fetchLimit
       `,
     )
-    .all(
-      {
-        lat,
-        lon,
-        south: bbox.minLat,
-        north: bbox.maxLat,
-        west: bbox.minLon,
-        east: bbox.maxLon,
-        fetchLimit,
-      },
-      ...routeCond.params,
-    ) as (StopSearchRow & { dist_sq: number })[];
+    .all({
+      lat,
+      lon,
+      south: bbox.minLat,
+      north: bbox.maxLat,
+      west: bbox.minLon,
+      east: bbox.maxLon,
+      fetchLimit,
+    }) as (StopSearchRow & { dist_sq: number })[];
 
   const trimmed = stopRows.slice(0, limit).map(({ dist_sq, ...rest }) => rest);
   return enrichStopsWithRoutes(trimmed, db);

@@ -49,6 +49,42 @@ export const STOP_MIN_ZOOM = 10;
 /** Zoom level at which station circles reach their maximum size. */
 export const STOP_MAX_ZOOM = 16;
 
+/**
+ * Busway stations use smaller markers than rail stations because busway stops
+ * come in pairs (one per direction at different physical locations), so
+ * larger markers would overlap. These markers use the line color as the
+ * stroke with a white fill, visually distinguishing them from rail stations.
+ */
+/** Base radius (px) of busway station circles at low zoom. */
+export const BUSWAY_STOP_RADIUS = 3;
+
+/** Max radius (px) of busway station circles when zoomed in. */
+export const BUSWAY_STOP_RADIUS_MAX = 7;
+
+/** Base stroke width (px) of busway station circles at low zoom. */
+export const BUSWAY_STOP_STROKE_WIDTH = 2;
+
+/** Max stroke width (px) of busway station circles when zoomed in. */
+export const BUSWAY_STOP_STROKE_WIDTH_MAX = 3.5;
+
+/**
+ * Rail stations on the system map use markers that are larger than busway
+ * and bus stops but smaller than the default stop sizes (which are shared
+ * with `LineMap.astro` for single-line close-up views). This keeps the
+ * system map uncluttered while maintaining visual hierarchy.
+ */
+/** Base radius (px) of rail station circles at low zoom. */
+export const RAIL_STOP_RADIUS = 4;
+
+/** Max radius (px) of rail station circles when zoomed in. */
+export const RAIL_STOP_RADIUS_MAX = 9;
+
+/** Base stroke width (px) of rail station circles at low zoom. */
+export const RAIL_STOP_STROKE_WIDTH = 2.5;
+
+/** Max stroke width (px) of rail station circles when zoomed in. */
+export const RAIL_STOP_STROKE_WIDTH_MAX = 4;
+
 /** Base radius (px) of bus stop circles at low zoom. */
 export const BUS_STOP_RADIUS = 3;
 
@@ -163,9 +199,10 @@ export function makeStopLayer(
     strokeColor: ExpressionInput;
     radius?: ExpressionInput;
     strokeWidth?: ExpressionInput;
+    filter?: ExpressionInput;
   },
 ): CircleLayerSpecification {
-  return {
+  const layer: CircleLayerSpecification = {
     id,
     type: "circle",
     source,
@@ -194,6 +231,10 @@ export function makeStopLayer(
       "circle-opacity": 1,
     },
   };
+  if (options.filter !== undefined) {
+    layer.filter = options.filter as CircleLayerSpecification["filter"];
+  }
+  return layer;
 }
 
 /**

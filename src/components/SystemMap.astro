@@ -50,7 +50,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
   import { getData } from "../lib/getData";
   import type { SystemMapData } from "../lib/getAllRouteShapes";
   import type { Feature, FeatureCollection, LineString, Point } from "geojson";
-  import { getLineSlug } from "../lib/routeShortNameOverrides";
+  import { getLineSlug, isBuswayRoute } from "../lib/routeShortNameOverrides";
   import {
     makeCasingLayer,
     makeLineLayer,
@@ -63,6 +63,16 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     buildLinePopupHtml,
     STOP_STROKE_DARK,
     BUS_STOP_MIN_ZOOM,
+    BUSWAY_STOP_RADIUS,
+    BUSWAY_STOP_RADIUS_MAX,
+    BUSWAY_STOP_STROKE_WIDTH,
+    BUSWAY_STOP_STROKE_WIDTH_MAX,
+    RAIL_STOP_RADIUS,
+    RAIL_STOP_RADIUS_MAX,
+    RAIL_STOP_STROKE_WIDTH,
+    RAIL_STOP_STROKE_WIDTH_MAX,
+    STOP_MIN_ZOOM,
+    STOP_MAX_ZOOM,
   } from "../lib/mapStyles";
   import {
     BUS_STOP_GRID_SIZE,
@@ -71,6 +81,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     gridXForLon,
     gridYForLat,
   } from "../lib/busStopTiles";
+  import { systemMapFlyTarget } from "../lib/systemMapStore";
 
   /**
    * Pixel spacing between adjacent side-by-side lines. Offset slots from the
@@ -85,6 +96,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
   const LINES_LAYER = "system-lines";
   const STATIONS_SOURCE = "system-stations";
   const STATIONS_LAYER = "system-stations";
+  const BUSWAY_STATIONS_LAYER = "system-busway-stations";
   const BUS_STOPS_SOURCE = "bus-stops";
   const BUS_STOPS_LAYER = "bus-stops";
 
@@ -110,6 +122,38 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
 
     async function bootstrap() {
       const { map, maplibregl } = await createMap(mapContainer, esriKey);
+
+      // --- Fly-to listener ---
+      // The sidebar sets `systemMapFlyTarget` (e.g. when "nearby" is tapped).
+      // We listen immediately so a target set before the map's `load` event
+      // is not lost. If the map isn't loaded yet, we defer the `easeTo` until
+      // `load` fires and then consume the current store value.
+      let mapLoaded = false;
+
+      systemMapFlyTarget.listen((target) => {
+        if (!target) return;
+        if (!mapLoaded) return;
+        map.easeTo({
+          center: [target.lon, target.lat],
+          zoom: target.zoom,
+          duration: 800,
+        });
+        systemMapFlyTarget.set(null);
+      });
+
+      // Consume any target that was set before the map finished loading.
+      map.on("load", () => {
+        mapLoaded = true;
+        const pending = systemMapFlyTarget.get();
+        if (pending) {
+          map.easeTo({
+            center: [pending.lon, pending.lat],
+            zoom: pending.zoom,
+            duration: 800,
+          });
+          systemMapFlyTarget.set(null);
+        }
+      });
 
       if (data.lines.length === 0) return;
 
@@ -150,20 +194,40 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
       // -----------------------------------------------------------------
       const stationFeatures: FeatureCollection<Point> = {
         type: "FeatureCollection",
-        features: data.stations.map((station) => ({
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: [station.lon, station.lat],
-          },
-          properties: {
-            popupHtml: buildStopPopupHtml({
-              stopId: station.stationId,
-              stopName: station.stopName,
-              badges: [...station.lines, ...station.busRoutes],
-            }),
-          },
-        })),
+        features: data.stations.map((station) => {
+          // A station is "busway" if any of its lines is a busway route.
+          // Busway stops come in pairs (one per direction), so they get
+          // smaller markers with the line color as the stroke.
+          const isBusway = station.lines.some((line) =>
+            isBuswayRoute(line.routeId),
+          );
+          // Stroke color for the station marker:
+          // - Busway: the first busway line's color (line-colored stroke)
+          // - Single-line rail: that line's color
+          // - Multi-line rail (interchange): dark stroke (STOP_STROKE_DARK)
+          const strokeColor = isBusway
+            ? (station.lines.find((line) => isBuswayRoute(line.routeId))
+                ?.color ?? "#e16710")
+            : station.lines.length === 1
+              ? (station.lines[0]?.color ?? STOP_STROKE_DARK)
+              : STOP_STROKE_DARK;
+          return {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [station.lon, station.lat],
+            },
+            properties: {
+              isBusway,
+              color: strokeColor,
+              popupHtml: buildStopPopupHtml({
+                stopId: station.stationId,
+                stopName: station.stopName,
+                badges: [...station.lines, ...station.busRoutes],
+              }),
+            },
+          };
+        }),
       };
 
       // Wait for the map style to load before adding sources/layers.
@@ -192,9 +256,61 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
           data: stationFeatures,
         });
 
+        // Busway stations — white fill, line-color stroke, smaller markers.
+        // Busway stops come in pairs (one per direction), so smaller markers
+        // prevent overlap and the colored stroke ties them to their line.
+        // Added before the rail layer so rail stations render on top.
+        map.addLayer(
+          makeStopLayer(BUSWAY_STATIONS_LAYER, STATIONS_SOURCE, {
+            strokeColor: ["get", "color"],
+            radius: [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              STOP_MIN_ZOOM,
+              BUSWAY_STOP_RADIUS,
+              STOP_MAX_ZOOM,
+              BUSWAY_STOP_RADIUS_MAX,
+            ],
+            strokeWidth: [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              STOP_MIN_ZOOM,
+              BUSWAY_STOP_STROKE_WIDTH,
+              STOP_MAX_ZOOM,
+              BUSWAY_STOP_STROKE_WIDTH_MAX,
+            ],
+            filter: ["==", ["get", "isBusway"], true],
+          }),
+        );
+
+        // Rail stations — white fill, data-driven stroke color (line color
+        // for single-line stations, dark for interchanges), smaller markers
+        // than the default stop sizes but still larger than busway/bus stops.
+        // Added after the busway layer so rail stations render on top.
         map.addLayer(
           makeStopLayer(STATIONS_LAYER, STATIONS_SOURCE, {
-            strokeColor: STOP_STROKE_DARK,
+            strokeColor: ["get", "color"],
+            radius: [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              STOP_MIN_ZOOM,
+              RAIL_STOP_RADIUS,
+              STOP_MAX_ZOOM,
+              RAIL_STOP_RADIUS_MAX,
+            ],
+            strokeWidth: [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              STOP_MIN_ZOOM,
+              RAIL_STOP_STROKE_WIDTH,
+              STOP_MAX_ZOOM,
+              RAIL_STOP_STROKE_WIDTH_MAX,
+            ],
+            filter: ["!=", ["get", "isBusway"], true],
           }),
         );
 
@@ -203,6 +319,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
 
         attachPopupHandlers(map, LINES_LAYER, popup);
         attachPopupHandlers(map, STATIONS_LAYER, popup);
+        attachPopupHandlers(map, BUSWAY_STATIONS_LAYER, popup);
 
         // Fit bounds to all line coordinates.
         const allCoords: [number, number][] = lineFeatures.features
