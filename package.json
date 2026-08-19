@@ -6,7 +6,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "import-gtfs": "npx tsx --env-file=.env scripts/import-gtfs.ts",
-    "test": "npx playwright test",
+    "test": "npm run build && npx playwright test",
     "astro": "astro",
     "start": "tsx start.mjs"
   },
