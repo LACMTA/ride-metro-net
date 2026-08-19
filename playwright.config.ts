@@ -21,6 +21,5 @@ export default defineConfig({
     url: "http://localhost:4321/lines/a",
     /* Server startup can be slow on first run */
     timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
   },
 });
