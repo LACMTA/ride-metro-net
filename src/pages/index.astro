@@ -18,38 +18,22 @@ const allLines = [...railBuswayRoutes, ...busRoutes];
 ---
 
 <Layout title="Metro System Map" fullHeight>
-  <div class="flex h-full overflow-hidden">
-    <!-- Mobile sidebar toggle button -->
-    <button
-      id="sidebar-toggle"
-      class="bg-background-white border-divider-line absolute top-3 left-3 z-30 flex h-10 w-10 items-center justify-center rounded-lg border shadow-sm md:hidden"
-      aria-label="Toggle sidebar"
-    >
-      <svg
-        class="h-5 w-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width={2}
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M4 6h16M4 12h16M4 18h16"></path>
-      </svg>
-    </button>
-
-    <!-- Mobile backdrop -->
+  <div class="relative flex h-full overflow-hidden">
+    <!-- Mobile backdrop. `absolute inset-0` (not `fixed`) so it's contained
+         to this map-area wrapper rather than the full viewport — it won't dim
+         or overlay the sitewide header above. -->
     <div
       id="sidebar-backdrop"
-      class="fixed inset-0 z-20 hidden bg-black/30 md:hidden"
+      class="absolute inset-0 z-20 hidden bg-black/30 md:hidden"
     >
     </div>
 
-    <!-- Sidebar -->
+    <!-- Sidebar. `absolute inset-y-0 left-0` (not `fixed`) anchors it to this
+         map-area wrapper (`relative`), so the drawer opens within the map
+         area — below the header — instead of covering the full viewport. -->
     <aside
       id="sidebar-aside"
-      class="bg-background-white border-divider-line fixed inset-y-0 left-0 z-20 w-80 max-w-[85vw] -translate-x-full border-r transition-transform duration-200 md:static md:z-auto md:w-96 md:max-w-none md:translate-x-0"
+      class="bg-background-white border-divider-line absolute inset-y-0 left-0 z-20 w-80 max-w-[85vw] -translate-x-full border-r transition-transform duration-200 md:static md:z-auto md:w-96 md:max-w-none md:translate-x-0"
     >
       <SystemMapSidebar
         client:load
@@ -65,28 +49,35 @@ const allLines = [...railBuswayRoutes, ...busRoutes];
   </div>
 
   <script>
+    import { sidebarOpen } from "../lib/systemMapStore";
+
     const toggle = document.getElementById("sidebar-toggle");
     const backdrop = document.getElementById("sidebar-backdrop");
     const aside = document.getElementById("sidebar-aside");
 
-    function openSidebar() {
-      aside?.classList.remove("-translate-x-full");
-      backdrop?.classList.remove("hidden");
+    /** Reflect the shared sidebarOpen store onto the DOM (translate + backdrop). */
+    function applySidebarState(open: boolean) {
+      if (open) {
+        aside?.classList.remove("-translate-x-full");
+        backdrop?.classList.remove("hidden");
+      } else {
+        aside?.classList.add("-translate-x-full");
+        backdrop?.classList.add("hidden");
+      }
     }
 
-    function closeSidebar() {
-      aside?.classList.add("-translate-x-full");
-      backdrop?.classList.add("hidden");
-    }
+    // Keep the DOM in sync with the store. This is the single source of truth:
+    // both the hamburger toggle button and the sidebar's left-arrow close
+    // button write to `sidebarOpen`, and this listener applies the result.
+    sidebarOpen.listen(applySidebarState);
+    applySidebarState(sidebarOpen.get());
 
     toggle?.addEventListener("click", () => {
-      if (aside?.classList.contains("-translate-x-full")) {
-        openSidebar();
-      } else {
-        closeSidebar();
-      }
+      sidebarOpen.set(!sidebarOpen.get());
     });
 
-    backdrop?.addEventListener("click", closeSidebar);
+    backdrop?.addEventListener("click", () => {
+      sidebarOpen.set(false);
+    });
   </script>
 </Layout>

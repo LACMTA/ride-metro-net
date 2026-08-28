@@ -67,3 +67,25 @@ export const systemMapLocateRequest = atom<boolean>(false);
 export function requestLocateMe(): void {
   systemMapLocateRequest.set(true);
 }
+
+// ---------------------------------------------------------------------------
+// Sidebar open/close (mobile only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether the mobile sidebar drawer is open. Written by the hamburger
+ * toggle button (vanilla, in the SystemMap Astro markup) and by the
+ * sidebar's left-arrow close button (React, in SystemMapSidebar), and read
+ * by the index.astro script which translates the `<aside>` / toggles the
+ * backdrop. Like the atoms above, this is shared across the Astro
+ * `<script>` ↔ React `client:load` boundary via module dedup.
+ *
+ * On desktop (≥ md) the sidebar is always visible (`md:static`), so this
+ * atom has no visual effect there.
+ */
+export const sidebarOpen = atom<boolean>(false);
+
+/** Open or close the mobile sidebar drawer. */
+export function setSidebarOpen(open: boolean): void {
+  sidebarOpen.set(open);
+}

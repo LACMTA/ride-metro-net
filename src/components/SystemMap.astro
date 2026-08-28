@@ -27,6 +27,30 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
   data-bus-stop-color={busStopColor}
   data-service-area-bbox={`${serviceAreaBbox.minLon},${serviceAreaBbox.minLat},${serviceAreaBbox.maxLon},${serviceAreaBbox.maxLat}`}
 >
+  <!-- Mobile sidebar toggle button. Lives inside the map (whose root is
+       `relative`) so that `absolute top-3 left-3` positions against the map
+       area — not the viewport — keeping it below the sitewide header. At
+       `z-10` the `z-20` sidebar drawer slides in over it when opened. The
+       click handler is wired up in `src/pages/index.astro`. -->
+  <button
+    id="sidebar-toggle"
+    class="bg-background-white border-divider-line absolute top-3 left-3 z-10 flex h-10 w-10 items-center justify-center rounded-lg border shadow-sm md:hidden"
+    aria-label="Toggle sidebar"
+  >
+    <svg
+      class="h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      stroke-width={2}
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M4 6h16M4 12h16M4 18h16"></path>
+    </svg>
+  </button>
+
   <div
     class="h-full w-full"
     aria-label="Map of Metro rail and busway lines"
