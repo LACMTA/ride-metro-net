@@ -2002,12 +2002,12 @@
   "807": {
     "trips": [
       {
-        "tripId": "64685925",
+        "tripId": "64204877",
         "directionId": 0,
         "serviceType": "core"
       },
       {
-        "tripId": "64685923",
+        "tripId": "64204876",
         "directionId": 1,
         "serviceType": "core"
       }
