@@ -1,18 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useStore } from "@nanostores/react";
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from "@headlessui/react";
 import RouteBadge from "./RouteBadge";
 import MapPinIcon from "./MapPinIcon";
-import { getLineSlug, isBuswayRoute } from "../lib/routeShortNameOverrides";
+import { getLineSlug } from "../lib/routeShortNameOverrides";
 import type { RouteWithInfo } from "../lib/getRouteById";
 import type {
   SystemStation,
   SystemStationLine,
 } from "../lib/getAllRouteShapes";
 import type { BusStop } from "../lib/getBusStopsForBbox";
-import { flyToLocation } from "../lib/systemMapStore";
-import { gridXForLon, gridYForLat } from "../lib/busStopTiles";
 import { ensureTilesLoaded } from "../lib/busStopTileCache";
+import { gridXForLon, gridYForLat } from "../lib/busStopTiles";
 import { haversineMeters } from "../lib/distance";
+import { systemMapViewport, requestLocateMe } from "../lib/systemMapStore";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,133 +24,39 @@ interface SearchResult {
   stops: BusStop[];
 }
 
-type SidebarMode = "browse" | "search" | "nearby";
+type SidebarMode = "browse" | "search";
 
-// ---------------------------------------------------------------------------
-// Frontend "nearby" computation
-// ---------------------------------------------------------------------------
-//
-// Instead of hitting the SSR `/api/nearby` endpoint (which runs a live SQLite
-// query), nearby stops are computed on the client from:
-//   1. prerendered bus-stop tiles (served via CDN, cached in
-//      `busStopTileCache` and shared with the system map), and
-//   2. the rail/busway stations already passed to this sidebar.
-//
-// This keeps the data 1:1 with the old endpoint (the tiles use the same
-// eligibility + busway-exclusion logic), removes DB load from the nearby
-// path, and reuses tiles that are likely already loaded for the map.
-
-/** Maximum number of nearby stops to return (matches the old endpoint). */
-const NEARBY_LIMIT = 30;
-
-/** Initial tile ring around the user (3×3 grid ≈ 6.6 km). */
-const NEARBY_INIT_RING = 1;
-/** Maximum tile ring to expand to if the initial ring has too few stops
- *  (5×5 grid ≈ 11 km — always enough in the LA service area). */
-const NEARBY_MAX_RING = 2;
-
-/** Tile keys for a square ring of tiles centered on a coordinate. */
-function tileKeysAround(lat: number, lon: number, ring: number): string[] {
-  const cx = gridXForLon(lon);
-  const cy = gridYForLat(lat);
-  const keys: string[] = [];
-  for (let gx = cx - ring; gx <= cx + ring; gx++) {
-    for (let gy = cy - ring; gy <= cy + ring; gy++) {
-      keys.push(`${gx},${gy}`);
-    }
-  }
-  return keys;
-}
+/** Tab indices for the browse TabGroup. */
+const TAB_LINES = 0;
+const TAB_STOPS = 1;
+const TAB_NEARBY = 2;
 
 /**
- * Converts a rail/busway station into the `BusStop` shape used by the
- * results list. Only the station's system-map `lines` are carried as route
- * badges (mirroring the old endpoint, which enriched parent stations with
- * their rail routes — regular bus routes are `[]` for rail stations).
+ * Maximum distance (in meters) from the map center for a stop/station to be
+ * considered "nearby". Tunable — small enough to feel like "near the center",
+ * generous enough to return results in lower-density areas.
  */
-function stationToBusStop(station: SystemStation): BusStop {
-  return {
-    stopId: station.stationId,
-    stopName: station.stopName,
-    lat: station.lat,
-    lon: station.lon,
-    routes: station.lines.map((line) => ({
-      routeId: line.routeId,
-      routeShortName: line.routeShortName,
-      routeType: line.routeType,
-      routeColor: line.routeColor,
-      routeTextColor: line.routeTextColor,
-    })),
-  };
-}
+const NEARBY_RADIUS_METERS = 600;
+
+/** Maximum number of nearby stops to render. */
+const NEARBY_STOP_LIMIT = 20;
 
 /**
- * Computes the nearest stops to a coordinate on the frontend.
- *
- * Bus stops come from bus-stop tiles; rail stations come from `stations`
- * (excluding pure-busway stations, matching the old endpoint's busway
- * exclusion). Both sources are merged, sorted by haversine distance, and
- * the nearest `NEARBY_LIMIT` are returned. A deduplicated route list is
- * built for the "Lines" subheader.
+ * A stop near the map center — either a rail/busway station (from the
+ * prerendered `stations` prop) or a bus stop (from the bus-stop tile cache).
+ * Tagged with its haversine distance for sorting.
  */
-async function computeNearby(
-  lat: number,
-  lon: number,
-  stations: SystemStation[],
-): Promise<SearchResult> {
-  // Rail/busway station candidates, excluding pure-busway stations.
-  const railStations = stations
-    .filter((s) => !s.lines.every((line) => isBuswayRoute(line.routeId)))
-    .map(stationToBusStop);
+interface NearbyStopEntry {
+  distance: number;
+  key: string;
+  station?: SystemStation;
+  busStop?: BusStop;
+}
 
-  async function gatherCandidates(ring: number): Promise<BusStop[]> {
-    const tileStops = await ensureTilesLoaded(tileKeysAround(lat, lon, ring));
-    const seen = new Set<string>();
-    const merged: BusStop[] = [];
-    for (const stop of [...tileStops, ...railStations]) {
-      if (seen.has(stop.stopId)) continue;
-      seen.add(stop.stopId);
-      merged.push(stop);
-    }
-    return merged;
-  }
-
-  let candidates = await gatherCandidates(NEARBY_INIT_RING);
-  if (candidates.length < NEARBY_LIMIT) {
-    candidates = await gatherCandidates(NEARBY_MAX_RING);
-  }
-
-  const stops = candidates
-    .map((stop) => ({
-      stop,
-      dist: haversineMeters(lat, lon, stop.lat, stop.lon),
-    }))
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, NEARBY_LIMIT)
-    .map((entry) => entry.stop);
-
-  // Deduplicate routes across the returned stops for the "Lines" subheader.
-  const seenRouteIds = new Set<string>();
-  const lines: RouteWithInfo[] = [];
-  for (const stop of stops) {
-    for (const route of stop.routes) {
-      if (seenRouteIds.has(route.routeId)) continue;
-      seenRouteIds.add(route.routeId);
-      lines.push({
-        routeId: route.routeId,
-        routeShortName: route.routeShortName,
-        // routeLongName isn't available from tile/station route info; the
-        // sidebar displays the badge + short name only (matches old endpoint).
-        routeLongName: "",
-        routeType: route.routeType,
-        routeColor: route.routeColor,
-        routeTextColor: route.routeTextColor,
-        defaultLineColor: "",
-      });
-    }
-  }
-
-  return { stops, lines };
+/** Result of a nearby computation: nearby lines + nearby stops (sorted). */
+interface NearbyResult {
+  lines: RouteWithInfo[];
+  stops: NearbyStopEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +133,7 @@ function StationBadge({ line }: { line: SystemStationLine }) {
 }
 
 /**
- * Renders a single bus stop (from search/nearby) as a list item with its
+ * Renders a single bus stop (from search) as a list item with its
  * name and serving route badges. Links to the stop detail page.
  */
 function StopItem({ stop }: { stop: BusStop }) {
@@ -258,7 +165,7 @@ function StopItem({ stop }: { stop: BusStop }) {
 }
 
 // ---------------------------------------------------------------------------
-// Results list (search / nearby)
+// Results list (search)
 // ---------------------------------------------------------------------------
 
 function ResultsList({ results }: { results: SearchResult }) {
@@ -294,6 +201,53 @@ function ResultsList({ results }: { results: SearchResult }) {
 }
 
 // ---------------------------------------------------------------------------
+// Nearby list (browse "Nearby" tab)
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders the nearby lines and stops with "Lines" / "Stops" subheaders,
+ * reusing the shared {@link LineItem}, {@link StationItem}, and {@link StopItem}
+ * row components.
+ */
+function NearbyList({ result }: { result: NearbyResult }) {
+  const hasLines = result.lines.length > 0;
+  const hasStops = result.stops.length > 0;
+
+  if (!hasLines && !hasStops) {
+    return (
+      <p className="px-4 py-8 text-center text-gray-500">
+        No stops or lines found nearby. Drag the map to look elsewhere.
+      </p>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-gray-100">
+      {hasLines && (
+        <>
+          <h3 className={SUBHEADER_CLASS}>Lines</h3>
+          {result.lines.map((route) => (
+            <LineItem key={route.routeId} route={route} />
+          ))}
+        </>
+      )}
+      {hasStops && (
+        <>
+          <h3 className={SUBHEADER_CLASS}>Stops</h3>
+          {result.stops.map((entry) =>
+            entry.station ? (
+              <StationItem key={entry.key} station={entry.station} />
+            ) : (
+              <StopItem key={entry.key} stop={entry.busStop!} />
+            ),
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main sidebar component
 // ---------------------------------------------------------------------------
 
@@ -314,12 +268,30 @@ export default function SystemMapSidebar({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Active browse tab (0 = Lines, 1 = Stops, 2 = Nearby).
+  const [activeTab, setActiveTab] = useState(TAB_LINES);
+
+  // --- Nearby tab state ---
+  const [nearby, setNearby] = useState<NearbyResult | null>(null);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  // The system map publishes its center/zoom into this nanostore on `load` and
+  // on every `moveend` (drag, zoom, programmatic pans). Like `lineMapStore`,
+  // this atom is shared across the Astro `<script>` ↔ React `client:load`
+  // boundary because Vite/Rollup dedupe `src/lib` modules into one chunk.
+  const viewport = useStore(systemMapViewport);
+  // True once we've ever triggered a locate from the Nearby tab, so the
+  // jump-to-user-location only happens on the *first* selection.
+  const hasTriggeredNearbyLocate = useRef(false);
+  const nearbyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic id to ignore stale nearby computations.
+  const nearbyReqIdRef = useRef(0);
+
+  // (Computed inline in `computeNearby` via `lines.filter` to preserve order.)
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  // Monotonic request id used to ignore stale nearby/search completions
-  // (e.g. a nearby search finishing after the user switched back to browse or
-  // started a text search). Nearby no longer uses an AbortController since it
-  // reads prerendered tiles instead of a cancellable fetch.
+  // Monotonic request id used to ignore stale search completions (e.g. a
+  // search finishing after the user cleared the query or started a new one).
   const reqIdRef = useRef(0);
 
   // -------------------------------------------------------------------------
@@ -338,7 +310,7 @@ export default function SystemMapSidebar({
     setLoading(true);
     setError(null);
 
-    // Cancel any in-flight request and invalidate any pending nearby result.
+    // Cancel any in-flight request.
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -377,70 +349,123 @@ export default function SystemMapSidebar({
   // Nearby
   // -------------------------------------------------------------------------
 
-  const handleNearby = useCallback(() => {
-    // If already in nearby mode, toggle back to browse.
-    if (mode === "nearby") {
-      ++reqIdRef.current;
-      setMode("browse");
-      setResults(null);
-      setQuery("");
-      return;
-    }
+  /**
+   * Compute nearby lines and stops for a map center. Bus stops are pulled
+   * from the shared bus-stop tile cache (3×3 tiles around the center — cache
+   * hits are free since the map already loads these tiles on pan), rail/busway
+   * stations come from the `stations` prop. Both are filtered by haversine
+   * distance to the center and sorted nearest-first. "Lines" are the routes
+   * serving those nearby stops/stations, resolved to `RouteWithInfo` via the
+   * `lines` prop (preserving its stable order).
+   */
+  const computeNearby = useCallback(
+    async (center: { lon: number; lat: number }) => {
+      const myId = ++nearbyReqIdRef.current;
+      setNearbyLoading(true);
 
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
-      return;
-    }
-
-    setMode("nearby");
-    setLoading(true);
-    setError(null);
-    setQuery("");
-
-    // Cancel any in-flight text search; this nearby request is not abortable
-    // (it reads prerendered tiles), so a request id guards stale completions.
-    abortRef.current?.abort();
-    const myId = ++reqIdRef.current;
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-
-        // Pan and zoom the system map to the user's location.
-        flyToLocation(longitude, latitude);
-
-        if (myId !== reqIdRef.current) return;
-
-        try {
-          const data = await computeNearby(latitude, longitude, stations);
-          if (myId !== reqIdRef.current) return;
-          setResults(data);
-        } catch {
-          if (myId !== reqIdRef.current) return;
-          setError("Failed to find nearby stops.");
-        } finally {
-          if (myId === reqIdRef.current) setLoading(false);
+      try {
+        // --- Bus stops: 3×3 tiles around the center ---
+        const gx = gridXForLon(center.lon);
+        const gy = gridYForLat(center.lat);
+        const tileKeys: string[] = [];
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            tileKeys.push(`${gx + dx},${gy + dy}`);
+          }
         }
-      },
-      (err) => {
-        if (myId !== reqIdRef.current) return;
-        setLoading(false);
-        if (err.code === err.PERMISSION_DENIED) {
-          setError("Location permission denied.");
-        } else {
-          setError("Unable to determine your location.");
+        const busStops = await ensureTilesLoaded(tileKeys);
+
+        if (myId !== nearbyReqIdRef.current) return;
+
+        // --- Nearby stops (bus + rail/busway stations) within radius ---
+        const stopEntries: NearbyStopEntry[] = [];
+
+        for (const stop of busStops) {
+          const d = haversineMeters(center.lat, center.lon, stop.lat, stop.lon);
+          if (d <= NEARBY_RADIUS_METERS) {
+            stopEntries.push({ distance: d, key: stop.stopId, busStop: stop });
+          }
         }
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
-    );
-  }, [mode, stations]);
+
+        for (const station of stations) {
+          const d = haversineMeters(
+            center.lat,
+            center.lon,
+            station.lat,
+            station.lon,
+          );
+          if (d <= NEARBY_RADIUS_METERS) {
+            stopEntries.push({
+              distance: d,
+              key: station.stationId,
+              station,
+            });
+          }
+        }
+
+        stopEntries.sort((a, b) => a.distance - b.distance);
+        const nearbyStops = stopEntries.slice(0, NEARBY_STOP_LIMIT);
+
+        // --- Nearby lines: routes serving the nearby stops/stations ---
+        const routeIdSet = new Set<string>();
+        for (const entry of nearbyStops) {
+          if (entry.station) {
+            for (const l of entry.station.lines) routeIdSet.add(l.routeId);
+            for (const l of entry.station.busRoutes) routeIdSet.add(l.routeId);
+          } else if (entry.busStop) {
+            for (const r of entry.busStop.routes) routeIdSet.add(r.routeId);
+          }
+        }
+        // Preserve the `lines` prop order for stable, deduped line ordering.
+        const nearbyLines = lines.filter((l) => routeIdSet.has(l.routeId));
+
+        if (myId !== nearbyReqIdRef.current) return;
+        setNearby({ lines: nearbyLines, stops: nearbyStops });
+      } catch {
+        if (myId !== nearbyReqIdRef.current) return;
+        setNearby(null);
+      } finally {
+        if (myId === nearbyReqIdRef.current) setNearbyLoading(false);
+      }
+    },
+    [lines, stations],
+  );
+
+  // Recompute nearby (debounced) when the viewport changes while the Nearby
+  // tab is active. The map publishes the viewport on load and on `moveend`
+  // (drag-end, zoom, programmatic pans), so this updates as the user drags.
+  useEffect(() => {
+    if (activeTab !== TAB_NEARBY) return;
+    if (!viewport) return;
+
+    if (nearbyDebounceRef.current) clearTimeout(nearbyDebounceRef.current);
+    nearbyDebounceRef.current = setTimeout(() => {
+      void computeNearby({ lon: viewport.lon, lat: viewport.lat });
+    }, 250);
+    return () => {
+      if (nearbyDebounceRef.current) clearTimeout(nearbyDebounceRef.current);
+    };
+  }, [viewport, activeTab, computeNearby]);
+
+  /** Controlled tab change: trigger locate the first time Nearby is selected. */
+  const handleTabChange = useCallback((index: number) => {
+    setActiveTab(index);
+    if (index === TAB_NEARBY && !hasTriggeredNearbyLocate.current) {
+      hasTriggeredNearbyLocate.current = true;
+      // Jump to the user's location, just like the find-me button. The map
+      // re-publishes its viewport on `moveend` (after the pan), which
+      // triggers the nearby computation above.
+      setNearbyLoading(true);
+      setNearby(null);
+      requestLocateMe();
+    }
+  }, []);
 
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
-  const isNearby = mode === "nearby";
-  const showResults = mode === "search" || mode === "nearby";
+  const showResults = mode === "search";
 
   return (
     <div className="bg-background-white flex h-full flex-col">
@@ -481,18 +506,6 @@ export default function SystemMapSidebar({
             </button>
           )}
         </div>
-        <button
-          onClick={handleNearby}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors ${
-            isNearby
-              ? "border-blue bg-blue text-white"
-              : "border-divider-line text-metro-text hover:bg-gray-50"
-          }`}
-          aria-label="Find nearby stops"
-          title="Find nearby stops"
-        >
-          <MapPinIcon className="h-5" />
-        </button>
       </div>
 
       {/* --- Error message --- */}
@@ -511,13 +524,16 @@ export default function SystemMapSidebar({
         )}
 
         {!loading && !showResults && (
-          <TabGroup>
+          <TabGroup selectedIndex={activeTab} onChange={handleTabChange}>
             <TabList className="flex border-b border-gray-200">
               <Tab className="border-blue data-selected:text-metro-text px-4 py-2.5 text-sm text-gray-500 outline-none data-selected:border-b-2 data-selected:font-semibold">
                 Lines
               </Tab>
               <Tab className="border-blue data-selected:text-metro-text px-4 py-2.5 text-sm text-gray-500 outline-none data-selected:border-b-2 data-selected:font-semibold">
                 Stops
+              </Tab>
+              <Tab className="border-blue data-selected:text-metro-text px-4 py-2.5 text-sm text-gray-500 outline-none data-selected:border-b-2 data-selected:font-semibold">
+                Nearby
               </Tab>
             </TabList>
             <TabPanels>
@@ -534,6 +550,21 @@ export default function SystemMapSidebar({
                     <StationItem key={station.stationId} station={station} />
                   ))}
                 </div>
+              </TabPanel>
+              <TabPanel>
+                {nearbyLoading ? (
+                  <p className="px-4 py-8 text-center text-gray-500">
+                    {viewport ? "Loading nearby…" : "Locating…"}
+                  </p>
+                ) : nearby ? (
+                  <NearbyList result={nearby} />
+                ) : (
+                  <p className="px-4 py-8 text-center text-gray-500">
+                    {viewport
+                      ? "No stops or lines found nearby. Drag the map to look elsewhere."
+                      : "Locating your position…"}
+                  </p>
+                )}
               </TabPanel>
             </TabPanels>
           </TabGroup>

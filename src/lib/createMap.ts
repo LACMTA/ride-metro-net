@@ -1,5 +1,5 @@
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { Map as MLMap, MapOptions } from "maplibre-gl";
+import type { Map as MLMap, MapOptions, IControl } from "maplibre-gl";
 
 type MapLibreGL = typeof import("maplibre-gl");
 
@@ -64,11 +64,27 @@ export async function createMap(
   // the plugin's own AttributionControl is compact and starts collapsed,
   // avoiding MapLibre's built-in control (disabled above) which would
   // otherwise conflict with the plugin's `canAdd` check.
-  BasemapStyle.applyStyle(map, {
+  const basemapStyle = BasemapStyle.applyStyle(map, {
     map,
     style: ESRI_BASEMAP_ENUM,
     token: esriKey,
     attributionControl: { compact: true, collapsed: true },
+  });
+
+  // The ESRI plugin adds its AttributionControl at MapLibre's default position
+  // (bottom-right). Relocate it to the bottom-left corner so the bottom-right
+  // corner stays clear for the "find my location" button overlay (see
+  // SystemMap.astro). The plugin emits `BasemapAttributionLoad` once the
+  // control has been added, handing us the control instance to move.
+  //
+  // Note: the plugin's `AttributionControl` type declares `onAdd` as
+  // `HTMLElement | null`, which is structurally incompatible with MapLibre's
+  // `IControl` (`HTMLElement`), so we cast through `IControl`. At runtime the
+  // control extends `maplibregl.AttributionControl`, so this is safe.
+  basemapStyle.on("BasemapAttributionLoad", (ctrl) => {
+    const control = ctrl as unknown as IControl;
+    map.removeControl(control);
+    map.addControl(control, "bottom-left");
   });
 
   // Add zoom/rotate controls.

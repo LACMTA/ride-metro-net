@@ -23,3 +23,47 @@ export const systemMapFlyTarget = atom<SystemMapFlyTarget | null>(null);
 export function flyToLocation(lon: number, lat: number, zoom = 15): void {
   systemMapFlyTarget.set({ lon, lat, zoom });
 }
+
+// ---------------------------------------------------------------------------
+// Current viewport (map → sidebar)
+// ---------------------------------------------------------------------------
+
+/**
+ * The system map's current viewport. The SystemMap script publishes this on
+ * `load` and on every `moveend` (which covers drag-end, zoom, and programmatic
+ * `easeTo` pans). The sidebar reads it via `useStore` to compute "nearby".
+ *
+ * Like {@link systemMapFlyTarget}, this atom is shared across the Astro
+ * `<script>` ↔ React `client:load` boundary: Vite/Rollup dedupe `src/lib`
+ * modules into a single chunk imported by both bundles (see `lineMapStore` for
+ * a proven cross-boundary precedent), so both sides reference the same atom
+ * instance.
+ */
+export interface SystemMapViewport {
+  lon: number;
+  lat: number;
+  zoom: number;
+}
+
+/** `null` until the map publishes its first viewport on `load`. */
+export const systemMapViewport = atom<SystemMapViewport | null>(null);
+
+// ---------------------------------------------------------------------------
+// Locate (find-me) request
+// ---------------------------------------------------------------------------
+
+/**
+ * Set to `true` by the sidebar (e.g. the "Nearby" tab) to request that the
+ * system map locate the user — exactly the same behavior as tapping the
+ * find-my-location button (geolocation + pan/zoom + "you are here" marker).
+ *
+ * The SystemMap script consumes the request, runs geolocation, and resets the
+ * flag to `false` — mirroring the {@link systemMapFlyTarget} consume pattern so
+ * a request made before the map finishes loading isn't lost.
+ */
+export const systemMapLocateRequest = atom<boolean>(false);
+
+/** Request that the system map locate the user (same as the find-me button). */
+export function requestLocateMe(): void {
+  systemMapLocateRequest.set(true);
+}

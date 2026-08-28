@@ -43,6 +43,40 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
   >
     <span data-bus-stop-info-text></span>
   </div>
+
+  <!-- "Find my location" button — overlays the map bottom-right corner. The
+       ESRI attribution control has been moved to the bottom-left (see
+       createMap.ts) so this corner is clear. Centers the map on the user's
+       location and drops a blue "you are here" marker. -->
+  <button
+    type="button"
+    class="text-blue absolute right-3 bottom-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-60"
+    aria-label="Find my location"
+    title="Find my location"
+    data-locate-button
+  >
+    <svg
+      class="h-5 w-5"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"
+      ></path>
+    </svg>
+  </button>
+
+  <!-- Transient status message for the locate button (errors / unsupported). -->
+  <div
+    class="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded bg-white/90 px-3 py-1.5 text-sm text-gray-600 shadow-sm"
+    role="status"
+    aria-live="polite"
+    data-locate-status
+    hidden
+  >
+    <span data-locate-status-text></span>
+  </div>
 </div>
 
 <script>
@@ -81,7 +115,12 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     gridXForLon,
     gridYForLat,
   } from "../lib/busStopTiles";
-  import { systemMapFlyTarget } from "../lib/systemMapStore";
+  import {
+    systemMapFlyTarget,
+    flyToLocation,
+    systemMapViewport,
+    systemMapLocateRequest,
+  } from "../lib/systemMapStore";
   import {
     fetchTile as fetchBusStopTile,
     hasTile as hasBusStopTile,
@@ -123,6 +162,12 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     const infoText = container.querySelector(
       "[data-bus-stop-info-text]",
     ) as HTMLElement;
+    const locateStatusEl = container.querySelector(
+      "[data-locate-status]",
+    ) as HTMLElement | null;
+    const locateStatusText = container.querySelector(
+      "[data-locate-status-text]",
+    ) as HTMLElement | null;
 
     async function bootstrap() {
       const { map, maplibregl } = await createMap(mapContainer, esriKey);
@@ -133,6 +178,12 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
       // is not lost. If the map isn't loaded yet, we defer the `easeTo` until
       // `load` fires and then consume the current store value.
       let mapLoaded = false;
+
+      /** Publish the current center/zoom so the sidebar can compute "nearby". */
+      function publishViewport(): void {
+        const c = map.getCenter();
+        systemMapViewport.set({ lon: c.lng, lat: c.lat, zoom: map.getZoom() });
+      }
 
       systemMapFlyTarget.listen((target) => {
         if (!target) return;
@@ -157,6 +208,117 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
           });
           systemMapFlyTarget.set(null);
         }
+
+        // Publish the initial viewport so the sidebar has a center to work
+        // with even before the user moves the map.
+        publishViewport();
+
+        // Consume a locate request that arrived before the map loaded.
+        if (systemMapLocateRequest.get()) {
+          systemMapLocateRequest.set(false);
+          locateUser();
+        }
+      });
+
+      // Re-publish the viewport whenever the map stops moving — this covers
+      // drag-end, zoom, and programmatic `easeTo` pans (e.g. from find-me).
+      map.on("moveend", () => {
+        publishViewport();
+      });
+
+      // --- Find-me (locate) ---
+      // Shared by the find-my-location button overlay and the sidebar's
+      // "Nearby" tab (via the `systemMapLocateRequest` store). Requests the
+      // user's geolocation, pans/zooms the map to that point (via the shared
+      // fly-to store), and drops a blue "you are here" marker that stays
+      // anchored to the coordinate as the user pans/zooms.
+      const locateBtn = container.querySelector(
+        "[data-locate-button]",
+      ) as HTMLButtonElement | null;
+
+      /** Show a transient locate status message for a few seconds. */
+      function showLocateMessage(msg: string): void {
+        if (!locateStatusEl || !locateStatusText) return;
+        locateStatusText.textContent = msg;
+        locateStatusEl.hidden = false;
+        window.setTimeout(() => {
+          if (locateStatusText.textContent === msg) {
+            locateStatusEl.hidden = true;
+          }
+        }, 4000);
+      }
+
+      let locationMarker: maplibregl.Marker | null = null;
+
+      /**
+       * Request geolocation, pan the map to the result, and drop/update the
+       * "you are here" marker. Called by the find-me button and by the
+       * sidebar's "Nearby" tab (via `systemMapLocateRequest`).
+       */
+      function locateUser(): void {
+        if (!("geolocation" in navigator)) {
+          showLocateMessage("Geolocation is not supported by your browser.");
+          return;
+        }
+
+        if (locateBtn) {
+          locateBtn.disabled = true;
+          locateBtn.setAttribute("aria-busy", "true");
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+
+            // Pan/zoom the map to the user's location via the shared
+            // fly-to store (reuses the listener registered above).
+            flyToLocation(longitude, latitude);
+
+            // Drop or update the blue "you are here" marker.
+            if (!locationMarker) {
+              const el = document.createElement("div");
+              el.className = "metro-location-marker";
+              locationMarker = new maplibregl.Marker({
+                element: el,
+                anchor: "center",
+              })
+                .setLngLat([longitude, latitude])
+                .addTo(map);
+            } else {
+              locationMarker.setLngLat([longitude, latitude]);
+            }
+
+            if (locateBtn) {
+              locateBtn.disabled = false;
+              locateBtn.removeAttribute("aria-busy");
+            }
+          },
+          (err) => {
+            if (locateBtn) {
+              locateBtn.disabled = false;
+              locateBtn.removeAttribute("aria-busy");
+            }
+            showLocateMessage(
+              err.code === err.PERMISSION_DENIED
+                ? "Location permission denied."
+                : "Unable to determine your location.",
+            );
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+        );
+      }
+
+      if (locateBtn) {
+        locateBtn.addEventListener("click", locateUser);
+      }
+
+      // Listen for locate requests from the sidebar (e.g. the "Nearby" tab).
+      // Mirrors the fly-target pattern: defer until the map has loaded.
+      systemMapLocateRequest.listen((requested) => {
+        if (!requested) return;
+        if (!mapLoaded) return;
+        systemMapLocateRequest.set(false);
+        locateUser();
       });
 
       if (data.lines.length === 0) return;

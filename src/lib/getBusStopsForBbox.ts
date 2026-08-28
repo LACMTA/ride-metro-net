@@ -136,7 +136,10 @@ export function getBusStopsForBbox(
     seen.add(shortName);
 
     routes.push({
-      routeId: row.route_id,
+      // Normalize to the stable numeric prefix (e.g. "2-13201" -> "2"),
+      // matching RouteWithInfo.routeId and the rest of the app so the nearby
+      // lines join (and any future line-page links) resolve correctly.
+      routeId: row.route_id.split("-")[0],
       routeShortName: shortName,
       routeType: row.route_type,
       routeColor: row.route_color ?? "",
