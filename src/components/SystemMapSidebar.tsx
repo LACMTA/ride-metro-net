@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from "@headlessui/react";
 import RouteBadge from "./RouteBadge";
 import MapPinIcon from "./MapPinIcon";
-import { getLineSlug } from "../lib/routeShortNameOverrides";
+import { getLineSlug, isBuswayRoute } from "../lib/routeShortNameOverrides";
 import type { RouteWithInfo } from "../lib/getRouteById";
 import type {
   SystemStation,
@@ -10,6 +10,9 @@ import type {
 } from "../lib/getAllRouteShapes";
 import type { BusStop } from "../lib/getBusStopsForBbox";
 import { flyToLocation } from "../lib/systemMapStore";
+import { gridXForLon, gridYForLat } from "../lib/busStopTiles";
+import { ensureTilesLoaded } from "../lib/busStopTileCache";
+import { haversineMeters } from "../lib/distance";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +24,133 @@ interface SearchResult {
 }
 
 type SidebarMode = "browse" | "search" | "nearby";
+
+// ---------------------------------------------------------------------------
+// Frontend "nearby" computation
+// ---------------------------------------------------------------------------
+//
+// Instead of hitting the SSR `/api/nearby` endpoint (which runs a live SQLite
+// query), nearby stops are computed on the client from:
+//   1. prerendered bus-stop tiles (served via CDN, cached in
+//      `busStopTileCache` and shared with the system map), and
+//   2. the rail/busway stations already passed to this sidebar.
+//
+// This keeps the data 1:1 with the old endpoint (the tiles use the same
+// eligibility + busway-exclusion logic), removes DB load from the nearby
+// path, and reuses tiles that are likely already loaded for the map.
+
+/** Maximum number of nearby stops to return (matches the old endpoint). */
+const NEARBY_LIMIT = 30;
+
+/** Initial tile ring around the user (3×3 grid ≈ 6.6 km). */
+const NEARBY_INIT_RING = 1;
+/** Maximum tile ring to expand to if the initial ring has too few stops
+ *  (5×5 grid ≈ 11 km — always enough in the LA service area). */
+const NEARBY_MAX_RING = 2;
+
+/** Tile keys for a square ring of tiles centered on a coordinate. */
+function tileKeysAround(lat: number, lon: number, ring: number): string[] {
+  const cx = gridXForLon(lon);
+  const cy = gridYForLat(lat);
+  const keys: string[] = [];
+  for (let gx = cx - ring; gx <= cx + ring; gx++) {
+    for (let gy = cy - ring; gy <= cy + ring; gy++) {
+      keys.push(`${gx},${gy}`);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Converts a rail/busway station into the `BusStop` shape used by the
+ * results list. Only the station's system-map `lines` are carried as route
+ * badges (mirroring the old endpoint, which enriched parent stations with
+ * their rail routes — regular bus routes are `[]` for rail stations).
+ */
+function stationToBusStop(station: SystemStation): BusStop {
+  return {
+    stopId: station.stationId,
+    stopName: station.stopName,
+    lat: station.lat,
+    lon: station.lon,
+    routes: station.lines.map((line) => ({
+      routeId: line.routeId,
+      routeShortName: line.routeShortName,
+      routeType: line.routeType,
+      routeColor: line.routeColor,
+      routeTextColor: line.routeTextColor,
+    })),
+  };
+}
+
+/**
+ * Computes the nearest stops to a coordinate on the frontend.
+ *
+ * Bus stops come from bus-stop tiles; rail stations come from `stations`
+ * (excluding pure-busway stations, matching the old endpoint's busway
+ * exclusion). Both sources are merged, sorted by haversine distance, and
+ * the nearest `NEARBY_LIMIT` are returned. A deduplicated route list is
+ * built for the "Lines" subheader.
+ */
+async function computeNearby(
+  lat: number,
+  lon: number,
+  stations: SystemStation[],
+): Promise<SearchResult> {
+  // Rail/busway station candidates, excluding pure-busway stations.
+  const railStations = stations
+    .filter((s) => !s.lines.every((line) => isBuswayRoute(line.routeId)))
+    .map(stationToBusStop);
+
+  async function gatherCandidates(ring: number): Promise<BusStop[]> {
+    const tileStops = await ensureTilesLoaded(tileKeysAround(lat, lon, ring));
+    const seen = new Set<string>();
+    const merged: BusStop[] = [];
+    for (const stop of [...tileStops, ...railStations]) {
+      if (seen.has(stop.stopId)) continue;
+      seen.add(stop.stopId);
+      merged.push(stop);
+    }
+    return merged;
+  }
+
+  let candidates = await gatherCandidates(NEARBY_INIT_RING);
+  if (candidates.length < NEARBY_LIMIT) {
+    candidates = await gatherCandidates(NEARBY_MAX_RING);
+  }
+
+  const stops = candidates
+    .map((stop) => ({
+      stop,
+      dist: haversineMeters(lat, lon, stop.lat, stop.lon),
+    }))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, NEARBY_LIMIT)
+    .map((entry) => entry.stop);
+
+  // Deduplicate routes across the returned stops for the "Lines" subheader.
+  const seenRouteIds = new Set<string>();
+  const lines: RouteWithInfo[] = [];
+  for (const stop of stops) {
+    for (const route of stop.routes) {
+      if (seenRouteIds.has(route.routeId)) continue;
+      seenRouteIds.add(route.routeId);
+      lines.push({
+        routeId: route.routeId,
+        routeShortName: route.routeShortName,
+        // routeLongName isn't available from tile/station route info; the
+        // sidebar displays the badge + short name only (matches old endpoint).
+        routeLongName: "",
+        routeType: route.routeType,
+        routeColor: route.routeColor,
+        routeTextColor: route.routeTextColor,
+        defaultLineColor: "",
+      });
+    }
+  }
+
+  return { stops, lines };
+}
 
 // ---------------------------------------------------------------------------
 // Shared sub-components
@@ -186,6 +316,11 @@ export default function SystemMapSidebar({
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Monotonic request id used to ignore stale nearby/search completions
+  // (e.g. a nearby search finishing after the user switched back to browse or
+  // started a text search). Nearby no longer uses an AbortController since it
+  // reads prerendered tiles instead of a cancellable fetch.
+  const reqIdRef = useRef(0);
 
   // -------------------------------------------------------------------------
   // Search
@@ -203,10 +338,11 @@ export default function SystemMapSidebar({
     setLoading(true);
     setError(null);
 
-    // Cancel any in-flight request.
+    // Cancel any in-flight request and invalidate any pending nearby result.
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    const myId = ++reqIdRef.current;
 
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
@@ -214,13 +350,15 @@ export default function SystemMapSidebar({
       });
       if (!res.ok) throw new Error("Search request failed");
       const data = (await res.json()) as SearchResult;
+      if (myId !== reqIdRef.current) return;
       setResults(data);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
+        if (myId !== reqIdRef.current) return;
         setError("Search failed. Please try again.");
       }
     } finally {
-      setLoading(false);
+      if (myId === reqIdRef.current) setLoading(false);
     }
   }, []);
 
@@ -242,6 +380,7 @@ export default function SystemMapSidebar({
   const handleNearby = useCallback(() => {
     // If already in nearby mode, toggle back to browse.
     if (mode === "nearby") {
+      ++reqIdRef.current;
       setMode("browse");
       setResults(null);
       setQuery("");
@@ -258,6 +397,11 @@ export default function SystemMapSidebar({
     setError(null);
     setQuery("");
 
+    // Cancel any in-flight text search; this nearby request is not abortable
+    // (it reads prerendered tiles), so a request id guards stale completions.
+    abortRef.current?.abort();
+    const myId = ++reqIdRef.current;
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -265,27 +409,21 @@ export default function SystemMapSidebar({
         // Pan and zoom the system map to the user's location.
         flyToLocation(longitude, latitude);
 
-        abortRef.current?.abort();
-        const controller = new AbortController();
-        abortRef.current = controller;
+        if (myId !== reqIdRef.current) return;
 
         try {
-          const res = await fetch(
-            `/api/nearby?lat=${latitude}&lon=${longitude}`,
-            { signal: controller.signal },
-          );
-          if (!res.ok) throw new Error("Nearby request failed");
-          const data = (await res.json()) as SearchResult;
+          const data = await computeNearby(latitude, longitude, stations);
+          if (myId !== reqIdRef.current) return;
           setResults(data);
-        } catch (err) {
-          if ((err as Error).name !== "AbortError") {
-            setError("Failed to find nearby stops.");
-          }
+        } catch {
+          if (myId !== reqIdRef.current) return;
+          setError("Failed to find nearby stops.");
         } finally {
-          setLoading(false);
+          if (myId === reqIdRef.current) setLoading(false);
         }
       },
       (err) => {
+        if (myId !== reqIdRef.current) return;
         setLoading(false);
         if (err.code === err.PERMISSION_DENIED) {
           setError("Location permission denied.");
@@ -295,7 +433,7 @@ export default function SystemMapSidebar({
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
     );
-  }, [mode]);
+  }, [mode, stations]);
 
   // -------------------------------------------------------------------------
   // Render

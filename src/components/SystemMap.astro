@@ -82,6 +82,10 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
     gridYForLat,
   } from "../lib/busStopTiles";
   import { systemMapFlyTarget } from "../lib/systemMapStore";
+  import {
+    fetchTile as fetchBusStopTile,
+    hasTile as hasBusStopTile,
+  } from "../lib/busStopTileCache";
 
   /**
    * Pixel spacing between adjacent side-by-side lines. Offset slots from the
@@ -400,13 +404,11 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
         /**
          * Fetch bus stops for a single grid tile and merge results into
          * `busStopMap`. The tile key is recorded in `fetchedTiles` so it
-         * won't be re-requested.
+         * won't be re-requested. Fetching goes through the shared
+         * `busStopTileCache` so tiles the sidebar already loaded (e.g. for a
+         * "nearby" search) are instant cache hits.
          */
-        async function fetchTile(
-          tileWest: number,
-          tileSouth: number,
-          tileKey: string,
-        ): Promise<void> {
+        async function fetchTile(tileKey: string): Promise<void> {
           if (fetchedTiles.has(tileKey)) return;
           fetchedTiles.add(tileKey);
 
@@ -416,25 +418,9 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
           let addedAny = false;
 
           try {
-            const res = await fetch(`/api/bus-stops/${tileKey}.json`);
-            if (!res.ok) return;
-            const json = (await res.json()) as {
-              stops: {
-                stopId: string;
-                stopName: string;
-                lat: number;
-                lon: number;
-                routes: {
-                  routeId: string;
-                  routeShortName: string;
-                  routeType: number;
-                  routeColor: string;
-                  routeTextColor: string;
-                }[];
-              }[];
-            };
+            const stops = await fetchBusStopTile(tileKey);
 
-            for (const stop of json.stops) {
+            for (const stop of stops) {
               if (busStopMap.has(stop.stopId)) continue;
               if (stationIds.has(stop.stopId)) continue;
               busStopMap.set(stop.stopId, {
@@ -453,11 +439,11 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
               });
               addedAny = true;
             }
-          } catch {
-            // Network errors are non-fatal — bus stops are supplementary.
-            // Remove the tile key so it can be retried on the next pan.
-            fetchedTiles.delete(tileKey);
           } finally {
+            // If the fetch failed at the network level (the cache does not
+            // persist network errors), allow a retry on the next pan —
+            // mirrors the previous retry-on-error behavior.
+            if (!hasBusStopTile(tileKey)) fetchedTiles.delete(tileKey);
             // Incremental rendering — push new stops to the map as soon
             // as this tile resolves, rather than waiting for all tiles.
             if (addedAny) syncBusStopSource();
@@ -504,7 +490,7 @@ const busStopColor = getAgencySettings("LACMTA")?.lineColor ?? "#e16710";
                 continue;
               }
               const tileKey = `${gridXForLon(lon)},${gridYForLat(lat)}`;
-              fetchTile(lon, lat, tileKey);
+              fetchTile(tileKey);
             }
           }
         }

@@ -8,7 +8,6 @@ import { getAgencyIdsByFlag, getAgencySettings } from "./agencies";
 import { buildStopPagesRouteCondition } from "./stopEligibility";
 import type { RouteWithInfo } from "./getRouteById";
 import type { BusStop, BusRouteInfo } from "./getBusStopsForBbox";
-import { getBusStopServiceAreaBbox } from "./getBusStopsForBbox";
 
 // ---------------------------------------------------------------------------
 // Eligible-stops temp table
@@ -366,64 +365,4 @@ export function searchStops(query: string, limit = 30): BusStop[] {
     .all({ like: likeQuery, limit }) as StopSearchRow[];
 
   return enrichStopsWithRoutes(stopRows, db);
-}
-
-// ---------------------------------------------------------------------------
-// Nearby stops
-// ---------------------------------------------------------------------------
-
-/**
- * Finds the nearest stops to a given coordinate, constrained to the bus
- * service area bounding box. Uses a simple squared-distance approximation
- * for ordering (sufficient for "nearest N" at city scale).
- *
- * @param lat - Latitude of the user's location.
- * @param lon - Longitude of the user's location.
- * @param limit - Maximum number of results. Defaults to 30.
- * @returns `BusStop[]` sorted by approximate distance (nearest first).
- */
-export function findNearbyStops(
-  lat: number,
-  lon: number,
-  limit = 30,
-): BusStop[] {
-  const db = getGtfsDb();
-  const routeCond = buildStopPagesRouteCondition("r");
-  if (routeCond.params.length === 0) return [];
-
-  ensureEligibleStopsTable(db);
-  const bbox = getBusStopServiceAreaBbox();
-
-  // Over-fetch by 3x so we have candidates after the eligibility filter, then
-  // trim to the requested limit after ordering by distance.
-  const fetchLimit = limit * 3;
-
-  const stopRows = db
-    .prepare(
-      `
-      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon,
-             ((s.stop_lat - @lat) * (s.stop_lat - @lat)
-              + (s.stop_lon - @lon) * (s.stop_lon - @lon)) AS dist_sq
-      FROM stops s
-      JOIN _eligible_stops es ON es.stop_id = s.stop_id
-      WHERE (s.location_type IN (0, 1) OR s.location_type IS NULL)
-        AND s.parent_station IS NULL
-        AND s.stop_lat BETWEEN @south AND @north
-        AND s.stop_lon BETWEEN @west AND @east
-      ORDER BY dist_sq ASC
-      LIMIT @fetchLimit
-      `,
-    )
-    .all({
-      lat,
-      lon,
-      south: bbox.minLat,
-      north: bbox.maxLat,
-      west: bbox.minLon,
-      east: bbox.maxLon,
-      fetchLimit,
-    }) as (StopSearchRow & { dist_sq: number })[];
-
-  const trimmed = stopRows.slice(0, limit).map(({ dist_sq, ...rest }) => rest);
-  return enrichStopsWithRoutes(trimmed, db);
 }
