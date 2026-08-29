@@ -1,5 +1,6 @@
 import getAllRailBuswayRoutes from "./getAllRailBuswayRoutes";
 import getRouteShapes, {
+  throwIfMissingTrips,
   type RouteShapeFeature,
   trimCoordinates,
 } from "./getRouteShapes";
@@ -293,6 +294,11 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       });
     }
   }
+
+  // Throw a single combined error if any routes had missing canonical trip
+  // IDs. This collects ALL affected routes before failing, rather than
+  // throwing on the first one inside getRouteShapes.
+  throwIfMissingTrips();
 
   // Compute offset segments for side-by-side rendering of shared corridors.
   const segmentsByRoute = computeLineOffsets(inputs);

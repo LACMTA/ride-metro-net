@@ -406,6 +406,27 @@ function getNearbyConnectionsQuery() {
 }
 
 // ---------------------------------------------------------------------------
+// Missing-trips accumulator (module-level)
+// ---------------------------------------------------------------------------
+
+/**
+ * Accumulates missing canonical trip IDs across all `getRouteShapes` calls,
+ * keyed by route ID. This allows the caller (e.g. `getAllRouteShapes`) to
+ * collect missing trips for **every** route before throwing a single combined
+ * error, rather than failing on the first route that has stale config.
+ *
+ * `getRouteShapes` records into this map (and warns in dev); the caller is
+ * responsible for calling {@link throwIfMissingTrips} after processing all
+ * routes to flush the accumulated errors.
+ */
+const _missingTripsByRoute = new Map<string, string[]>();
+
+/** ANSI escape codes for prominent (red, bold) console output. */
+const _RED = "\x1b[31m";
+const _BOLD = "\x1b[1m";
+const _RESET = "\x1b[0m";
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -524,21 +545,20 @@ export default function getRouteShapes(
     features.push(feature);
   }
 
-  // Fail loudly when canonical trip IDs are missing from the database so
-  // stale lineMapTrips.json configs are caught early. In dev, log a warning
-  // so the server keeps running; in production (build), throw to break the
-  // build with a clear, actionable error message.
+  // Record missing canonical trip IDs into the module-level accumulator so
+  // the caller can collect them across ALL routes and throw a single combined
+  // error. In dev, also emit an immediate per-route warning (in red bold) so
+  // developers get instant feedback without waiting for the full loop.
   if (missingTrips.length > 0) {
-    const detail = `
-      Missing trip(s) for route ${routeId}: ${missingTrips.join(", ")}.
-      Manually replace with correct trips in src/data/lineMapTrips.json,
-      Or use npx tsx scripts/seed-line-map-trips.ts [route_ids]
-      to generate a best guess. Do NOT push to production without
-      checking system map and line pages for effected routes.`;
+    _missingTripsByRoute.set(routeId, missingTrips);
+
     if (import.meta.env.DEV) {
-      console.warn(`[getRouteShapes] ${detail}`);
-    } else {
-      throw new Error(`[getRouteShapes] ${detail}`);
+      const detail = `Missing trip(s) for route ${routeId}: ${missingTrips.join(", ")}
+    Manually replace with correct trips in src/data/lineMapTrips.json,
+    Or use npx tsx scripts/seed-line-map-trips.ts [route_ids]
+    to generate a best guess. Do NOT push to production without
+    checking system map and line pages for effected routes.`;
+      console.warn(`${_RED}${_BOLD}[getRouteShapes] ${detail}${_RESET}`);
     }
   }
 
@@ -590,6 +610,43 @@ export default function getRouteShapes(
     isSplitline,
     features,
   };
+}
+
+/**
+ * Checks the module-level missing-trips accumulator and, if any routes have
+ * missing trips, throws a single combined error (in production) or logs a
+ * combined warning (in dev) listing **all** affected routes at once.
+ *
+ * Clears the accumulator regardless of outcome so repeated calls (e.g. across
+ * HMR reloads in dev) don't accumulate stale entries.
+ *
+ * Should be called by the caller of {@link getRouteShapes} after processing
+ * all routes — typically `getAllRouteShapes` after its routes loop.
+ */
+export function throwIfMissingTrips(): void {
+  if (_missingTripsByRoute.size === 0) return;
+
+  const entries = [..._missingTripsByRoute.entries()];
+  _missingTripsByRoute.clear();
+
+  const routeLines = entries
+    .map(([routeId, trips]) => `  • Route ${routeId}: ${trips.join(", ")}`)
+    .join("\n");
+
+  const detail = `Missing trips for ${entries.length} route(s):
+
+${routeLines}
+
+  Manually replace with correct trips in src/data/lineMapTrips.json,
+  Or use npx tsx scripts/seed-line-map-trips.ts [route_ids]
+  to generate a best guess. Do NOT push to production without
+  checking system map and line pages for effected routes.`;
+
+  if (import.meta.env.DEV) {
+    console.warn(`${_RED}${_BOLD}[getRouteShapes] ${detail}${_RESET}`);
+  } else {
+    throw new Error(`[getRouteShapes] ${detail}`);
+  }
 }
 
 /**
