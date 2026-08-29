@@ -105,6 +105,34 @@ function resolveLineColor(route: RouteWithInfo): string {
 }
 
 /**
+ * Coordinate precision for the prerendered system-map payload, in decimal
+ * places. Five decimals is ~1.1 m at LA's latitude — far finer than MapLibre
+ * can render — but GTFS shape points carry up to ten decimals, and rounding
+ * them roughly halves the JSON payload size.
+ */
+const COORDINATE_PRECISION = 1e5;
+
+/** Rounds a lon/lat to {@link COORDINATE_PRECISION} decimal places. */
+function roundCoordinate(value: number): number {
+  return Math.round(value * COORDINATE_PRECISION) / COORDINATE_PRECISION;
+}
+
+/**
+ * Returns a copy of a render segment with every coordinate rounded to
+ * {@link COORDINATE_PRECISION} for compact serialization. Produces new
+ * arrays — the input segment is not mutated.
+ */
+function roundSegmentCoordinates(segment: RenderSegment): RenderSegment {
+  return {
+    ...segment,
+    coordinates: segment.coordinates.map(
+      ([lon, lat]) =>
+        [roundCoordinate(lon), roundCoordinate(lat)] as [number, number],
+    ),
+  };
+}
+
+/**
  * Trims a {@link RouteShapeFeature} to only the contiguous portion
  * containing stops whose `parentStationId` is not in `renderedStations`,
  * extended by one shared stop on each end for connectivity. Used to render
@@ -312,7 +340,8 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
       routeType: route.routeType,
       mode: isBuswayRoute(route.routeId) ? "busway" : "rail",
       color: resolveLineColor(route),
-      segments: segmentsByRoute.get(routeId) ?? [],
+      segments:
+        segmentsByRoute.get(routeId)?.map(roundSegmentCoordinates) ?? [],
     };
   });
 
@@ -332,8 +361,8 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
     ([stationId, s]) => ({
       stationId,
       stopName: s.stopName,
-      lat: s.lat,
-      lon: s.lon,
+      lat: roundCoordinate(s.lat),
+      lon: roundCoordinate(s.lon),
       lineCount: s.routes.size,
       lines: [...s.routes].map((routeId) => {
         const route = routeMeta.get(routeId)!;

@@ -35,11 +35,7 @@ const allLines = [...railBuswayRoutes, ...busRoutes];
       id="sidebar-aside"
       class="bg-background-white border-divider-line absolute inset-y-0 left-0 z-20 w-80 max-w-[85vw] -translate-x-full border-r transition-transform duration-200 md:static md:z-auto md:w-96 md:max-w-none md:translate-x-0"
     >
-      <SystemMapSidebar
-        client:load
-        lines={allLines}
-        stations={systemMapData.stations}
-      />
+      <SystemMapSidebar client:load lines={allLines} />
     </aside>
 
     <!-- Map -->
@@ -50,6 +46,7 @@ const allLines = [...railBuswayRoutes, ...busRoutes];
 
   <script>
     import { sidebarOpen } from "../lib/systemMapStore";
+    import watchAlerts from "../lib/watchAlerts";
 
     const toggle = document.getElementById("sidebar-toggle");
     const backdrop = document.getElementById("sidebar-backdrop");
@@ -79,5 +76,10 @@ const allLines = [...railBuswayRoutes, ...busRoutes];
     backdrop?.addEventListener("click", () => {
       sidebarOpen.set(false);
     });
+
+    // Populate the alerts store so the sitewide SystemWideAlert banner
+    // (rendered by Layout) has data on this page. With no stop/route filter
+    // this fetches all active alerts, including system-wide ones.
+    watchAlerts();
   </script>
 </Layout>

@@ -8,9 +8,18 @@ export interface AlertsQuery {
 }
 
 async function fetchAlerts(query: AlertsQuery): Promise<ConciseAlert[]> {
-  const res = await fetch(
-    `/api/alerts?stopId=${query.stopIds.join(",")}&routeId=${query.routeIds.join(",")}`,
-  );
+  // Only send non-empty filters. Sending `stopId=&routeId=` makes the API
+  // treat them as a filter matching the empty string (which matches nothing),
+  // whereas omitting them entirely returns all active alerts — including
+  // system-wide ones.
+  const params = new URLSearchParams();
+  if (query.stopIds.length > 0) {
+    params.set("stopId", query.stopIds.join(","));
+  }
+  if (query.routeIds.length > 0) {
+    params.set("routeId", query.routeIds.join(","));
+  }
+  const res = await fetch(`/api/alerts?${params.toString()}`);
   if (!res.ok) {
     console.error(await res.text());
     throw new Error(`Failed to fetch alerts: ${res.status}`);

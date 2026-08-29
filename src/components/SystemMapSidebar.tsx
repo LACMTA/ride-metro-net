@@ -6,10 +6,12 @@ import MapPinIcon from "./MapPinIcon";
 import { getLineSlug } from "../lib/routeShortNameOverrides";
 import type { RouteWithInfo } from "../lib/getRouteById";
 import type {
+  SystemMapData,
   SystemStation,
   SystemStationLine,
 } from "../lib/getAllRouteShapes";
 import type { BusStop } from "../lib/getBusStopsForBbox";
+import { getData } from "../lib/getData";
 import { ensureTilesLoaded } from "../lib/busStopTileCache";
 import { gridXForLon, gridYForLat } from "../lib/busStopTiles";
 import { haversineMeters } from "../lib/distance";
@@ -258,14 +260,9 @@ function NearbyList({ result }: { result: NearbyResult }) {
 interface SystemMapSidebarProps {
   /** All Metro lines (rail, busway, and bus) for the browse "Lines" tab. */
   lines: RouteWithInfo[];
-  /** Rail and busway stations for the browse "Stops" tab. */
-  stations: SystemStation[];
 }
 
-export default function SystemMapSidebar({
-  lines,
-  stations,
-}: SystemMapSidebarProps) {
+export default function SystemMapSidebar({ lines }: SystemMapSidebarProps) {
   const [mode, setMode] = useState<SidebarMode>("browse");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult | null>(null);
@@ -274,6 +271,20 @@ export default function SystemMapSidebar({
 
   // Active browse tab (0 = Lines, 1 = Stops, 2 = Nearby).
   const [activeTab, setActiveTab] = useState(TAB_LINES);
+
+  // --- Stations (read from the embedded system-map payload) ---
+  // Stations are deliberately not passed as island props — Astro serializes
+  // island props into the HTML, which would duplicate the ~90 KB station list
+  // already embedded as the page's `data-system-map` JSON payload (written by
+  // SystemMap.astro's DataInjector). Instead it is read from the DOM after
+  // mount — the same payload the map script reads. Starts as `null` so the
+  // server render matches React's first client render (no hydration
+  // mismatch).
+  const [stations, setStations] = useState<SystemStation[] | null>(null);
+
+  useEffect(() => {
+    setStations(getData<SystemMapData>("data-system-map").stations);
+  }, []);
 
   // --- Nearby tab state ---
   const [nearby, setNearby] = useState<NearbyResult | null>(null);
@@ -357,7 +368,7 @@ export default function SystemMapSidebar({
    * Compute nearby lines and stops for a map center. Bus stops are pulled
    * from the shared bus-stop tile cache (3×3 tiles around the center — cache
    * hits are free since the map already loads these tiles on pan), rail/busway
-   * stations come from the `stations` prop. Both are filtered by haversine
+   * stations come from the embedded station list. Both are filtered by haversine
    * distance to the center and sorted nearest-first. "Lines" are the routes
    * serving those nearby stops/stations, resolved to `RouteWithInfo` via the
    * `lines` prop (preserving its stable order).
@@ -391,7 +402,7 @@ export default function SystemMapSidebar({
           }
         }
 
-        for (const station of stations) {
+        for (const station of stations ?? []) {
           const d = haversineMeters(
             center.lat,
             center.lon,
@@ -574,9 +585,15 @@ export default function SystemMapSidebar({
               </TabPanel>
               <TabPanel>
                 <div className="divide-y divide-gray-100">
-                  {stations.map((station) => (
-                    <StationItem key={station.stationId} station={station} />
-                  ))}
+                  {stations === null ? (
+                    <p className="px-4 py-8 text-center text-gray-500">
+                      Loading…
+                    </p>
+                  ) : (
+                    stations.map((station) => (
+                      <StationItem key={station.stationId} station={station} />
+                    ))
+                  )}
                 </div>
               </TabPanel>
               <TabPanel>
