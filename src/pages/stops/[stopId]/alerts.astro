@@ -9,11 +9,10 @@ import PageHeader from "../../../components/PageHeader";
 import Column from "../../../components/Column";
 import { getStopStaticPaths } from "../../../lib/getStopStaticPaths";
 
-export const prerender = true;
+export const prerender = false;
 
-export async function getStaticPaths() {
-  return getStopStaticPaths();
-}
+// Alerts-only launch: stop alerts pages are disabled.
+return new Response(null, { status: 404 });
 
 const { stopId } = Astro.params;
 
@@ -37,7 +36,6 @@ const hasRail = stop.routes.some((route) => route.routeType !== 3);
     {
       stopIds: allStopIds,
       routeIds: stop.routes.map((route) => route.routeId),
-      agency: stop.swiftlyAgencyId,
     },
   ]);
 </script>
@@ -48,8 +46,16 @@ const hasRail = stop.routes.some((route) => route.routeType !== 3);
     <section>
       <TabNav
         tabs={[
-          { href: `/stops/${stop.stopId}/`, label: "Arrivals", key: "arrivals" },
-          { href: `/stops/${stop.stopId}/alerts`, label: hasRail ? "Station Alerts" : "Stop Alerts", key: "alerts" },
+          {
+            href: `/stops/${stop.stopId}/`,
+            label: "Arrivals",
+            key: "arrivals",
+          },
+          {
+            href: `/stops/${stop.stopId}/alerts`,
+            label: hasRail ? "Station Alerts" : "Stop Alerts",
+            key: "alerts",
+          },
         ]}
         activeTab="alerts"
       >

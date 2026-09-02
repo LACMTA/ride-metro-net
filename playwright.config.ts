@@ -17,8 +17,7 @@ export default defineConfig({
   /* Start the Astro dev server before tests run */
   webServer: {
     command: "npm run dev",
-    /* Use a route page for the health check — the index page returns 404 by design */
-    url: "http://localhost:4321/lines/a",
+    url: "http://localhost:4321/alerts",
     /* The GTFS import + Vite startup can be slow on first page render */
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,

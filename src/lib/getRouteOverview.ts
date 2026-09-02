@@ -1,5 +1,4 @@
-import { openDb } from "gtfs";
-import { GTFSconfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 import type Database from "better-sqlite3";
 
 /** A pair of GTFS time strings (e.g. "05:30:00", "24:45:00") representing
@@ -41,19 +40,7 @@ interface OverviewRow {
   weekend_last: string | null;
 }
 
-let dbInstance: Database.Database | null = null;
 let preparedQuery: Database.Statement | null = null;
-
-function getDb() {
-  if (!dbInstance) {
-    dbInstance = openDb(GTFSconfig);
-    dbInstance.pragma("synchronous = OFF");
-    dbInstance.pragma("cache_size = 10000");
-    dbInstance.pragma("temp_store = MEMORY");
-    dbInstance.pragma("journal_mode = OFF");
-  }
-  return dbInstance;
-}
 
 /**
  * Optimised single-pass query that:
@@ -170,7 +157,7 @@ const query = `
 
 function getPreparedQuery() {
   if (!preparedQuery) {
-    const db = getDb();
+    const db = getGtfsDb();
     preparedQuery = db.prepare(query);
   }
   return preparedQuery;

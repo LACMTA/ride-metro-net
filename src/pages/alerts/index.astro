@@ -9,7 +9,6 @@ import getAllBusRoutes from "../../lib/getAllBusRoutes";
 import LineAlertStatusList from "../../components/LineAlertStatusList";
 import BusIcon from "../../components/BusIcon";
 import BusAlertBadgeList from "../../components/BusAlertBadgeList";
-import ElevatorIcon from "../../components/ElevatorIcon";
 import AccessibilityAlertStopList from "../../components/AccessibilityAlertStopList";
 import AccessibilityIcon from "../../components/AccessibilityIcon";
 
@@ -37,9 +36,6 @@ const busRoutes = await getAllBusRoutes();
             markClassName="text-metro-text"
           />
           <h1 class="text-4xl font-bold">Alerts</h1>
-          <span class="border-blue text-blue rounded-sm border px-2 py-0.5"
-            >Beta</span
-          >
         </div>
       </div>
     </Column>

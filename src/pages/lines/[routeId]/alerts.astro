@@ -38,18 +38,16 @@ const title =
     {
       stopIds: [],
       routeIds: [route.routeId],
-      agency: route.swiftlyAgencyId,
     },
   ]);
 </script>
 
 <Layout title={`${title} — Alerts`}>
   <main>
-    <PageHeader routes={[route]} title={title} badgeSize="xl" />
+    <PageHeader routes={[route]} title={title} badgeSize="xl" linkBadges={false} />
     <section>
       <TabNav
         tabs={[
-          { href: `/lines/${routeId}/`, label: "Maps & Schedules", key: "schedules" },
           { href: `/lines/${routeId}/alerts`, label: "Alerts", key: "alerts" },
         ]}
         activeTab="alerts"
