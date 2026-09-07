@@ -11,7 +11,7 @@ import {
   buswayRouteSqlCondition,
   resolveRouteShortName,
 } from "./routeShortNameOverrides";
-import { buildStopPagesRouteCondition } from "./stopEligibility";
+import { buildForWebRouteCondition } from "./stopEligibility";
 import { getGtfsDb } from "./gtfsConfig";
 import {
   computeLineOffsets,
@@ -384,7 +384,7 @@ export default async function getAllRouteShapes(): Promise<SystemMapData> {
 
 /**
  * Queries non-busway bus routes (route_type = 3) serving the given stop IDs.
- * Mirrors the logic in the prerendered bus-stops tile API — uses `buildStopPagesRouteCondition`
+ * Mirrors the logic in the prerendered bus-stops tile API — uses `buildForWebRouteCondition`
  * for agency eligibility and `buswayRouteSqlCondition` to exclude busway
  * routes (G / J Line). Returns routes in `SystemStationLine` shape for
  * direct use in station popups.
@@ -397,7 +397,7 @@ function queryBusRoutesForStations(
   const result = new Map<string, SystemStationLine[]>();
   if (stationIds.length === 0) return result;
 
-  const routeCond = buildStopPagesRouteCondition("r");
+  const routeCond = buildForWebRouteCondition("r");
   if (routeCond.params.length === 0) return result;
 
   const db = getGtfsDb();

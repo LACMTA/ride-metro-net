@@ -5,7 +5,7 @@ import {
   ROUTE_SHORT_NAME_OVERRIDES,
 } from "./routeShortNameOverrides";
 import { getAgencyIdsByFlag, getAgencySettings } from "./agencies";
-import { buildStopPagesRouteCondition } from "./stopEligibility";
+import { buildForWebRouteCondition } from "./stopEligibility";
 import type { RouteWithInfo } from "./getRouteById";
 import type { BusStop, BusRouteInfo } from "./getBusStopsForBbox";
 
@@ -13,7 +13,7 @@ import type { BusStop, BusRouteInfo } from "./getBusStopsForBbox";
 // Eligible-stops temp table
 // ---------------------------------------------------------------------------
 //
-// The stop-eligibility check (buildStopPages agencies + non-empty
+// The stop-eligibility check (buildForWeb agencies + non-empty
 // route_long_name + busway exclusion) requires joining stop_times → trips →
 // routes for *every* candidate stop. As a correlated EXISTS subquery this is
 // O(stops × stop_times) — ~2.3 s for a short LIKE query.
@@ -33,7 +33,7 @@ let eligibleStopsReady = false;
 function ensureEligibleStopsTable(db: ReturnType<typeof getGtfsDb>): void {
   if (eligibleStopsReady) return;
 
-  const routeCond = buildStopPagesRouteCondition("r");
+  const routeCond = buildForWebRouteCondition("r");
   if (routeCond.params.length === 0) {
     eligibleStopsReady = true;
     return;
@@ -215,7 +215,7 @@ function enrichStopsWithRoutes(
 ): BusStop[] {
   if (stopRows.length === 0) return [];
 
-  const routeCond = buildStopPagesRouteCondition("r");
+  const routeCond = buildForWebRouteCondition("r");
   if (routeCond.params.length === 0) {
     return stopRows.map((row) => ({
       stopId: row.stop_id,
@@ -343,7 +343,7 @@ function enrichStopsWithRoutes(
  */
 export function searchStops(query: string, limit = 30): BusStop[] {
   const db = getGtfsDb();
-  const routeCond = buildStopPagesRouteCondition("r");
+  const routeCond = buildForWebRouteCondition("r");
   if (routeCond.params.length === 0) return [];
 
   ensureEligibleStopsTable(db);

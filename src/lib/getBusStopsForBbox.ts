@@ -3,7 +3,7 @@ import {
   buswayRouteSqlCondition,
   resolveRouteShortName,
 } from "./routeShortNameOverrides";
-import { buildStopPagesRouteCondition } from "./stopEligibility";
+import { buildForWebRouteCondition } from "./stopEligibility";
 import {
   BUS_STOP_GRID_SIZE,
   BUS_STOP_PREFETCH_TILES,
@@ -49,7 +49,7 @@ interface RouteRow {
 
 /**
  * Queries bus stops within a bounding box and enriches each with the distinct
- * bus routes serving it. Uses the same eligibility (`buildStopPagesRouteCondition`)
+ * bus routes serving it. Uses the same eligibility (`buildForWebRouteCondition`)
  * and busway-exclusion logic as the rest of the app so the system map stays
  * 1-1 with built stop pages.
  *
@@ -63,9 +63,9 @@ export function getBusStopsForBbox(
 ): BusStop[] {
   const db = getGtfsDb();
 
-  // Shared condition: routes from buildStopPages agencies with non-empty
+  // Shared condition: routes from buildForWeb agencies with non-empty
   // route_long_name. Keeps the system map 1-1 with built stop pages.
-  const routeCond = buildStopPagesRouteCondition("r");
+  const routeCond = buildForWebRouteCondition("r");
   if (routeCond.params.length === 0) return [];
 
   // Exclude busway routes (G / J Line) from the bus-stop route list — those
@@ -73,7 +73,7 @@ export function getBusStopsForBbox(
   const buswayExclude = buswayRouteSqlCondition("r.route_id", false);
 
   // --- Query 1: qualifying stops in the bounding box ---
-  // A stop is included if it has at least one eligible (buildStopPages agency,
+  // A stop is included if it has at least one eligible (buildForWeb agency,
   // non-empty route_long_name, non-busway) route serving it.
   const stopRows = db
     .prepare(
@@ -167,7 +167,7 @@ export function getBusStopsForBbox(
 export function getAllBusStopTileKeys(): string[] {
   const db = getGtfsDb();
 
-  const routeCond = buildStopPagesRouteCondition("r");
+  const routeCond = buildForWebRouteCondition("r");
   if (routeCond.params.length === 0) return [];
 
   const buswayExclude = buswayRouteSqlCondition("r.route_id", false);
@@ -220,7 +220,7 @@ export interface ServiceAreaBbox {
 export function getBusStopServiceAreaBbox(): ServiceAreaBbox {
   const db = getGtfsDb();
 
-  const routeCond = buildStopPagesRouteCondition("r");
+  const routeCond = buildForWebRouteCondition("r");
   if (routeCond.params.length === 0) {
     // No eligible agencies — return a zero-size bbox.
     return { minLon: 0, minLat: 0, maxLon: 0, maxLat: 0 };

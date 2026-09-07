@@ -102,21 +102,54 @@ function toAlert(row: RawAlertRow, entities: RawEntityRow[]): Alert {
  * When a `filter` is provided an EXISTS subquery restricts the result set to
  * alerts whose informed entities match the requested routes or stops — the
  * filtering happens entirely in SQLite rather than in JS.
+ *
+ * `filter.excludedAgencyPrefixes` narrows system-wide (scope-less) alerts by
+ * agency: an alert whose entities are all scope-less — the signal the
+ * `SystemWideAlert` banner keys on — is dropped when its stored `id` starts
+ * with one of the given gtfs agency prefixes. Alerts with at least one
+ * route- or stop-scoped entity always pass through.
  */
 function fetchAlertRows(
   db: ReturnType<typeof getGtfsDb>,
   nowSeconds: number,
-  filter?: { routeIds?: string[]; stopIds?: string[]; agencyIds?: string[] },
+  filter?: {
+    routeIds?: string[];
+    stopIds?: string[];
+    agencyIds?: string[];
+    excludedAgencyPrefixes?: string[];
+  },
 ): RawAlertRow[] {
   const hasRoutes = (filter?.routeIds?.length ?? 0) > 0;
   const hasStops = (filter?.stopIds?.length ?? 0) > 0;
   const hasAgencies = (filter?.agencyIds?.length ?? 0) > 0;
 
+  // Shared SQL fragment (appended to both branches below) that drops
+  // scope-less alerts whose `id` carries an excluded agency's gtfs prefix
+  // (`sa.id NOT LIKE 'prefix%'`). Unprefixed ids — the Metro feeds declare
+  // no prefix — always pass, so Metro system-wide alerts are never excluded.
+  const excludedPrefixes = filter?.excludedAgencyPrefixes ?? [];
+  const prefixClause = excludedPrefixes.length
+    ? `
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM service_alert_informed_entities saie
+            WHERE saie.alert_id = sa.id
+              AND (saie.route_id IS NOT NULL OR saie.stop_id IS NOT NULL)
+          )
+          OR (${excludedPrefixes.map(() => `sa.id NOT LIKE ?`).join(" AND ")})
+        )`
+    : "";
+  const prefixParams = excludedPrefixes.map((prefix) => `${prefix}%`);
+
   if (!hasRoutes && !hasStops && !hasAgencies) {
-    // No filter — return every non-expired alert.
+    // No filter — return every non-expired alert, except system-wide alerts
+    // from agencies with excluded prefixes (see prefixClause above).
     return db
-      .prepare(`SELECT * FROM service_alerts WHERE expiration_timestamp > ?`)
-      .all(nowSeconds) as RawAlertRow[];
+      .prepare(
+        `SELECT sa.* FROM service_alerts sa WHERE sa.expiration_timestamp > ?${prefixClause}`,
+      )
+      .all(nowSeconds, ...prefixParams) as RawAlertRow[];
   }
 
   // Build the inner WHERE conditions for service_alert_informed_entities.
@@ -155,9 +188,9 @@ function fetchAlertRows(
            WHERE saie.alert_id = sa.id
              AND saie.expiration_timestamp > ?
              AND (${entityConditions.join(" OR ")})
-         )`,
+         )${prefixClause}`,
     )
-    .all(params) as RawAlertRow[];
+    .all(...params, ...prefixParams) as RawAlertRow[];
 }
 
 /**
@@ -197,11 +230,19 @@ function fetchEntitiesByAlertId(
  * executed inside SQLite rather than after fetching all rows.  Omit the
  * filter (or pass `undefined`) to retrieve every active alert — appropriate
  * for callers like `/api/alert-status` that need a system-wide view.
+ *
+ * `excludedAgencyPrefixes` optionally drops *system-wide* alerts (alerts
+ * whose informed entities are all scope-less) whose stored ids start with
+ * one of the listed gtfs agency prefixes. Used by the unfiltered branch of
+ * `/api/alerts` to keep system-wide alerts from agencies that are not
+ * built for the web out of the sitewide `SystemWideAlert` banner — see
+ * `getNonWebAgencyPrefixes` in agencies.ts.
  */
 export async function getServiceAlertsFromDb(filter?: {
   routeIds?: string[];
   stopIds?: string[];
   agencyIds?: string[];
+  excludedAgencyPrefixes?: string[];
 }): Promise<Alert[]> {
   const db = getGtfsDb();
   const nowSeconds = Math.floor(Date.now() / 1000);

@@ -34,13 +34,13 @@ const ACTIVE_SERVICES_CTE = `
 const db = getGtfsDb();
 
 const stmts = {
-  // All route IDs that have trips and belong to agencies with buildLinePages flag
+  // All route IDs that have trips and belong to agencies with buildForWeb flag
   allRoutes: db.prepare(`
     SELECT DISTINCT r.route_id
     FROM routes r
     JOIN trips t ON t.route_id = r.route_id
     WHERE r.route_long_name IS NOT NULL AND r.route_long_name != ''
-      AND r.agency_id IN (${getAgencyIdsByFlag("buildLinePages")
+      AND r.agency_id IN (${getAgencyIdsByFlag("buildForWeb")
         .map(() => "?")
         .join(", ")})
     ORDER BY r.route_id
@@ -619,7 +619,7 @@ if (cliArgs.length > 0) {
 } else {
   // --- Full rebuild: process all routes (original behavior) ---
 
-  const agencyIds = getAgencyIdsByFlag("buildLinePages");
+  const agencyIds = getAgencyIdsByFlag("buildForWeb");
   const allRoutes = stmts.allRoutes.all.apply(
     stmts.allRoutes,
     agencyIds,

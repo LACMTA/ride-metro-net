@@ -573,7 +573,7 @@ export default function getRouteShapes(
   // -----------------------------------------------------------------------
   if (!options?.skipConnections) {
     // Compute agency IDs once and reuse for both connection queries.
-    const agencyIdsJson = JSON.stringify(getAgencyIdsByFlag("buildLinePages"));
+    const agencyIdsJson = JSON.stringify(getAgencyIdsByFlag("buildForWeb"));
 
     const connectionsByParent = buildConnectionsMap(
       getConnectionsQuery(),

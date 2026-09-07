@@ -22,15 +22,14 @@ export interface AgencyConfig {
      */
     showInAlertsIndex?: boolean;
     /**
-     * When `true`, line pages (`/lines/[routeId]/*`) are built for this agency
+     * When `true`, this agency's data powers the public website — line pages
+     * (`/lines/[routeId]/*`), stop pages (`/stops/[stopId]/*`), the system
+     * map, search, and web-only display features such as the sitewide
+     * system-wide alert banner. Feeds may still be used by other experiences
+     * (e.g. screen displays) when this is `false`.
      * @default false
      */
-    buildLinePages?: boolean;
-    /**
-     * When `true`, stop pages (`/stops/[stopId]/*`) are built for this agency
-     * @default false
-     */
-    buildStopPages?: boolean;
+    buildForWeb?: boolean;
     /** Brand color (hex) for the agency, used on screen displays. */
     color?: string;
     /**
@@ -61,11 +60,11 @@ if (!API_KEY) throw new Error("Swiftly API_KEY not defined!");
  * given flag set to `true`.
  *
  * Used to restrict queries to the agencies that should appear on a particular
- * page or feature (e.g. `showInAlertsIndex` for `/alerts`,
- * `buildLinePages` for line pages, `buildStopPages` for stop pages).
+ * page or feature (e.g. `showInAlertsIndex` for `/alerts`, `buildForWeb`
+ * for line/stop pages, the system map, and web display features).
  */
 export function getAgencyIdsByFlag(
-  flag: "showInAlertsIndex" | "buildLinePages" | "buildStopPages",
+  flag: "showInAlertsIndex" | "buildForWeb",
 ): string[] {
   return agencyConfigs.flatMap((cfg) =>
     cfg.agencySettings.filter((s) => s[flag]).map((s) => s.agencyId),
@@ -84,6 +83,32 @@ export function getAgencySettings(agencyId: string) {
   return undefined;
 }
 
+/**
+ * Return the gtfs ID `prefix`es of agencies that are not built for the web —
+ * i.e. agencies where no `agencySettings` entry has `buildForWeb` set.
+ *
+ * node-gtfs prefixes every ID it imports for an agency (alert IDs, entity
+ * route/stop IDs) with that agency's configured gtfs `prefix`; the Metro
+ * feeds have none, so unprefixed IDs always belong to Metro. This lets
+ * callers exclude data belonging to agencies whose feeds are still imported
+ * (e.g. for screen displays) but that should not appear on the website —
+ * currently used to keep non-Metro system-wide alerts out of the sitewide
+ * `SystemWideAlert` banner (see the unfiltered branch of `/api/alerts`).
+ *
+ * Note: a non-web agency must declare a gtfs `prefix` for its data to be
+ * distinguishable from unprefixed (Metro) data.
+ */
+export function getNonWebAgencyPrefixes(): string[] {
+  const prefixes: string[] = [];
+  for (const cfg of agencyConfigs) {
+    const isWeb = cfg.agencySettings.some((s) => s.buildForWeb);
+    if (!isWeb && cfg.gtfs.prefix) {
+      prefixes.push(cfg.gtfs.prefix);
+    }
+  }
+  return prefixes;
+}
+
 export const agencyConfigs: AgencyConfig[] = [
   // LA Metro Rail
   {
@@ -91,8 +116,7 @@ export const agencyConfigs: AgencyConfig[] = [
       {
         agencyId: "LACMTA_Rail",
         showInAlertsIndex: true,
-        buildLinePages: true,
-        buildStopPages: true,
+        buildForWeb: true,
         color: "#121212",
         lineColor: "#e16710",
         logoFile: "metro.svg",
@@ -127,8 +151,7 @@ export const agencyConfigs: AgencyConfig[] = [
       {
         agencyId: "LACMTA",
         showInAlertsIndex: true,
-        buildLinePages: true,
-        buildStopPages: true,
+        buildForWeb: true,
         color: "#121212",
         lineColor: "#e16710",
         logoFile: "metro.svg",
@@ -163,8 +186,7 @@ export const agencyConfigs: AgencyConfig[] = [
       {
         agencyId: "bigbluebus6216179",
         showInAlertsIndex: false,
-        buildLinePages: false,
-        buildStopPages: false,
+        buildForWeb: false,
         color: "#005DAA",
         logoFile: "big-blue-bus.svg",
       },
@@ -190,8 +212,7 @@ export const agencyConfigs: AgencyConfig[] = [
       {
         agencyId: "culvercitybus1",
         showInAlertsIndex: false,
-        buildLinePages: false,
-        buildStopPages: false,
+        buildForWeb: false,
         color: "#F7A800",
         logoFile: "culver-citybus.svg",
       },
@@ -218,8 +239,7 @@ export const agencyConfigs: AgencyConfig[] = [
       {
         agencyId: "torrancetransit1",
         showInAlertsIndex: false,
-        buildLinePages: false,
-        buildStopPages: false,
+        buildForWeb: false,
         color: "#0066B3",
         logoFile: "torrance-transit.svg",
       },
@@ -256,8 +276,7 @@ export const agencyConfigs: AgencyConfig[] = [
       {
         agencyId: "gtrans1",
         showInAlertsIndex: false,
-        buildLinePages: false,
-        buildStopPages: false,
+        buildForWeb: false,
         color: "#0067B1",
         logoFile: "gtrans.svg",
       },
@@ -284,8 +303,7 @@ export const agencyConfigs: AgencyConfig[] = [
       {
         agencyId: "beachcitiestransit203",
         showInAlertsIndex: false,
-        buildLinePages: false,
-        buildStopPages: false,
+        buildForWeb: false,
         color: "#00A14B",
         logoFile: "beach-cities-transit.svg",
       },
@@ -311,8 +329,7 @@ export const agencyConfigs: AgencyConfig[] = [
       {
         agencyId: "longbeachtransit90023",
         showInAlertsIndex: false,
-        buildLinePages: false,
-        buildStopPages: false,
+        buildForWeb: false,
         color: "#003DA5",
         logoFile: "long-beach-transit.svg",
       },

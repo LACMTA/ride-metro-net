@@ -14,7 +14,7 @@ export async function getLineStaticPaths() {
   // Build pages for all routes that have trips (are active in the schedule).
   // Strip the version suffix from route_id (e.g. "901-13196" → "901") so that
   // page URLs are stable across GTFS releases, then deduplicate.
-  const agencyIds = getAgencyIdsByFlag("buildLinePages");
+  const agencyIds = getAgencyIdsByFlag("buildForWeb");
   const placeholders = agencyIds.map(() => "?").join(", ");
 
   const allRoutes = (await db

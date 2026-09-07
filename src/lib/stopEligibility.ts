@@ -2,7 +2,7 @@ import { getAgencyIdsByFlag } from "./agencies";
 
 /**
  * Shared SQL condition + bind params that identify routes from agencies
- * where `buildStopPages` is enabled and whose `route_long_name` is non-empty.
+ * where `buildForWeb` is enabled and whose `route_long_name` is non-empty.
  *
  * Used by both `getStopStaticPaths` (built stop pages) and the prerendered
  * bus-stops tile API (system map) so that the set of stops shown on the map stays 1-1 with
@@ -12,11 +12,11 @@ import { getAgencyIdsByFlag } from "./agencies";
  * @returns `{ clause, params }` — `clause` is a SQL fragment with `?`
  *   placeholders; `params` are the bind values (agency IDs) in order.
  */
-export function buildStopPagesRouteCondition(routeAlias: string): {
+export function buildForWebRouteCondition(routeAlias: string): {
   clause: string;
   params: string[];
 } {
-  const agencyIds = getAgencyIdsByFlag("buildStopPages");
+  const agencyIds = getAgencyIdsByFlag("buildForWeb");
   const placeholders = agencyIds.map(() => "?").join(",");
   const clause = `${routeAlias}.agency_id IN (${placeholders})
         AND ${routeAlias}.route_long_name IS NOT NULL

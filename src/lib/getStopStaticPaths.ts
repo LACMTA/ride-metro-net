@@ -1,5 +1,5 @@
 import { getGtfsDb } from "./gtfsConfig";
-import { buildStopPagesRouteCondition } from "./stopEligibility";
+import { buildForWebRouteCondition } from "./stopEligibility";
 
 /**
  * Shared `getStaticPaths` logic for stop pages (`/stops/[stopId]/*`).
@@ -14,10 +14,10 @@ import { buildStopPagesRouteCondition } from "./stopEligibility";
 export async function getStopStaticPaths() {
   const db = getGtfsDb();
 
-  // Shared condition: routes from buildStopPages agencies with non-empty
+  // Shared condition: routes from buildForWeb agencies with non-empty
   // route_long_name. Used in both halves of the UNION so that the set of
   // built stop pages stays 1-1 with the stops shown on the system map.
-  const routeCond = buildStopPagesRouteCondition("r");
+  const routeCond = buildForWebRouteCondition("r");
 
   const allStops = (await db
     .prepare(
