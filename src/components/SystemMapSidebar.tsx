@@ -15,11 +15,7 @@ import { getData } from "../lib/getData";
 import { ensureTilesLoaded } from "../lib/busStopTileCache";
 import { gridXForLon, gridYForLat } from "../lib/busStopTiles";
 import { haversineMeters } from "../lib/distance";
-import {
-  systemMapViewport,
-  requestLocateMe,
-  sidebarOpen,
-} from "../lib/systemMapStore";
+import { systemMapViewport, requestLocateMe } from "../lib/systemMapStore";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -486,30 +482,6 @@ export default function SystemMapSidebar({ lines }: SystemMapSidebarProps) {
     <div className="bg-background-white flex h-full flex-col">
       {/* --- Search bar --- */}
       <div className="flex items-center gap-2 border-b border-gray-200 p-3">
-        {/* Left-arrow close button — only on mobile (below md). Closes the
-            drawer by writing to the shared `sidebarOpen` store, which the
-            index.astro script listens to. */}
-        <button
-          type="button"
-          onClick={() => sidebarOpen.set(false)}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 md:hidden"
-          aria-label="Hide panel"
-        >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
         <div className="relative flex-1">
           <input
             type="text"

@@ -18,64 +18,28 @@ const allLines = [...railBuswayRoutes, ...busRoutes];
 ---
 
 <Layout title="Metro System Map" fullHeight>
-  <div class="relative flex h-full overflow-hidden">
-    <!-- Mobile backdrop. `absolute inset-0` (not `fixed`) so it's contained
-         to this map-area wrapper rather than the full viewport — it won't dim
-         or overlay the sitewide header above. -->
-    <div
-      id="sidebar-backdrop"
-      class="absolute inset-0 z-20 hidden bg-black/30 md:hidden"
-    >
+  <!-- Column on mobile: map on top, sidebar docked at the bottom of the
+       screen (always visible). Row on desktop: sidebar left, map right
+       (unchanged). -->
+  <div class="relative flex h-full flex-col overflow-hidden md:flex-row">
+    <!-- Map -->
+    <div class="order-1 min-h-0 flex-1 overflow-hidden md:order-2">
+      <SystemMap data={systemMapData} serviceAreaBbox={serviceAreaBbox} />
     </div>
 
-    <!-- Sidebar. `absolute inset-y-0 left-0` (not `fixed`) anchors it to this
-         map-area wrapper (`relative`), so the drawer opens within the map
-         area — below the header — instead of covering the full viewport. -->
+    <!-- Sidebar. Always-visible bottom panel on mobile (`order-2` places it
+         below the map in the column layout; `md:order-1` restores it to the
+         left on desktop). In-flow flex child at both breakpoints — no more
+         absolute positioning, z-index, translate, or backdrop. -->
     <aside
-      id="sidebar-aside"
-      class="bg-background-white border-divider-line absolute inset-y-0 left-0 z-20 w-80 max-w-[85vw] -translate-x-full border-r transition-transform duration-200 md:static md:z-auto md:w-96 md:max-w-none md:translate-x-0"
+      class="bg-background-white border-divider-line order-2 h-[40dvh] w-full shrink-0 border-t md:order-1 md:h-full md:w-96 md:border-t-0 md:border-r"
     >
       <SystemMapSidebar client:load lines={allLines} />
     </aside>
-
-    <!-- Map -->
-    <div class="flex-1 overflow-hidden">
-      <SystemMap data={systemMapData} serviceAreaBbox={serviceAreaBbox} />
-    </div>
   </div>
 
   <script>
-    import { sidebarOpen } from "../lib/systemMapStore";
     import watchAlerts from "../lib/watchAlerts";
-
-    const toggle = document.getElementById("sidebar-toggle");
-    const backdrop = document.getElementById("sidebar-backdrop");
-    const aside = document.getElementById("sidebar-aside");
-
-    /** Reflect the shared sidebarOpen store onto the DOM (translate + backdrop). */
-    function applySidebarState(open: boolean) {
-      if (open) {
-        aside?.classList.remove("-translate-x-full");
-        backdrop?.classList.remove("hidden");
-      } else {
-        aside?.classList.add("-translate-x-full");
-        backdrop?.classList.add("hidden");
-      }
-    }
-
-    // Keep the DOM in sync with the store. This is the single source of truth:
-    // both the hamburger toggle button and the sidebar's left-arrow close
-    // button write to `sidebarOpen`, and this listener applies the result.
-    sidebarOpen.listen(applySidebarState);
-    applySidebarState(sidebarOpen.get());
-
-    toggle?.addEventListener("click", () => {
-      sidebarOpen.set(!sidebarOpen.get());
-    });
-
-    backdrop?.addEventListener("click", () => {
-      sidebarOpen.set(false);
-    });
 
     // Populate the alerts store so the sitewide SystemWideAlert banner
     // (rendered by Layout) has data on this page. With no stop/route filter
