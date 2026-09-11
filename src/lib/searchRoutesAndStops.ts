@@ -101,6 +101,17 @@ interface RouteSearchRow {
  * agencies (same agencies used in the alerts index and system map). Deduplicates
  * by route-ID prefix, matching the pattern used throughout the app.
  *
+ * The query is tokenized on non-alphanumeric characters so multi-word queries
+ * can be matched per-token in addition to the whole-query substring match:
+ *
+ * - Purely numeric tokens (e.g. "127" in "bus 127" / "127 bus") are matched
+ *   exactly against `route_short_name` and the canonical route-ID prefix —
+ *   bus `route_long_name` values are generic ("Metro Local Line"), so the
+ *   route number is the only useful search text for bus routes.
+ * - Rail display letters (A–K, from ROUTE_SHORT_NAME_OVERRIDES) match only
+ *   as standalone tokens ("b line", "metro b"), never as substrings — the
+ *   word "bus" must not false-positive match the B Line.
+ *
  * @param query - Search string (at least 2 characters recommended).
  * @param limit - Maximum number of results. Defaults to 50.
  * @returns `RouteWithInfo[]` sorted by short name.
@@ -110,15 +121,37 @@ export function searchRoutes(query: string, limit = 50): RouteWithInfo[] {
   const agencyIds = getAgencyIdsByFlag("showInAlertsIndex");
   const placeholders = agencyIds.map(() => "?").join(", ");
   const likeQuery = `%${query.replace(/[%_]/g, (m) => "\\" + m)}%`;
-  const lowerQuery = query.toLowerCase().trim();
+
+  // Tokenize on non-alphanumeric characters so multi-word queries ("bus 127",
+  // "b line") can be matched per-token instead of as one substring.
+  const tokens = query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+
+  // Route-number matching: treat every purely numeric token as a candidate
+  // route number, matched exactly against route_short_name and the canonical
+  // route-ID prefix (both bare and suffixed forms, e.g. "901-%" for the G
+  // Line). Tokens are digits-only and capped, so interpolating them into SQL
+  // is safe (same pattern as the letter clauses below).
+  const routeNumbers = [
+    ...new Set(tokens.filter((token) => /^\d+$/.test(token))),
+  ].slice(0, 5);
+  const numberClauses = routeNumbers.flatMap((number) => [
+    `r.route_short_name = '${number}'`,
+    `r.route_id = '${number}'`,
+    `r.route_id LIKE '${number}-%'`,
+  ]);
+  const numberCond =
+    numberClauses.length > 0 ? `OR (${numberClauses.join(" OR ")})` : "";
 
   // Rail lines (A–K) have empty route_short_name in raw GTFS; their display
   // names come from ROUTE_SHORT_NAME_OVERRIDES. Build extra SQL OR-conditions
-  // to match by route_id prefix when the query contains the letter (e.g.
-  // searching "a line" or just "a" should match route_id 801).
+  // to match by route_id prefix when the query contains the letter as a
+  // standalone token (e.g. "b line" or just "b" should match route_id 802).
   const overrideClauses: string[] = [];
   for (const [prefix, letter] of Object.entries(ROUTE_SHORT_NAME_OVERRIDES)) {
-    if (lowerQuery.includes(letter.toLowerCase())) {
+    if (tokens.includes(letter.toLowerCase())) {
       overrideClauses.push(`r.route_id = '${prefix}'`);
       overrideClauses.push(`r.route_id LIKE '${prefix}-%'`);
     }
@@ -142,6 +175,7 @@ export function searchRoutes(query: string, limit = 50): RouteWithInfo[] {
         AND EXISTS (SELECT 1 FROM trips t WHERE t.route_id = r.route_id)
         AND (r.route_short_name LIKE @like ESCAPE '\\'
              OR r.route_long_name LIKE @like ESCAPE '\\'
+             ${numberCond}
              ${overrideCond})
       ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name
       LIMIT @limit

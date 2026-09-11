@@ -17,6 +17,10 @@ interface SearchResponse {
  * Searches Metro routes and stops by name. Returns matching lines (rail,
  * busway, and bus) and stops (with their serving routes for badge rendering).
  *
+ * Multi-word queries are tokenized: numeric tokens match route numbers
+ * exactly (so "bus 127" / "127 bus" find route 127), and rail letters match
+ * only as standalone tokens ("b line" finds the B Line, "bus" does not).
+ *
  * Empty queries return empty arrays. Single-character queries are allowed so
  * that short route names (e.g. bus "2") can be searched.
  */
