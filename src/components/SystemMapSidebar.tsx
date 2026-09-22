@@ -3,6 +3,7 @@ import { useStore } from "@nanostores/react";
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from "@headlessui/react";
 import RouteBadge from "./RouteBadge";
 import MapPinIcon from "./MapPinIcon";
+import TargetIcon from "./TargetIcon";
 import { getLineSlug } from "../lib/routeShortNameOverrides";
 import type { RouteWithInfo } from "../lib/getRouteById";
 import type {
@@ -569,6 +570,10 @@ export default function SystemMapSidebar({ lines }: SystemMapSidebarProps) {
                 </div>
               </TabPanel>
               <TabPanel>
+                <p className="text-metro-text flex items-center gap-1.5 px-4 pt-3 pb-1 text-sm">
+                  <TargetIcon className="h-4 w-4 shrink-0" />
+                  Showing results near map center
+                </p>
                 {nearbyLoading ? (
                   <p className="px-4 py-8 text-center text-gray-500">
                     {viewport ? "Loading nearby…" : "Locating…"}
