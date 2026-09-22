@@ -87,7 +87,10 @@ const esriKey = import.meta.env.ESRI_KEY;
     let state: MapState | null = null;
 
     async function bootstrap() {
-      const { map, maplibregl } = await createMap(mapContainer, esriKey);
+      // Require two fingers to pan/zoom the map (Google-Maps-style) so a
+      // one-finger touch drag over the embedded map scrolls the page
+      // instead of hijacking it; desktop zooming needs ctrl/⌘ + scroll.
+      const { map, maplibregl } = await createMap(mapContainer, esriKey, true);
 
       state = { map, maplibregl, loaded: false, pendingRender: false };
 

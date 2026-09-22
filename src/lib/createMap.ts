@@ -35,10 +35,18 @@ export interface CreateMapResult {
  * The basemap is best-effort: if the ESRI key is invalid or the service is
  * unreachable, the map still initializes (the style will fail to load, but
  * the map container remains interactive).
+ *
+ * When `cooperativeGestures` is true, the map requires two fingers to
+ * pan/zoom on touch devices (a one-finger drag pans the page instead) and
+ * ctrl/⌘ + scroll to zoom on desktop; MapLibre shows a built-in hint
+ * overlay when a blocked gesture is attempted. Enable this for embedded
+ * maps (e.g. line pages) where one-finger map panning would hijack page
+ * scrolling, and leave it off for the full-screen system map.
  */
 export async function createMap(
   container: HTMLElement,
   esriKey: string,
+  cooperativeGestures: boolean = false,
 ): Promise<CreateMapResult> {
   const maplibregl = await import("maplibre-gl");
   const { BasemapStyle } = await import("@esri/maplibre-arcgis");
@@ -48,6 +56,7 @@ export async function createMap(
     center: DEFAULT_CENTER,
     zoom: DEFAULT_ZOOM,
     minZoom: 2,
+    cooperativeGestures,
     // Disable MapLibre's built-in AttributionControl so it doesn't conflict
     // with the ESRI plugin's own AttributionControl (added by
     // `BasemapStyle.applyStyle` via `_setEsriAttribution`). The plugin's
