@@ -1,25 +1,17 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
+import LineEditor from "../../components/admin/LineEditor";
 
 export const prerender = false;
+
+// Read the ESRI basemap key server-side and pass it into the island as a
+// prop (same pattern as SystemMap.astro / LineMap.astro — Astro env-schema
+// variables are not inlined into client-side import.meta.env).
+const esriKey = import.meta.env.ESRI_KEY;
 ---
 
 <AdminLayout title="Lines - Admin">
   <main>
-    <div class="m-auto w-11/12 max-w-3xl py-8">
-      <h1 class="text-metro-text text-4xl font-bold">Lines</h1>
-      <p class="text-secondary-text mt-3">
-        A UI for editing the line-map configuration stored in
-        <code class="rounded bg-gray-100 px-1 py-0.5 text-sm"
-          >src/data/lineMapTrips.json</code
-        >, so changes can be reviewed and committed to the repo.
-      </p>
-      <div
-        class="border-border-dark text-secondary-text mt-8 rounded-md border border-dashed bg-white p-8 text-center"
-      >
-        <p class="text-metro-text font-bold">Coming soon</p>
-        <p class="mt-1 text-sm">This tool hasn't been built yet.</p>
-      </div>
-    </div>
+    <LineEditor client:load esriKey={esriKey} />
   </main>
 </AdminLayout>
