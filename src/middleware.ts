@@ -29,9 +29,25 @@ const IMMUTABLE_EXACT = new Set(["/favicon.svg", "/robots.txt"]);
  *
  * API routes and HTML pages are left untouched — they set their own headers
  * (via `prodCacheHeader`) or receive Render's default behavior.
+ *
+ * It also gates the dev-only admin tools: any `/admin` request in a
+ * production build is rejected with a 404 before it can reach a route.
  */
 export const onRequest = defineMiddleware(async (context, next) => {
   const pathname = context.url.pathname;
+
+  // Admin tools (src/pages/admin/) are only available on the dev server.
+  // `import.meta.env.PROD` is statically replaced at build time, so in any
+  // production build — including `npm run start` and `npm run preview` —
+  // every /admin request 404s here before any admin page or future
+  // /admin API endpoint can run. In the dev server the check compiles to
+  // `false` and requests pass through untouched.
+  if (
+    import.meta.env.PROD &&
+    (pathname === "/admin" || pathname.startsWith("/admin/"))
+  ) {
+    return new Response("Not Found", { status: 404 });
+  }
 
   const isImmutable =
     IMMUTABLE_PREFIXES.some((p) => pathname.startsWith(p)) ||

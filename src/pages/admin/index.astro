@@ -1,0 +1,32 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+
+export const prerender = false;
+---
+
+<AdminLayout title="Admin">
+  <main>
+    <div class="m-auto w-11/12 max-w-3xl py-8">
+      <h1 class="text-metro-text text-4xl font-bold">Admin</h1>
+      <p class="text-secondary-text mt-3">
+        Internal tools for editing the JSON config files in
+        <code class="rounded bg-gray-100 px-1 py-0.5 text-sm">src/data/</code>.
+        Changes are saved to the repo and committed like any other code change.
+        These tools are only available on the dev server — they 404 in
+        production.
+      </p>
+      <ul
+        class="border-border-light divide-border-light mt-8 divide-y rounded-md border bg-white"
+      >
+        <li>
+          <a class="block px-4 py-3 hover:bg-gray-100" href="/admin/lines">
+            <span class="text-metro-text font-bold">Lines</span>
+            <span class="text-secondary-text ml-2"
+              >Edit the line-map configuration</span
+            >
+          </a>
+        </li>
+      </ul>
+    </div>
+  </main>
+</AdminLayout>
