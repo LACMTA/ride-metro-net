@@ -126,3 +126,88 @@ export interface ConfigTripFilter {
   /** Selected service type, or null. */
   serviceType: "core" | "owl" | null;
 }
+
+// ---------------------------------------------------------------------------
+// Screen-signs editor (/admin/screens)
+// ---------------------------------------------------------------------------
+
+/** One selectable screen sign in the screens editor's dropdown. */
+export interface AdminScreenSummary {
+  /** URL-safe sign slug — the screenSigns.json key. */
+  signId: string;
+  /** Number of stop IDs configured for the sign. */
+  stopCount: number;
+  /** Number of entries in the sign's routeOrder (0 when absent). */
+  routeOrderCount: number;
+}
+
+/** A top-level stop result from the screens editor's stop lookup. */
+export interface AdminScreenStopLookupResult {
+  stopId: string;
+  stopName: string;
+  /** True when the stop is a parent station (e.g. Union Station "80214S"). */
+  isParentStation: boolean;
+}
+
+/** Resolved info for one stop ID in a sign's stopIds. */
+export interface AdminScreenStop {
+  stopId: string;
+  /** GTFS stop_name ("" when the stop no longer exists). */
+  stopName: string;
+  /** Whether the stop exists in the GTFS database. */
+  found: boolean;
+  /** True when the stop is a parent station. */
+  isParentStation: boolean;
+}
+
+/** One route row in the screens editor's routeOrder list. */
+export interface AdminScreenRouteInfo {
+  /** Stable route-ID prefix (e.g. "801", "33") — the routeOrder value. */
+  routeId: string;
+  /** Resolved display short name ("B" for rail, "33" for bus). */
+  label: string;
+  /** GTFS route_long_name ("" when unknown). */
+  longName: string;
+  /** GTFS route_type. */
+  routeType: number;
+  /** GTFS route_color, hex without leading "#" ("" when unknown). */
+  routeColor: string;
+  /** GTFS route_text_color, hex without leading "#" ("" when unknown). */
+  routeTextColor: string;
+  /** False when the route no longer exists in the GTFS database at all. */
+  known: boolean;
+}
+
+/**
+ * Full editor payload for one screen sign: the saved config, resolved info
+ * for each configured stop, the routes serving those stops (merged the same
+ * way the public sign page merges them), and info for routeOrder entries
+ * that no longer serve the sign.
+ */
+export interface AdminScreenDetail {
+  signId: string;
+  /** The saved config; routeOrder is null when absent from the file. */
+  config: { stopIds: string[]; routeOrder: string[] | null };
+  /** Resolved info per configured stop ID, in config order. */
+  stops: AdminScreenStop[];
+  /**
+   * Routes serving the sign's stops, merged and deduped by stable
+   * route-ID prefix in the order the public sign page renders them.
+   */
+  servingRoutes: AdminScreenRouteInfo[];
+  /**
+   * Info for saved routeOrder entries that do not serve the sign's stops —
+   * either still-known routes (known: true) or IDs no longer in GTFS
+   * (known: false, label falls back to the raw ID).
+   */
+  staleRoutes: AdminScreenRouteInfo[];
+}
+
+/** POST response after a successful save. */
+export interface AdminScreenSaveResponse {
+  savedSignId: string;
+  /** The normalized stopIds written to screenSigns.json. */
+  stopIds: string[];
+  /** The normalized routeOrder written to screenSigns.json (null when omitted). */
+  routeOrder: string[] | null;
+}

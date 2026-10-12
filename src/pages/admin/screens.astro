@@ -1,0 +1,12 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import ScreenEditor from "../../components/admin/ScreenEditor";
+
+export const prerender = false;
+---
+
+<AdminLayout title="Screens - Admin">
+  <main>
+    <ScreenEditor client:load />
+  </main>
+</AdminLayout>
