@@ -3,11 +3,12 @@ import AnalyticsBody from "../components/AnalyticsBody.astro";
 import AnalyticsHead from "../components/AnalyticsHead.astro";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
+import SurveyModal from "../components/SurveyModal";
 import SystemWideAlert from "../components/SystemWideAlert";
 import "../styles/fonts.css";
 import "../styles/global.css";
 
-const { title, screen = false } = Astro.props;
+const { title, screen = false, showSurveyModal = true } = Astro.props;
 const includeAnalytics = import.meta.env.PROD && !screen;
 ---
 
@@ -28,10 +29,11 @@ const includeAnalytics = import.meta.env.PROD && !screen;
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>
-  <body class={screen ? 'bg-black text-white font-sans' : 'font-sans'}>
+  <body class={screen ? "bg-black text-white font-sans" : "font-sans"}>
     {includeAnalytics && <AnalyticsBody />}
     {!screen && <Header />}
     {!screen && <SystemWideAlert client:load />}
+    {!screen && showSurveyModal && <SurveyModal client:load />}
     <slot />
     {!screen && <Footer />}
   </body>

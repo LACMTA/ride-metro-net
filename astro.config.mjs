@@ -22,6 +22,12 @@ export default defineConfig({
         context: "client",
         access: "public",
       }),
+      SHOW_SURVEY_MODAL: envField.boolean({
+        context: "client",
+        access: "public",
+        optional: true,
+        default: false,
+      }),
     },
   },
   vite: {
