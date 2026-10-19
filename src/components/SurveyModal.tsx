@@ -24,8 +24,8 @@ const SESSION_STORAGE_KEY = "survey-modal-seen";
 // Small delay so the page has a chance to paint before the modal pops.
 const OPEN_DELAY_MS = 500;
 
-const SURVEY_URL_EN = "https://survey.cmix.com/2E7637E1/V99TJ5KM/en-US";
-const SURVEY_URL_ES = "https://survey.cmix.com/2E7637E1/VM4VBP3X/es-US";
+const SURVEY_URL_EN = "https://survey.cmix.com/3764F823/V99TJ5KM/en-US";
+const SURVEY_URL_ES = "https://survey.cmix.com/3764F823/VM4VBP3X/es-US";
 
 const SHOW_SURVEY_MODAL = import.meta.env.SHOW_SURVEY_MODAL;
 
