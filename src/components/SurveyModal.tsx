@@ -1,3 +1,4 @@
+import { SHOW_SURVEY_MODAL } from "astro:env/client";
 import {
   Dialog,
   DialogBackdrop,
@@ -14,6 +15,10 @@ import { useEffect, useState } from "react";
  * links). Enabled by the `SHOW_SURVEY_MODAL` environment variable (declared in
  * the Astro env schema in astro.config.mjs): set to `true` on Render, left
  * unset locally so the modal never appears in dev.
+ *
+ * The flag is imported from `astro:env/client`: Astro schema variables are
+ * NOT exposed on `import.meta.env` in the browser in dev, only via the
+ * virtual module.
  */
 
 // Records that the modal has been seen this session. sessionStorage survives
@@ -26,8 +31,6 @@ const OPEN_DELAY_MS = 500;
 
 const SURVEY_URL_EN = "https://survey.cmix.com/3764F823/V99TJ5KM/en-US";
 const SURVEY_URL_ES = "https://survey.cmix.com/3764F823/VM4VBP3X/es-US";
-
-const SHOW_SURVEY_MODAL = import.meta.env.SHOW_SURVEY_MODAL;
 
 export default function SurveyModal() {
   const [isOpen, setIsOpen] = useState(false);
