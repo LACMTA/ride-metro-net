@@ -109,7 +109,7 @@ export default function RouteBadge({
       : `${name} line ${mode === "busway" ? "busway" : "train"}`;
 
   const allClassName =
-    `inline-flex ${s.h} items-center justify-center ${s.text} ${!altBusColors && "font-bold"} ${shapeClass} ${colorClass} ${className}`.trim();
+    `inline-flex ${s.h} shrink-0 items-center justify-center ${s.text} ${!altBusColors && "font-bold"} ${shapeClass} ${colorClass} ${className}`.trim();
 
   const alertIcon = busAlertBadge && (
     <AlertIcon

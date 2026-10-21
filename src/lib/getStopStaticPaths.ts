@@ -1,5 +1,5 @@
-import { openDb } from "gtfs";
-import { GTFSconfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
+import { getAgencyIdsByFlag } from "./agencies";
 
 /**
  * Shared `getStaticPaths` logic for stop pages (`/stops/[stopId]/*`).
@@ -12,7 +12,10 @@ import { GTFSconfig } from "../integrations/import-gtfs";
  * or for parent stations whose children have no stop_times yet (not yet in service).
  */
 export async function getStopStaticPaths() {
-  const db = openDb(GTFSconfig);
+  const db = getGtfsDb();
+  const agencyIds = getAgencyIdsByFlag("buildStopPages");
+  const placeholders = agencyIds.map(() => "?").join(", ");
+
   const allStops = (await db
     .prepare(
       `
@@ -23,6 +26,7 @@ export async function getStopStaticPaths() {
       JOIN routes r ON r.route_id = t.route_id
       WHERE (s.parent_station IS NULL OR s.parent_station = '')
         AND r.route_long_name IS NOT NULL AND r.route_long_name != ''
+        AND r.agency_id IN (${placeholders})
 
       UNION
 
@@ -33,9 +37,10 @@ export async function getStopStaticPaths() {
       JOIN routes r ON r.route_id = t.route_id
       WHERE s.parent_station IS NOT NULL AND s.parent_station != ''
         AND r.route_long_name IS NOT NULL AND r.route_long_name != ''
+        AND r.agency_id IN (${placeholders})
       `,
     )
-    .all()) as { stop_id: string }[];
+    .all(...agencyIds, ...agencyIds)) as { stop_id: string }[];
 
   return allStops.map((stop) => ({
     params: { stopId: stop.stop_id },

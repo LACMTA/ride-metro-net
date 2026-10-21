@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { twMerge } from "tailwind-merge";
 
 interface BaseProps {
   children: ReactNode;
@@ -24,7 +25,10 @@ type Props = ButtonProps | AnchorProps;
 
 export default function Button(props: Props) {
   const { children, selected = false, className = "", onClick } = props;
-  const sharedClassName = `bg-blue cursor-pointer rounded-sm px-5 py-2 text-white ${className}`;
+  const sharedClassName = twMerge(
+    "bg-blue cursor-pointer rounded-sm px-5 py-2 text-white",
+    className,
+  );
 
   if (props.as === "a") {
     return (

@@ -38,6 +38,7 @@ pnpm-debug.log*
 # Local Netlify folder
 .netlify
 
+.clinerules
 AGENTS.md
 
 # Playwright

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { routes } from "./fixtures";
 
-test.describe("Route pages (/lines/:slug)", () => {
+test.describe.skip("Route pages (/lines/:slug) — disabled for alerts-only launch", () => {
   for (const route of routes) {
     test(`loads /lines/${route.slug} (${route.expectedShortName} Line)`, async ({
       page,

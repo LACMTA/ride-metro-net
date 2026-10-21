@@ -1,8 +1,8 @@
-import { openDb } from "gtfs";
-import { GTFSconfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 import { objectToCamel } from "ts-case-convert";
 import type Database from "better-sqlite3";
 import { resolveRouteShortName } from "./routeShortNameOverrides";
+import { getAgencySettings } from "./agencies";
 
 export interface RouteWithInfo {
   routeId: string;
@@ -11,12 +11,13 @@ export interface RouteWithInfo {
   routeType: number;
   routeColor: string;
   routeTextColor: string;
-  /** Swiftly real-time API agency key, derived from route_type at build time. */
-  swiftlyAgencyId: string;
+  /** Agency-level default line color (hex without `#`), or `""` if unset. */
+  defaultLineColor: string;
 }
 
 interface DatabaseQueryResult {
   route_id: string;
+  agency_id: string;
   route_short_name: string;
   route_long_name: string;
   route_type: number;
@@ -24,24 +25,20 @@ interface DatabaseQueryResult {
   route_text_color: string;
 }
 
-let dbInstance: Database.Database | null = null;
 let preparedQuery: Database.Statement | null = null;
 
-function getDb() {
-  if (!dbInstance) {
-    dbInstance = openDb(GTFSconfig);
-
-    dbInstance.pragma("synchronous = OFF");
-    dbInstance.pragma("cache_size = 10000");
-    dbInstance.pragma("temp_store = MEMORY");
-    dbInstance.pragma("journal_mode = OFF"); // Safe for in-memory
+function getPreparedQuery() {
+  if (!preparedQuery) {
+    const db = getGtfsDb();
+    preparedQuery = db.prepare(query);
   }
-  return dbInstance;
+  return preparedQuery;
 }
 
 const query = `
     SELECT
       route_id,
+      agency_id,
       route_short_name,
       route_long_name,
       route_type,
@@ -53,14 +50,6 @@ const query = `
     LIMIT 1
     `;
 
-function getPreparedQuery() {
-  if (!preparedQuery) {
-    const db = getDb();
-    preparedQuery = db.prepare(query);
-  }
-  return preparedQuery;
-}
-
 export default async function (routeId: string) {
   const mainQuery = getPreparedQuery();
   const res = mainQuery.get({ routeId }) as DatabaseQueryResult | undefined;
@@ -70,6 +59,7 @@ export default async function (routeId: string) {
   }
 
   const routeIdPrefix = res.route_id.split("-")[0];
+  const agencySettings = getAgencySettings(res.agency_id);
 
   const route: RouteWithInfo = {
     routeId: routeIdPrefix,
@@ -81,7 +71,7 @@ export default async function (routeId: string) {
     routeType: res.route_type,
     routeColor: res.route_color,
     routeTextColor: res.route_text_color,
-    swiftlyAgencyId: res.route_type === 3 ? "lametro" : "lametro-rail",
+    defaultLineColor: agencySettings?.lineColor ?? "",
   };
 
   return route;

@@ -1,0 +1,228 @@
+---
+import "leaflet/dist/leaflet.css";
+import LineMapControls from "./LineMapControls";
+
+interface Props {
+  /** Numeric route ID prefix (e.g. "801", "720") for the API endpoint. */
+  routeId: string;
+  /** Resolved line color as a CSS hex string (e.g. `"#E47525"`). */
+  lineColor: string;
+}
+
+const { routeId, lineColor } = Astro.props;
+const esriKey = import.meta.env.ESRI_KEY;
+---
+
+<div
+  class="bg-background-white mb-8 rounded-lg"
+  data-line-map
+  data-route-id={routeId}
+  data-line-color={lineColor}
+  data-esri-key={esriKey}
+>
+  <LineMapControls client:load />
+  <div
+    class="h-96 w-full overflow-hidden"
+    aria-label="Map of Metro line route"
+    role="img"
+    data-map-container
+  >
+  </div>
+</div>
+
+<script>
+  import type {
+    RouteShapesGeoJSON,
+    RouteShapeFeature,
+  } from "../lib/getRouteShapes";
+  import { lightenColor } from "../lib/lightenColor";
+  import {
+    lineMapGeoJson,
+    lineMapSelection,
+    getFilteredShapes,
+  } from "../lib/lineMapStore";
+
+  // Default center: LA Metro service area
+  const DEFAULT_CENTER: [number, number] = [
+    34.00095151499077, -118.25133692966446,
+  ];
+  const DEFAULT_ZOOM = 11;
+
+  // ESRI basemap configuration — Metro branded vector basemap.
+  // See https://github.com/LACMTA/map-template.
+  const ESRI_BASERMAP_ENUM = "65aff2873118478482ec3dec199e9058";
+
+  type LeafletModule = typeof import("leaflet");
+
+  interface MapState {
+    L: LeafletModule;
+    map: import("leaflet").Map;
+    shapeLayer: import("leaflet").LayerGroup | null;
+    stopsLayer: import("leaflet").LayerGroup | null;
+  }
+
+  function initMap(container: HTMLElement): void {
+    const lineColor = container.dataset.lineColor!;
+    const esriKey = container.dataset.esriKey!;
+
+    const mapContainer = container.querySelector(
+      "[data-map-container]",
+    ) as HTMLElement;
+
+    let state: MapState | null = null;
+
+    async function bootstrap() {
+      const [{ default: L }, { vectorBasemapLayer }] = await Promise.all([
+        import("leaflet"),
+        import("esri-leaflet-vector"),
+      ]);
+
+      const map = L.map(mapContainer, { minZoom: 2 }).setView(
+        DEFAULT_CENTER,
+        DEFAULT_ZOOM,
+      );
+
+      try {
+        vectorBasemapLayer(ESRI_BASERMAP_ENUM, {
+          apiKey: esriKey,
+        }).addTo(map);
+      } catch {
+        // Non-fatal: map stays on default LA-wide view.
+      }
+
+      state = {
+        L,
+        map,
+        shapeLayer: null,
+        stopsLayer: null,
+      };
+
+      // If the GeoJSON has already been fetched (by the page script) before
+      // the map finished initializing, render it now.
+      renderSelection();
+    }
+
+    function getGhostFeatures(
+      geojson: RouteShapesGeoJSON,
+    ): RouteShapeFeature[] {
+      const selection = lineMapSelection.get();
+      const splitNum = selection.splitLineNumber;
+      const serviceType = selection.serviceType;
+      return geojson.features.filter((f) => {
+        const fSplit = f.properties.splitLineNumber;
+        const sameSplit =
+          splitNum === null ? fSplit === undefined : fSplit === splitNum;
+        const diffSplit = !sameSplit;
+        const diffService = f.properties.serviceType !== serviceType;
+        // Exactly one dimension differs.
+        return diffService !== diffSplit && (diffService || diffSplit);
+      });
+    }
+
+    function renderSelection() {
+      if (!state?.L || !state.map) return;
+      const geojson = lineMapGeoJson.get();
+      if (!geojson || geojson.features.length === 0) return;
+      const selection = lineMapSelection.get();
+
+      const filtered = getFilteredShapes(geojson, selection);
+      if (filtered.length === 0) return;
+
+      const feature = filtered[0];
+
+      // Remove previous shape and stop layers.
+      if (state.shapeLayer) {
+        state.shapeLayer.remove();
+        state.shapeLayer = null;
+      }
+      if (state.stopsLayer) {
+        state.stopsLayer.remove();
+        state.stopsLayer = null;
+      }
+
+      const ghostColor = lightenColor(lineColor, 0.5);
+      const L = state.L;
+      const map = state.map;
+
+      const shapeGroup = L.layerGroup().addTo(map);
+      state.shapeLayer = shapeGroup;
+
+      // Ghost layer: features that differ from the current selection in
+      // exactly one dimension — the unselected split-line side (same service
+      // type) or the unselected service type (same split-line, e.g. owl when
+      // core is selected). Rendered as a lightened tint at full opacity so
+      // overlapping ghost lines don't darken each other the way translucent
+      // (alpha-blended) lines do.
+      const ghostFeatures = getGhostFeatures(geojson);
+      if (ghostFeatures.length > 0) {
+        L.geoJSON(
+          {
+            type: "FeatureCollection",
+            features: ghostFeatures,
+          } as import("geojson").FeatureCollection,
+          {
+            style: { color: ghostColor, weight: 6, opacity: 1 },
+          },
+        ).addTo(shapeGroup);
+      }
+
+      // Selected feature layer — rendered on top of the ghost.
+      L.geoJSON(feature, {
+        style: { color: lineColor, weight: 6, opacity: 0.9 },
+      }).addTo(shapeGroup);
+
+      // Render a circle marker for each stop served by the selected shape.
+      const stopsGroup = L.layerGroup().addTo(map);
+      state.stopsLayer = stopsGroup;
+
+      for (const stop of feature.properties.stops) {
+        L.circleMarker([stop.lat, stop.lon], {
+          radius: 5,
+          color: lineColor,
+          weight: 3,
+          fillColor: "#fff",
+          fillOpacity: 1,
+        })
+          .bindPopup(`<strong>${stop.stopName}</strong>`)
+          .addTo(stopsGroup);
+      }
+
+      // Fit the map to the selected feature AND the ghost (when present).
+      const allLatLngs: [number, number][] = [
+        ...feature.geometry.coordinates.map(
+          ([lon, lat]) => [lat, lon] as [number, number],
+        ),
+        ...feature.properties.stops.map(
+          (s) => [s.lat, s.lon] as [number, number],
+        ),
+      ];
+
+      for (const gf of getGhostFeatures(geojson)) {
+        for (const [lon, lat] of gf.geometry.coordinates) {
+          allLatLngs.push([lat, lon]);
+        }
+      }
+
+      map.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });
+    }
+
+    // Re-render the map whenever the selection store changes (user-driven
+    // control changes from LineMapControls or any other store consumer).
+    lineMapSelection.listen(() => {
+      renderSelection();
+    });
+
+    // Re-render when the GeoJSON data arrives (the page script fetches it
+    // independently of the map initialization).
+    lineMapGeoJson.listen(() => {
+      renderSelection();
+    });
+
+    bootstrap();
+  }
+
+  // Initialise all line map containers on the page.
+  document.querySelectorAll("[data-line-map]").forEach((el) => {
+    initMap(el as HTMLElement);
+  });
+</script>
