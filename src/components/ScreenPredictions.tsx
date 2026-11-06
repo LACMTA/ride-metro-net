@@ -7,9 +7,19 @@ import {
 interface Props {
   routeId: string;
   directionId: number | string;
+  /**
+   * Optional GTFS stop ID to scope predictions to (e.g. a route card's
+   * `childStopId`). When set, only predictions recorded against this stop
+   * are shown; otherwise predictions across all polled stops are merged.
+   */
+  stopId?: string;
 }
 
-export default function RoutePrediction({ routeId, directionId }: Props) {
+export default function RoutePrediction({
+  routeId,
+  directionId,
+  stopId,
+}: Props) {
   const $routePredictions = useStore(routePredictions);
   const $predictionsRequestStatus = useStore(predictionsRequestStatus);
 
@@ -27,6 +37,7 @@ export default function RoutePrediction({ routeId, directionId }: Props) {
 
   const predictions = routePred.destinations
     .filter((d) => d.directionId === String(directionId))
+    .filter((d) => stopId === undefined || d.stopId === stopId)
     .flatMap((d) => d.predictions);
 
   if (predictions.length === 0) {

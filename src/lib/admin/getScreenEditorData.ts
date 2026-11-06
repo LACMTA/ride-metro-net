@@ -2,10 +2,10 @@
  * Server-only SQLite queries powering the /admin/screens editor API
  * (`src/pages/admin/api/screens/*`).
  *
- * The serving-routes merge mirrors `/screens/[signId]` exactly: each
- * configured stop is resolved through getStopWithRoutes and all returned
- * routes are merged into one flat list (deduped here by stable route-ID
- * prefix for the routeOrder editor).
+ * The serving-pairs query mirrors `/screens/[signId]` exactly: each
+ * configured stop is resolved through getStopWithRoutes, and every
+ * (route, stop) card group becomes one selectable pair for the route-stop
+ * displayOrder editor.
  */
 import { getGtfsDb } from "../gtfsConfig";
 import { buildForWebRouteCondition } from "../stopEligibility";
@@ -14,7 +14,7 @@ import { ROUTE_SHORT_NAME_OVERRIDES } from "../routeShortNameOverrides";
 import { readScreenSignsFile } from "./screenSignsFile";
 import type {
   AdminScreenDetail,
-  AdminScreenRouteInfo,
+  AdminScreenRouteStopInfo,
   AdminScreenStop,
   AdminScreenStopLookupResult,
   AdminScreenSummary,
@@ -31,7 +31,7 @@ export function getScreenSummaries(): AdminScreenSummary[] {
   return Object.entries(signs).map(([signId, config]) => ({
     signId,
     stopCount: config.stopIds.length,
-    routeOrderCount: config.routeOrder?.length ?? 0,
+    displayOrderCount: config.displayOrder.length,
   }));
 }
 
@@ -223,62 +223,72 @@ function getRouteRows(routeIds: string[]): Map<string, RouteRow> {
   return byPrefix;
 }
 
-/** Builds an AdminScreenRouteInfo from a GTFS route row. */
-function toRouteInfo(prefix: string, row: RouteRow): AdminScreenRouteInfo {
-  return {
-    routeId: prefix,
-    label: row.route_short_name || ROUTE_SHORT_NAME_OVERRIDES[prefix] || prefix,
-    longName: row.route_long_name ?? "",
-    routeType: row.route_type,
-    routeColor: row.route_color,
-    routeTextColor: row.route_text_color,
-    known: true,
-  };
-}
-
 /**
- * Merges the routes serving the given stops — the same merge the public
- * sign page performs — deduped by stable route-ID prefix in first-seen
- * order. Stops that don't exist or have no routes are skipped.
+ * The (route, stop) pairs serving the given stops — the same cards the
+ * public sign page merges, one entry per (route, stop) in config-stop
+ * order. This is the selectable list for `route-stop` displayOrder entries,
+ * so signs that include multiple nearby stops serving the same route can
+ * pick the exact pair they want.
+ * Stops that don't exist or have no routes are skipped.
  */
-export async function getMergedServingRoutes(
+export async function getServingPairs(
   stopIds: string[],
-): Promise<AdminScreenRouteInfo[]> {
-  const merged: StopRoute[] = [];
+): Promise<AdminScreenRouteStopInfo[]> {
+  const perStop: { stopId: string; byRoute: Map<string, StopRoute[]> }[] = [];
+  const allRouteIds = new Set<string>();
   for (const stopId of stopIds) {
+    let stopRoutes: StopRoute[];
     try {
-      const stop = await getStopWithRoutes(stopId);
-      merged.push(...stop.routes);
+      stopRoutes = (await getStopWithRoutes(stopId)).routes;
     } catch {
       // Stop doesn't exist or has no routes — skipped. Existence is
       // surfaced separately via the detail payload / save validation.
+      continue;
+    }
+    const byRoute = new Map<string, StopRoute[]>();
+    for (const route of stopRoutes) {
+      const cards = byRoute.get(route.routeId);
+      if (cards) cards.push(route);
+      else byRoute.set(route.routeId, [route]);
+      allRouteIds.add(route.routeId);
+    }
+    perStop.push({ stopId, byRoute });
+  }
+
+  const stopRows = getStopRows(stopIds);
+  const routeRows = getRouteRows([...allRouteIds]);
+
+  const pairs: AdminScreenRouteStopInfo[] = [];
+  const seenPairs = new Set<string>();
+  for (const { stopId, byRoute } of perStop) {
+    for (const [routeId, cards] of byRoute) {
+      const key = `${routeId}:${stopId}`;
+      if (seenPairs.has(key)) continue;
+      seenPairs.add(key);
+
+      const first = cards[0];
+      const row = routeRows.get(routeId);
+      // getStopWithRoutes already resolves the display short name for rail
+      // routes; the route row fills in the long name.
+      pairs.push({
+        routeId,
+        stopId,
+        stopName: stopRows.get(stopId)?.stop_name ?? "",
+        headsigns: [...new Set(cards.flatMap((card) => card.headsigns))],
+        label:
+          first.routeShortName ||
+          row?.route_short_name ||
+          ROUTE_SHORT_NAME_OVERRIDES[routeId] ||
+          routeId,
+        longName: row?.route_long_name ?? "",
+        routeType: first.routeType,
+        routeColor: first.routeColor,
+        routeTextColor: first.routeTextColor,
+        known: true,
+      });
     }
   }
-
-  const byPrefix = new Map<string, StopRoute>();
-  for (const route of merged) {
-    if (!byPrefix.has(route.routeId)) byPrefix.set(route.routeId, route);
-  }
-  const routeRows = getRouteRows([...byPrefix.keys()]);
-
-  return [...byPrefix.entries()].map(([prefix, stopRoute]) => {
-    const row = routeRows.get(prefix);
-    // getStopWithRoutes already resolves the display short name for rail
-    // routes; the route row fills in the long name.
-    return {
-      routeId: prefix,
-      label:
-        stopRoute.routeShortName ||
-        row?.route_short_name ||
-        ROUTE_SHORT_NAME_OVERRIDES[prefix] ||
-        prefix,
-      longName: row?.route_long_name ?? "",
-      routeType: stopRoute.routeType,
-      routeColor: stopRoute.routeColor,
-      routeTextColor: stopRoute.routeTextColor,
-      known: true,
-    };
-  });
+  return pairs;
 }
 
 /**
@@ -301,38 +311,52 @@ export async function getScreenDetail(
     };
   });
 
-  const servingRoutes = await getMergedServingRoutes(config.stopIds);
+  const servingPairs = await getServingPairs(config.stopIds);
 
-  // Info for saved routeOrder entries that no longer serve the sign —
-  // either still-known routes or IDs no longer present in GTFS at all.
-  const servingIds = new Set(servingRoutes.map((route) => route.routeId));
-  const staleIds = (config.routeOrder ?? []).filter(
-    (routeId) => !servingIds.has(routeId),
+  // Saved route-stop entries that no longer serve the sign's stops — kept
+  // in the config, flagged by the editor, skipped by the sign page. Route
+  // display info is resolved where the route still exists in GTFS.
+  const servingPairKeys = new Set(
+    servingPairs.map((pair) => `${pair.routeId}:${pair.stopId}`),
   );
-  const staleRows = getRouteRows(staleIds);
-  const staleRoutes: AdminScreenRouteInfo[] = staleIds.map((routeId) => {
-    const row = staleRows.get(routeId);
-    return row
-      ? toRouteInfo(routeId, row)
-      : {
-          routeId,
-          label: routeId,
-          longName: "",
-          routeType: 3,
-          routeColor: "",
-          routeTextColor: "",
-          known: false,
-        };
-  });
+  const staleCandidates = config.displayOrder.flatMap((entry) =>
+    entry.component === "route-stop" ? [entry] : [],
+  );
+  const staleRouteRows = getRouteRows([
+    ...new Set(staleCandidates.map((pair) => pair.routeId)),
+  ]);
+  const stalePairs: AdminScreenRouteStopInfo[] = [];
+  const seenStaleKeys = new Set<string>();
+  for (const pair of staleCandidates) {
+    const key = `${pair.routeId}:${pair.stopId}`;
+    if (servingPairKeys.has(key) || seenStaleKeys.has(key)) continue;
+    seenStaleKeys.add(key);
+    const row = staleRouteRows.get(pair.routeId);
+    stalePairs.push({
+      routeId: pair.routeId,
+      stopId: pair.stopId,
+      stopName: stopRows.get(pair.stopId)?.stop_name ?? "",
+      headsigns: [],
+      label:
+        row?.route_short_name ||
+        ROUTE_SHORT_NAME_OVERRIDES[pair.routeId] ||
+        pair.routeId,
+      longName: row?.route_long_name ?? "",
+      routeType: row?.route_type ?? 3,
+      routeColor: row?.route_color ?? "",
+      routeTextColor: row?.route_text_color ?? "",
+      known: row !== undefined,
+    });
+  }
 
   return {
     signId,
     config: {
       stopIds: config.stopIds,
-      routeOrder: config.routeOrder ?? null,
+      displayOrder: config.displayOrder,
     },
     stops,
-    servingRoutes,
-    staleRoutes,
+    servingPairs,
+    stalePairs,
   };
 }

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import RouteBadge from "../RouteBadge";
+import type { DisplayOrderEntry } from "../../data/types";
 import type {
   AdminScreenDetail,
-  AdminScreenRouteInfo,
+  AdminScreenRouteStopInfo,
   AdminScreenSaveResponse,
   AdminScreenStopLookupResult,
   AdminScreenSummary,
@@ -24,7 +25,7 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 
 interface ScreenDraft {
   stopIds: string[];
-  routeOrder: string[];
+  displayOrder: DisplayOrderEntry[];
 }
 
 /** Display info for a stop ID, accumulated from detail loads and searches. */
@@ -61,9 +62,9 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 /**
  * Dev-only island for /admin/screens: pick a screen sign, edit its stop IDs
- * (with a top-level-stop lookup), and drag its routeOrder into shape. All
- * data is fetched at runtime from /admin/api/screens* and saved to
- * src/data/screenSigns.json.
+ * (with a top-level-stop lookup), and arrange its displayOrder — route-stop
+ * pair rows and header components — into shape. All data is fetched at
+ * runtime from /admin/api/screens* and saved to src/data/screenSigns.json.
  */
 export default function ScreenEditor() {
   const [signs, setSigns] = useState<AdminScreenSummary[] | null>(null);
@@ -72,9 +73,10 @@ export default function ScreenEditor() {
   const [newSlug, setNewSlug] = useState("");
   const [baseline, setBaseline] = useState<ScreenDraft | null>(null);
   const [draft, setDraft] = useState<ScreenDraft | null>(null);
-  const [servingRoutes, setServingRoutes] = useState<AdminScreenRouteInfo[]>(
+  const [servingPairs, setServingPairs] = useState<AdminScreenRouteStopInfo[]>(
     [],
   );
+  const [stalePairs, setStalePairs] = useState<AdminScreenRouteStopInfo[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -84,11 +86,11 @@ export default function ScreenEditor() {
   >(null);
   const [stopSearchError, setStopSearchError] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [headerText, setHeaderText] = useState("");
 
   // Display-info caches. Written alongside a state update that triggers the
   // next render, so plain refs (no re-render of their own) are fine here.
   const stopInfoRef = useRef<Map<string, StopInfo>>(new Map());
-  const routeInfoRef = useRef<Map<string, AdminScreenRouteInfo>>(new Map());
 
   // Tracks the latest selection so stale detail responses can be dropped.
   const signIdRef = useRef<string | null>(null);
@@ -105,9 +107,46 @@ export default function ScreenEditor() {
       draft !== null &&
       JSON.stringify(draft) !== JSON.stringify(baseline);
 
-  const servingRouteIds = useMemo(
-    () => new Set(servingRoutes.map((route) => route.routeId)),
-    [servingRoutes],
+  // Keys ("routeId:stopId") of route-stop entries in the draft displayOrder.
+  const draftPairKeys = useMemo(
+    () =>
+      new Set(
+        (draft?.displayOrder ?? []).flatMap((entry) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          entry.component === "route-stop"
+            ? [`${entry.routeId}:${entry.stopId}`]
+            : [],
+        ),
+      ),
+    [draft?.displayOrder],
+  );
+
+  // Serving-pair keys — used to flag draft pairs that no longer serve.
+  const servingPairKeys = useMemo(
+    () => new Set(servingPairs.map((pair) => `${pair.routeId}:${pair.stopId}`)),
+    [servingPairs],
+  );
+
+  // Pair display info by "routeId:stopId" — serving pairs plus stale pairs
+  // (saved but not currently serving) so every row can render.
+  const pairInfoMap = useMemo(() => {
+    const map = new Map<string, AdminScreenRouteStopInfo>();
+    for (const pair of [...servingPairs, ...stalePairs]) {
+      const key = `${pair.routeId}:${pair.stopId}`;
+      if (!map.has(key)) map.set(key, pair);
+    }
+    return map;
+  }, [servingPairs, stalePairs]);
+
+  // Route-stop pairs serving the draft stops but not already in the display
+  // order.
+  const availablePairs = useMemo(
+    () =>
+      servingPairs.filter(
+        (pair) => !draftPairKeys.has(`${pair.routeId}:${pair.stopId}`),
+      ),
+    [servingPairs, draftPairKeys],
   );
 
   /** Loads one sign's editor data; drops the response if the user moved on. */
@@ -118,7 +157,8 @@ export default function ScreenEditor() {
     setIsNew(false);
     setDraft(null);
     setBaseline(null);
-    setServingRoutes([]);
+    setServingPairs([]);
+    setStalePairs([]);
     setStopQuery("");
     setStopResults(null);
     setStopSearchError(null);
@@ -135,36 +175,22 @@ export default function ScreenEditor() {
           found: stop.found,
         });
       }
-      for (const route of [...detail.servingRoutes, ...detail.staleRoutes]) {
-        routeInfoRef.current.set(route.routeId, route);
-      }
+      setServingPairs(detail.servingPairs);
+      setStalePairs(detail.stalePairs);
 
-      setServingRoutes(detail.servingRoutes);
-
-      // Display order: saved routeOrder entries that still serve the sign
-      // (in saved order), then serving routes not listed in routeOrder (in
-      // sign-page render order), then saved entries that no longer serve
-      // (flagged). Saving writes this full arrangement.
-      const servingIds = new Set(
-        detail.servingRoutes.map((route) => route.routeId),
-      );
-      const saved = detail.config.routeOrder ?? [];
-      const ordered = [
-        ...saved.filter((id) => servingIds.has(id)),
-        ...detail.servingRoutes
-          .map((route) => route.routeId)
-          .filter((id) => !saved.includes(id)),
-        ...saved.filter((id) => !servingIds.has(id)),
-      ];
-      const unique = [...new Set(ordered)];
+      // Display order: the saved list verbatim. displayOrder is an
+      // allowlist — pairs serving the stops but not listed are shown in the
+      // available route-stop pairs section below, never auto-added.
+      const copyDisplayOrder = (): DisplayOrderEntry[] =>
+        detail.config.displayOrder.map((entry) => ({ ...entry }));
 
       setBaseline({
         stopIds: [...detail.config.stopIds],
-        routeOrder: [...unique],
+        displayOrder: copyDisplayOrder(),
       });
       setDraft({
         stopIds: [...detail.config.stopIds],
-        routeOrder: [...unique],
+        displayOrder: copyDisplayOrder(),
       });
     } catch (e) {
       if (signIdRef.current === nextSignId) {
@@ -185,9 +211,10 @@ export default function ScreenEditor() {
     if (dirty && !window.confirm("Discard unsaved changes?")) return;
     setIsNew(true);
     setSignId(null);
-    setDraft({ stopIds: [], routeOrder: [] });
+    setDraft({ stopIds: [], displayOrder: [] });
     setBaseline(null);
-    setServingRoutes([]);
+    setServingPairs([]);
+    setStalePairs([]);
     setNewSlug("");
     setSaveState("idle");
     setSaveError(null);
@@ -204,7 +231,8 @@ export default function ScreenEditor() {
     setNewSlug("");
     setDraft(null);
     setBaseline(null);
-    setServingRoutes([]);
+    setServingPairs([]);
+    setStalePairs([]);
     if (signs && signs[0]) setSignId(signs[0].signId);
   }
 
@@ -289,33 +317,22 @@ export default function ScreenEditor() {
   }, [stopQuery]);
 
   // Serving-routes preview: refetch whenever the draft stop IDs change so
-  // the routeOrder list stays in sync before anything is saved. Newly
-  // serving routes are appended as unlisted rows at the end.
+  // the available-routes list stays in sync before anything is saved.
+  // displayOrder is never modified here — routes must be added explicitly.
   const draftStopIdsKey = draft?.stopIds.join(",") ?? "";
   useEffect(() => {
     if (!draft || draft.stopIds.length === 0) {
-      setServingRoutes([]);
+      setServingPairs([]);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const res = await fetchJson<{ routes: AdminScreenRouteInfo[] }>(
+        const res = await fetchJson<{ pairs: AdminScreenRouteStopInfo[] }>(
           `/admin/api/screens/route-preview?stopIds=${encodeURIComponent(draftStopIdsKey)}`,
         );
         if (cancelled) return;
-        for (const route of res.routes) {
-          routeInfoRef.current.set(route.routeId, route);
-        }
-        setServingRoutes(res.routes);
-        setDraft((prev) => {
-          if (!prev) return prev;
-          const additions = res.routes
-            .map((route) => route.routeId)
-            .filter((id) => !prev.routeOrder.includes(id));
-          if (additions.length === 0) return prev;
-          return { ...prev, routeOrder: [...prev.routeOrder, ...additions] };
-        });
+        setServingPairs(res.pairs);
       } catch {
         // Advisory endpoint — ignore failures; saved data still loads.
       }
@@ -351,39 +368,88 @@ export default function ScreenEditor() {
     );
   }
 
-  /** Reorders the draft routeOrder (used by drag and the arrow buttons). */
-  function reorderRoute(from: number, to: number): void {
+  /** Reorders the draft displayOrder (used by drag and the arrow buttons). */
+  function reorderEntry(from: number, to: number): void {
     setDraft((prev) => {
       if (
         !prev ||
         from === to ||
         from < 0 ||
         to < 0 ||
-        from >= prev.routeOrder.length ||
-        to >= prev.routeOrder.length
+        from >= prev.displayOrder.length ||
+        to >= prev.displayOrder.length
       ) {
         return prev;
       }
-      const next = [...prev.routeOrder];
+      const next = [...prev.displayOrder];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
-      return { ...prev, routeOrder: next };
+      return { ...prev, displayOrder: next };
     });
   }
 
-  function moveRoute(index: number, delta: -1 | 1): void {
-    reorderRoute(index, index + delta);
+  function moveEntry(index: number, delta: -1 | 1): void {
+    reorderEntry(index, index + delta);
   }
 
-  function removeRoute(routeId: string): void {
+  function removeEntry(index: number): void {
     setDraft((prev) =>
       prev
         ? {
             ...prev,
-            routeOrder: prev.routeOrder.filter((id) => id !== routeId),
+            displayOrder: prev.displayOrder.filter((_, i) => i !== index),
           }
         : prev,
     );
+  }
+
+  /** Appends a route-stop pair component to the draft displayOrder. */
+  function addPair(pair: AdminScreenRouteStopInfo): void {
+    setDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            displayOrder: [
+              ...prev.displayOrder,
+              {
+                component: "route-stop" as const,
+                routeId: pair.routeId,
+                stopId: pair.stopId,
+              },
+            ],
+          }
+        : prev,
+    );
+  }
+
+  /** Appends a header component with the given text. */
+  function addHeader(text: string): void {
+    const trimmed = text.trim();
+    if (trimmed === "") return;
+    setDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            displayOrder: [
+              ...prev.displayOrder,
+              { component: "header" as const, text: trimmed },
+            ],
+          }
+        : prev,
+    );
+  }
+
+  /** Edits the text of the header component at the given index. */
+  function updateHeaderText(index: number, text: string): void {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const entry = prev.displayOrder[index];
+      if (!entry || typeof entry === "string") return prev;
+      if (entry.component !== "header") return prev;
+      const next = [...prev.displayOrder];
+      next[index] = { ...entry, text };
+      return { ...prev, displayOrder: next };
+    });
   }
 
   function handleDragStart(index: number, e: React.DragEvent): void {
@@ -397,7 +463,7 @@ export default function ScreenEditor() {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     if (dragIndex === null || dragIndex === index) return;
-    reorderRoute(dragIndex, index);
+    reorderEntry(dragIndex, index);
     setDragIndex(index);
   }
 
@@ -428,21 +494,19 @@ export default function ScreenEditor() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             stopIds: draft.stopIds,
-            routeOrder: draft.routeOrder,
+            displayOrder: draft.displayOrder,
           }),
         },
       );
-      const saved: ScreenDraft = {
-        stopIds: res.stopIds,
-        routeOrder: res.routeOrder ?? [],
-      };
+      const copyEntries = (): DisplayOrderEntry[] =>
+        res.displayOrder.map((entry) => ({ ...entry }));
       setBaseline({
-        stopIds: [...saved.stopIds],
-        routeOrder: [...saved.routeOrder],
+        stopIds: [...res.stopIds],
+        displayOrder: copyEntries(),
       });
       setDraft({
-        stopIds: [...saved.stopIds],
-        routeOrder: [...saved.routeOrder],
+        stopIds: [...res.stopIds],
+        displayOrder: copyEntries(),
       });
       setSaveState("saved");
       if (isNew) {
@@ -479,7 +543,8 @@ export default function ScreenEditor() {
         setSignId(null);
         setDraft(null);
         setBaseline(null);
-        setServingRoutes([]);
+        setServingPairs([]);
+        setStalePairs([]);
       }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : String(e));
@@ -556,10 +621,8 @@ export default function ScreenEditor() {
               {signs.map((sign) => (
                 <option key={sign.signId} value={sign.signId}>
                   {sign.signId} — {sign.stopCount}
-                  {sign.stopCount === 1 ? " stop" : " stops"}
-                  {sign.routeOrderCount > 0
-                    ? `, ${sign.routeOrderCount} ordered routes`
-                    : ""}
+                  {sign.stopCount === 1 ? " stop" : " stops"},{" "}
+                  {sign.displayOrderCount} display entries
                 </option>
               ))}
             </select>
@@ -607,9 +670,10 @@ export default function ScreenEditor() {
           <section>
             <h2 className="text-metro-text text-lg font-bold">Stop IDs</h2>
             <p className="text-secondary-text mb-3 text-sm">
-              Every route serving these stops is merged onto the sign. Only
-              top-level stops are valid — parent stations (e.g. 80214S) or
-              standalone stops (e.g. 3300), never child platforms.
+              The stops whose routes can appear on the sign — only routes listed
+              in the display order below are displayed. Only top-level stops are
+              valid — parent stations (e.g. 80214S) or standalone stops (e.g.
+              3300), never child platforms.
             </p>
             <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
               {draft.stopIds.map((stopId) => {
@@ -710,22 +774,121 @@ export default function ScreenEditor() {
             </div>
           </section>
 
-          {/* Route order */}
+          {/* Display order */}
           <section>
-            <h2 className="text-metro-text text-lg font-bold">Route order</h2>
+            <h2 className="text-metro-text text-lg font-bold">Display order</h2>
             <p className="text-secondary-text mb-3 text-sm">
-              Routes serving this sign’s stops, in display order — drag rows or
-              use the arrows to arrange. Rows update as stops are added or
-              removed; entries that no longer serve the sign are kept and
-              flagged. Saving writes the full list to <code>routeOrder</code>.
+              Exactly what the sign displays, in order — drag rows or use the
+              arrows to arrange. Route-stop rows render one exact (route, stop)
+              pair — use them to show a route at just one of several nearby
+              stops and intentionally exclude duplicates. Entries that no longer
+              serve the sign’s stops are kept and flagged; the sign page skips
+              them. Headers render as full-width section headings. Saving writes
+              the full list to <code>displayOrder</code>.
             </p>
             <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
-              {draft.routeOrder.map((routeId, index) => {
-                const info = routeInfoRef.current.get(routeId);
-                const serving = servingRouteIds.has(routeId);
+              {draft.displayOrder.map((entry, index) => {
+                const last = index === draft.displayOrder.length - 1;
+                if (entry.component === "route-stop") {
+                  const pairKey = `${entry.routeId}:${entry.stopId}`;
+                  const pair = pairInfoMap.get(pairKey);
+                  const serving = servingPairKeys.has(pairKey);
+                  const stopName =
+                    pair?.stopName ??
+                    stopInfoRef.current.get(entry.stopId)?.stopName ??
+                    entry.stopId;
+                  return (
+                    <li
+                      key={`route-stop-${index}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(index, e)}
+                      onDragOver={(e) => handleDragOver(index, e)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleDragEnd();
+                      }}
+                      onDragEnd={handleDragEnd}
+                      className={
+                        "flex items-center gap-3 px-3 py-2" +
+                        (dragIndex === index ? " opacity-50" : "")
+                      }
+                    >
+                      <span
+                        className="text-secondary-text cursor-grab select-none"
+                        aria-hidden="true"
+                      >
+                        ⠿
+                      </span>
+                      {pair && pair.known ? (
+                        <RouteBadge
+                          routeId={entry.routeId}
+                          routeType={pair.routeType}
+                          name={pair.label}
+                          color={pair.routeColor}
+                          textColor={pair.routeTextColor}
+                        />
+                      ) : (
+                        <span className="border-error text-error rounded-sm border px-1.5 py-0.5 font-mono text-xs">
+                          {entry.routeId}
+                        </span>
+                      )}
+                      <span className="text-secondary-text text-sm">
+                        {pair?.headsigns.join(" / ") || pair?.longName}
+                      </span>
+                      <span className="text-metro-text text-sm">
+                        at {stopName}
+                      </span>
+                      <span className="text-secondary-text font-mono text-xs">
+                        {entry.stopId}
+                      </span>
+                      {entry.directionId !== undefined && (
+                        <span className="border-blue text-blue rounded-sm border px-1.5 py-0.5 text-xs">
+                          dir {entry.directionId}
+                        </span>
+                      )}
+                      {pair && !pair.known && (
+                        <span className="text-error text-xs font-bold">
+                          not in GTFS
+                        </span>
+                      )}
+                      {!serving && (
+                        <span className="text-error text-xs">
+                          not currently serving
+                        </span>
+                      )}
+                      <span className="flex-1" />
+                      <button
+                        type="button"
+                        className="text-secondary-text hover:text-metro-text px-1 text-sm"
+                        aria-label={`Move ${entry.routeId} at ${entry.stopId} up`}
+                        disabled={index === 0}
+                        onClick={() => moveEntry(index, -1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="text-secondary-text hover:text-metro-text px-1 text-sm"
+                        aria-label={`Move ${entry.routeId} at ${entry.stopId} down`}
+                        disabled={last}
+                        onClick={() => moveEntry(index, 1)}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        className="text-error px-1 text-sm"
+                        aria-label={`Remove ${entry.routeId} at ${entry.stopId} from display order`}
+                        onClick={() => removeEntry(index)}
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  );
+                }
                 return (
                   <li
-                    key={routeId}
+                    key={`header-${index}`}
                     draggable
                     onDragStart={(e) => handleDragStart(index, e)}
                     onDragOver={(e) => handleDragOver(index, e)}
@@ -735,7 +898,7 @@ export default function ScreenEditor() {
                     }}
                     onDragEnd={handleDragEnd}
                     className={
-                      "flex items-center gap-3 px-3 py-2" +
+                      "flex items-center gap-3 bg-gray-100 px-3 py-2" +
                       (dragIndex === index ? " opacity-50" : "")
                     }
                   >
@@ -745,66 +908,123 @@ export default function ScreenEditor() {
                     >
                       ⠿
                     </span>
-                    {info && info.known ? (
-                      <RouteBadge
-                        routeId={routeId}
-                        routeType={info.routeType}
-                        name={info.label}
-                        color={info.routeColor}
-                        textColor={info.routeTextColor}
-                      />
-                    ) : (
-                      <span className="border-error text-error rounded-sm border px-1.5 py-0.5 font-mono text-xs">
-                        {routeId}
-                      </span>
-                    )}
-                    <span className="text-secondary-text text-sm">
-                      {info?.longName}
+                    <span className="text-secondary-text text-xs font-bold uppercase">
+                      Header
                     </span>
-                    {info && !info.known && (
-                      <span className="text-error text-xs font-bold">
-                        not in GTFS
-                      </span>
-                    )}
-                    {!serving && (
-                      <span className="text-error text-xs">
-                        not currently serving
-                      </span>
-                    )}
-                    <span className="flex-1" />
+                    <input
+                      className={INPUT_CLASS + " flex-1"}
+                      value={entry.text}
+                      aria-label={`Header ${index + 1} text`}
+                      onChange={(e) => updateHeaderText(index, e.target.value)}
+                    />
                     <button
                       type="button"
                       className="text-secondary-text hover:text-metro-text px-1 text-sm"
-                      aria-label={`Move ${routeId} up`}
+                      aria-label="Move header up"
                       disabled={index === 0}
-                      onClick={() => moveRoute(index, -1)}
+                      onClick={() => moveEntry(index, -1)}
                     >
                       ↑
                     </button>
                     <button
                       type="button"
                       className="text-secondary-text hover:text-metro-text px-1 text-sm"
-                      aria-label={`Move ${routeId} down`}
-                      disabled={index === draft.routeOrder.length - 1}
-                      onClick={() => moveRoute(index, 1)}
+                      aria-label="Move header down"
+                      disabled={last}
+                      onClick={() => moveEntry(index, 1)}
                     >
                       ↓
                     </button>
                     <button
                       type="button"
                       className="text-error px-1 text-sm"
-                      aria-label={`Remove ${routeId} from routeOrder`}
-                      onClick={() => removeRoute(routeId)}
+                      aria-label="Remove header from display order"
+                      onClick={() => removeEntry(index)}
                     >
                       ✕
                     </button>
                   </li>
                 );
               })}
-              {draft.routeOrder.length === 0 && (
+              {draft.displayOrder.length === 0 && (
                 <li className="text-secondary-text px-3 py-2 text-sm">
-                  No routes yet — they appear here once the sign has stops.
+                  Nothing on the sign yet — add routes from the list below or
+                  insert a header.
                 </li>
+              )}
+            </ul>
+
+            {/* Add header */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                className={INPUT_CLASS + " min-w-56"}
+                placeholder="Header text (e.g. Bus Arrivals)…"
+                value={headerText}
+                onChange={(e) => setHeaderText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addHeader(headerText);
+                }}
+              />
+              <button
+                type="button"
+                className={BUTTON_CLASS}
+                disabled={headerText.trim() === ""}
+                onClick={() => addHeader(headerText)}
+              >
+                Add header
+              </button>
+            </div>
+          </section>
+
+          {/* Available route-stop pairs */}
+          <section>
+            <h2 className="text-metro-text text-lg font-bold">
+              Available route-stop pairs
+            </h2>
+            <p className="text-secondary-text mb-3 text-sm">
+              Route-stop pairs serving the selected stops but not included in
+              the display order — one entry per (route, stop), so you can add
+              the exact pair the sign should show and intentionally exclude
+              duplicates when several nearby stops serve the same route. Adding
+              one appends it to the end of the display order above.
+            </p>
+            <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
+              {availablePairs.length === 0 ? (
+                <li className="text-secondary-text px-3 py-2 text-sm">
+                  No additional route-stop pairs serve the selected stops.
+                </li>
+              ) : (
+                availablePairs.map((pair) => (
+                  <li
+                    key={`${pair.routeId}:${pair.stopId}`}
+                    className="flex items-center gap-3 px-3 py-2"
+                  >
+                    <RouteBadge
+                      routeId={pair.routeId}
+                      routeType={pair.routeType}
+                      name={pair.label}
+                      color={pair.routeColor}
+                      textColor={pair.routeTextColor}
+                    />
+                    <span className="text-secondary-text text-sm">
+                      {pair.headsigns.join(" / ") || pair.longName}
+                    </span>
+                    <span className="text-metro-text text-sm">
+                      {pair.stopName}
+                    </span>
+                    <span className="text-secondary-text font-mono text-xs">
+                      {pair.stopId}
+                    </span>
+                    <span className="flex-1" />
+                    <button
+                      type="button"
+                      className="text-link text-sm"
+                      onClick={() => addPair(pair)}
+                    >
+                      Add
+                    </button>
+                  </li>
+                ))
               )}
             </ul>
           </section>

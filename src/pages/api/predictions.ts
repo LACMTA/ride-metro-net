@@ -13,9 +13,9 @@ import { prodCacheHeader } from "../../lib/prodCacheHeader";
 const PREDICTION_EXPIRY_GRACE_SECONDS = 30;
 
 /**
- * Default maximum number of predictions to return per route per direction.
- * The soonest arrivals across all headsigns in a direction are kept.
- * Callers may override via the `limit` query parameter.
+ * Default maximum number of predictions to return per route per direction
+ * per stop. The soonest arrivals across all headsigns in a direction at one
+ * stop are kept. Callers may override via the `limit` query parameter.
  */
 const DEFAULT_PREDICTIONS_LIMIT = 3;
 
@@ -23,6 +23,12 @@ export type RoutePredictions = {
   destinations: {
     directionId: string;
     headsign: string;
+    /**
+     * The GTFS stop ID these predictions are recorded against. Destinations
+     * are never merged across stops, so multi-stop requests can attribute
+     * every arrival to the exact stop it serves.
+     */
+    stopId: string;
     predictions: Prediction[];
   }[];
   routeId: string;
@@ -61,9 +67,11 @@ interface PredictionRow {
  * GET /api/predictions
  * @param {string} stopId - Comma-separated list of stop IDs to fetch predictions for.
  *   For parent stations, pass the child stop IDs. Results are aggregated into a single array.
- * @param {number} [limit] - Maximum number of predictions to return per route per direction.
- *   The soonest arrivals across all headsigns in a direction are kept. Defaults to 3.
+ * @param {number} [limit] - Maximum number of predictions to return per route per direction per stop.
+ *   The soonest arrivals across all headsigns in a direction at one stop are kept. Defaults to 3.
  * @returns {RoutePredictions[]} Aggregated array of predictions across all requested stops.
+ *   Destinations are grouped per direction + headsign per stop (never merged
+ *   across stops), so each arrival is attributable to its exact stop.
  */
 export async function GET(context: import("astro").APIContext) {
   const stopIdParam = context.url.searchParams.get("stopId");
@@ -147,7 +155,10 @@ export async function GET(context: import("astro").APIContext) {
 
   // Group flat rows into RoutePredictions shape, keyed by route_id.
   // Predictions across all requested stop IDs are merged into a single entry
-  // per route so the client sees one unified predictions list per line.
+  // per route so the client sees one unified predictions list per line, but
+  // destinations are grouped per direction + headsign per stop (never
+  // merged across stops) so each arrival stays attributable to its exact
+  // stop.
   const byRoute = new Map<string, RoutePredictions>();
 
   for (const row of rows) {
@@ -182,10 +193,18 @@ export async function GET(context: import("astro").APIContext) {
     const directionId = String(row.direction_id ?? 0);
 
     let dest = routePred.destinations.find(
-      (d) => d.directionId === directionId && d.headsign === headsign,
+      (d) =>
+        d.directionId === directionId &&
+        d.headsign === headsign &&
+        d.stopId === row.stop_id,
     );
     if (!dest) {
-      dest = { directionId, headsign, predictions: [] };
+      dest = {
+        directionId,
+        headsign,
+        stopId: row.stop_id,
+        predictions: [],
+      };
       routePred.destinations.push(dest);
     }
 
@@ -199,23 +218,32 @@ export async function GET(context: import("astro").APIContext) {
     });
   }
 
-  // Cap predictions per route per direction. For each direction, merge all
-  // predictions across headsigns, sort by arrival time, keep the soonest
-  // `limit`, then redistribute them back to their respective destinations.
-  // Destinations emptied by the cap are pruned.
+  // Cap predictions per route per direction per stop. For each direction +
+  // stop, merge all predictions across headsigns, sort by arrival time, keep
+  // the soonest `limit`, then redistribute them back to their respective
+  // destinations. Destinations emptied by the cap are pruned. Capping per
+  // stop (not across all requested stops) means a row scoped to one stop
+  // always sees its own soonest arrivals instead of losing them to another
+  // stop's.
   for (const routePred of byRoute.values()) {
-    const byDirection = new Map<
+    const byDirectionAndStop = new Map<
       string,
-      { directionId: string; headsign: string; predictions: Prediction[] }[]
+      {
+        directionId: string;
+        headsign: string;
+        stopId: string;
+        predictions: Prediction[];
+      }[]
     >();
     for (const dest of routePred.destinations) {
-      if (!byDirection.has(dest.directionId))
-        byDirection.set(dest.directionId, []);
-      byDirection.get(dest.directionId)!.push(dest);
+      const groupKey = `${dest.directionId}:${dest.stopId}`;
+      if (!byDirectionAndStop.has(groupKey))
+        byDirectionAndStop.set(groupKey, []);
+      byDirectionAndStop.get(groupKey)!.push(dest);
     }
 
     routePred.destinations = [];
-    for (const dirDests of byDirection.values()) {
+    for (const dirDests of byDirectionAndStop.values()) {
       const all: {
         time: number;
         dest: (typeof dirDests)[0];

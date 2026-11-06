@@ -5,7 +5,7 @@ import { getScreenDetail } from "../../../../lib/admin/getScreenEditorData";
 import {
   readScreenSignsFile,
   SIGN_ID_PATTERN,
-  validateRouteOrderAgainstDb,
+  validateDisplayOrderAgainstDb,
   validateScreenConfigBody,
   validateStopIdsAgainstDb,
   writeScreenSignsFile,
@@ -44,8 +44,8 @@ export const GET: APIRoute = async ({ params }) => {
  * POST /admin/api/screens/[signId]
  * Creates or replaces this sign's entry in src/data/screenSigns.json with
  * the request body's config (validated against the request shape and the
- * GTFS database). stopIds must be non-empty; an empty routeOrder omits the
- * key from the file entirely.
+ * GTFS database). stopIds must be non-empty; displayOrder is required and
+ * written as-is (an empty array is allowed).
  */
 export const POST: APIRoute = async ({ params, request }) => {
   const signId = params.signId ?? "";
@@ -72,19 +72,21 @@ export const POST: APIRoute = async ({ params, request }) => {
   const stopErrors = validateStopIdsAgainstDb(validation.stopIds);
   if (stopErrors.length > 0) return errorResponse(stopErrors, 400);
 
-  const routeErrors = validateRouteOrderAgainstDb(validation.routeOrder ?? []);
+  const routeErrors = validateDisplayOrderAgainstDb(validation.displayOrder);
   if (routeErrors.length > 0) return errorResponse(routeErrors, 400);
 
   const signs = readScreenSignsFile();
-  const entry: ScreenSignConfig = { stopIds: validation.stopIds };
-  if (validation.routeOrder) entry.routeOrder = validation.routeOrder;
+  const entry: ScreenSignConfig = {
+    stopIds: validation.stopIds,
+    displayOrder: validation.displayOrder,
+  };
   signs[signId] = entry;
   await writeScreenSignsFile(signs);
 
   const responseBody: AdminScreenSaveResponse = {
     savedSignId: signId,
     stopIds: validation.stopIds,
-    routeOrder: validation.routeOrder,
+    displayOrder: validation.displayOrder,
   };
   return new Response(JSON.stringify(responseBody), {
     headers: NO_STORE_HEADERS,

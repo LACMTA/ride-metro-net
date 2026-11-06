@@ -6,7 +6,7 @@
  * (`src/components/admin/*`), so these types must stay free of any
  * server-only imports.
  */
-import type { LineMapTripConfig } from "../../data/types";
+import type { DisplayOrderEntry, LineMapTripConfig } from "../../data/types";
 
 /** One selectable line in the admin editor's dropdown. */
 export interface AdminLineSummary {
@@ -137,8 +137,8 @@ export interface AdminScreenSummary {
   signId: string;
   /** Number of stop IDs configured for the sign. */
   stopCount: number;
-  /** Number of entries in the sign's routeOrder (0 when absent). */
-  routeOrderCount: number;
+  /** Number of entries in the sign's displayOrder (routes + components). */
+  displayOrderCount: number;
 }
 
 /** A top-level stop result from the screens editor's stop lookup. */
@@ -160,10 +160,25 @@ export interface AdminScreenStop {
   isParentStation: boolean;
 }
 
-/** One route row in the screens editor's routeOrder list. */
-export interface AdminScreenRouteInfo {
-  /** Stable route-ID prefix (e.g. "801", "33") — the routeOrder value. */
+/**
+ * One (route, stop) pair serving the sign's stops — the selectable unit for
+ * `route-stop` displayOrder entries. A route serving multiple configured
+ * stops yields one pair per stop, so the operator can add the exact pair
+ * they want and intentionally exclude duplicates between nearby stops.
+ */
+export interface AdminScreenRouteStopInfo {
+  /** Stable route-ID prefix (e.g. "33"). */
   routeId: string;
+  /** Config-level stop ID the route serves. */
+  stopId: string;
+  /** GTFS stop_name for the stop. */
+  stopName: string;
+  /**
+   * The headsigns this pair renders, one per served direction (e.g.
+   * "Downtown LA - Union Station") — mirrors what the sign page displays.
+   * Empty for stale pairs whose service has gone away.
+   */
+  headsigns: string[];
   /** Resolved display short name ("B" for rail, "33" for bus). */
   label: string;
   /** GTFS route_long_name ("" when unknown). */
@@ -174,33 +189,35 @@ export interface AdminScreenRouteInfo {
   routeColor: string;
   /** GTFS route_text_color, hex without leading "#" ("" when unknown). */
   routeTextColor: string;
-  /** False when the route no longer exists in the GTFS database at all. */
+  /** False when the route ID no longer exists in the GTFS database. */
   known: boolean;
 }
 
 /**
  * Full editor payload for one screen sign: the saved config, resolved info
- * for each configured stop, the routes serving those stops (merged the same
- * way the public sign page merges them), and info for routeOrder entries
- * that no longer serve the sign.
+ * for each configured stop, the route-stop pairs serving those stops (the
+ * selectable list for `route-stop` displayOrder entries), and info for
+ * saved pairs that no longer serve the sign.
  */
 export interface AdminScreenDetail {
   signId: string;
-  /** The saved config; routeOrder is null when absent from the file. */
-  config: { stopIds: string[]; routeOrder: string[] | null };
+  /** The saved config. */
+  config: { stopIds: string[]; displayOrder: DisplayOrderEntry[] };
   /** Resolved info per configured stop ID, in config order. */
   stops: AdminScreenStop[];
   /**
-   * Routes serving the sign's stops, merged and deduped by stable
-   * route-ID prefix in the order the public sign page renders them.
+   * Route-stop pairs serving the sign's stops — one entry per (route, stop)
+   * in config-stop order — the selectable list for `route-stop`
+   * displayOrder entries. Always `known: true`.
    */
-  servingRoutes: AdminScreenRouteInfo[];
+  servingPairs: AdminScreenRouteStopInfo[];
   /**
-   * Info for saved routeOrder entries that do not serve the sign's stops —
-   * either still-known routes (known: true) or IDs no longer in GTFS
-   * (known: false, label falls back to the raw ID).
+   * Saved `route-stop` displayOrder entries that no longer serve the
+   * sign's stops — either still-known routes (`known: true`) or route IDs
+   * no longer in GTFS (`known: false`, label falls back to the raw ID).
+   * Kept in the config, flagged by the editor, skipped by the sign page.
    */
-  staleRoutes: AdminScreenRouteInfo[];
+  stalePairs: AdminScreenRouteStopInfo[];
 }
 
 /** POST response after a successful save. */
@@ -208,6 +225,6 @@ export interface AdminScreenSaveResponse {
   savedSignId: string;
   /** The normalized stopIds written to screenSigns.json. */
   stopIds: string[];
-  /** The normalized routeOrder written to screenSigns.json (null when omitted). */
-  routeOrder: string[] | null;
+  /** The normalized displayOrder written to screenSigns.json. */
+  displayOrder: DisplayOrderEntry[];
 }

@@ -6,25 +6,73 @@
  */
 
 /**
+ * A header component in a sign's `displayOrder`: a full-width section heading
+ * rendered between route rows (e.g. "Bus Arrivals").
+ */
+export interface ScreenHeaderComponent {
+  component: "header";
+  /** Heading text displayed on the sign. */
+  text: string;
+}
+
+/**
+ * A route-stop component in a sign's `displayOrder`: renders the merged
+ * route card(s) for one route at one specific configured stop. Signs that
+ * include multiple nearby stops serving the same route use these to select
+ * the exact pair(s) they want and intentionally exclude duplicates.
+ */
+export interface ScreenRouteStopComponent {
+  component: "route-stop";
+  /** Stable route-ID prefix (e.g. "33", "802"). */
+  routeId: string;
+  /** Config-level stop ID — must be one of the sign's `stopIds`. */
+  stopId: string;
+  /**
+   * Optional: render only this direction's card at the stop. Omit to render
+   * every direction the stop serves for the route (e.g. both rail
+   * directions at a station).
+   */
+  directionId?: 0 | 1;
+}
+
+/**
+ * Rich component objects allowed in a sign's `displayOrder`. New component
+ * types are added by extending this union, the sign page's render loop
+ * (`/screens/[signId]`), the admin editor's row rendering, and the save-time
+ * validation whitelist in `src/lib/admin/screenSignsFile.ts`.
+ */
+export type DisplayOrderComponent =
+  | ScreenHeaderComponent
+  | ScreenRouteStopComponent;
+
+/**
+ * One entry in a sign's `displayOrder`: a rich component object — either a
+ * `route-stop` pair (a route rendered at one exact stop) or a header. Every
+ * route row names its stop explicitly; there is no bare route-ID shorthand.
+ */
+export type DisplayOrderEntry = DisplayOrderComponent;
+
+/**
  * Configuration for a single arrival-board screen sign.
  * Each key in `ScreenSigns` maps a URL-safe `signId` to its config.
  *
- * For now, a sign is simply defined by an array of stop IDs — the same data
- * that the query-parameter-based `/screens/` page accepts. Additional layout
- * options (headers, headsign filters, etc.) can be added to this interface later.
+ * A sign is defined by an array of stop IDs plus a required `displayOrder`
+ * that declares exactly what the sign shows, in order.
  */
 export interface ScreenSignConfig {
   /** GTFS stop IDs whose routes should be merged on this sign. */
   stopIds: string[];
 
   /**
-   * Optional array of `route_id` values that controls the display order of
-   * routes on the sign. Routes are sorted to match the order listed here;
-   * any routes returned by the query but not listed here appear at the end,
-   * preserving their original relative order. Route IDs that are listed
-   * but not returned by the query are silently ignored.
+   * Required. Exactly what the sign displays, in order: `route-stop`
+   * components (each rendering the card(s) for one exact route + stop pair,
+   * so duplicates between nearby stops serving the same route are excluded
+   * intentionally) and/or header components. Only pairs listed here are
+   * displayed — routes serving the configured stops but not listed are
+   * omitted. Pairs that no longer serve the sign's stops are kept and
+   * silently skipped at render time.
    */
-  routeOrder?: string[];
+  displayOrder: DisplayOrderEntry[];
 }
 
 /**

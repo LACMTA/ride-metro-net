@@ -1,6 +1,130 @@
 {
   "union-station-east-tower": {
-    "stopIds": ["80214S", "3300", "3301", "30000"],
-    "routeOrder": ["801", "802", "805", "910", "487", "40", "33"]
+    "stopIds": [
+      "80214S",
+      "3300",
+      "3301",
+      "30000",
+      "652",
+      "3103",
+      "683",
+      "3234"
+    ],
+    "displayOrder": [
+      {
+        "component": "header",
+        "text": "Departures"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "801",
+        "stopId": "80214S"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "802",
+        "stopId": "80214S"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "805",
+        "stopId": "80214S"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "910",
+        "stopId": "3300"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "910",
+        "stopId": "3301"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "487",
+        "stopId": "3300"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "487",
+        "stopId": "3301"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "40",
+        "stopId": "30000"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "40",
+        "stopId": "652"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "40",
+        "stopId": "683"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "33",
+        "stopId": "30000"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "33",
+        "stopId": "652"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "33",
+        "stopId": "683"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "33",
+        "stopId": "3234"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "70",
+        "stopId": "3103"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "70",
+        "stopId": "683"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "74",
+        "stopId": "3103"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "74",
+        "stopId": "683"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "78",
+        "stopId": "3103"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "78",
+        "stopId": "683"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "28",
+        "stopId": "683"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "28",
+        "stopId": "3234"
+      }
+    ]
   }
 }
