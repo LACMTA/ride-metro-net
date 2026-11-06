@@ -32,6 +32,7 @@ export function getScreenSummaries(): AdminScreenSummary[] {
     signId,
     stopCount: config.stopIds.length,
     displayOrderCount: config.displayOrder.length,
+    dimensions: config.dimensions ?? null,
   }));
 }
 
@@ -315,13 +316,15 @@ export async function getScreenDetail(
 
   // Saved route-stop entries that no longer serve the sign's stops — kept
   // in the config, flagged by the editor, skipped by the sign page. Route
-  // display info is resolved where the route still exists in GTFS.
+  // display info is resolved where the route still exists in GTFS. Checks
+  // both the paginated displayOrder and the fixedComponents.
   const servingPairKeys = new Set(
     servingPairs.map((pair) => `${pair.routeId}:${pair.stopId}`),
   );
-  const staleCandidates = config.displayOrder.flatMap((entry) =>
-    entry.component === "route-stop" ? [entry] : [],
-  );
+  const staleCandidates = [
+    ...config.displayOrder,
+    ...(config.fixedComponents ?? []),
+  ].flatMap((entry) => (entry.component === "route-stop" ? [entry] : []));
   const staleRouteRows = getRouteRows([
     ...new Set(staleCandidates.map((pair) => pair.routeId)),
   ]);
@@ -354,6 +357,9 @@ export async function getScreenDetail(
     config: {
       stopIds: config.stopIds,
       displayOrder: config.displayOrder,
+      fixedComponents: config.fixedComponents ?? [],
+      dimensions: config.dimensions ?? null,
+      pagination: config.pagination ?? null,
     },
     stops,
     servingPairs,

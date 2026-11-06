@@ -4,27 +4,43 @@ export const prerender = true;
 import getStopWithRoutes from "../../lib/getStopWithRoutes";
 import type { StopRoute } from "../../lib/getStopWithRoutes";
 import type {
+  DisplayOrderEntry,
   ScreenHeaderComponent,
   ScreenRouteStopComponent,
 } from "../../data/types";
 import { getScreenSignEntries, getScreenSign } from "../../lib/getScreenSigns";
+import {
+  measureScreenRenderItem,
+  packIntoPages,
+  paginatedAreaHeight,
+  resolvePaginationIntervalMs,
+  resolveScreenDimensions,
+  SCREEN_ROW_HEIGHTS,
+  type ScreenRenderItem,
+} from "../../lib/screenLayout";
 import DataInjector from "../../components/DataInjector.astro";
-import RoutePrediction from "../../components/ScreenPredictions";
+import ScreenItem from "../../components/ScreenItem.astro";
 import Layout from "../../layouts/Layout.astro";
-import RouteBadge from "../../components/RouteBadge";
 
 /**
  * /screens/[signId].astro
  *
- * Config-driven arrival board. Each sign is defined in `src/data/screenSigns.json`
- * and pre-rendered at build time. Real-time predictions are polled client-side.
+ * Config-driven arrival board for a physical screen. Each sign is defined in
+ * `src/data/screenSigns.json` and prerendered at build time; real-time
+ * predictions are polled client-side.
  *
- * The sign displays exactly what its required `displayOrder` array lists, in
- * order — `route-stop` components render the card(s) for one exact (route,
- * stop) pair so duplicates between nearby stops serving the same route can
- * be excluded intentionally, and header components render between the rows.
- * Routes serving the configured stops but not listed in `displayOrder` are
- * not displayed.
+ * The board renders at exactly the sign's configured pixel `dimensions`
+ * (default 1920×1080): optional `fixedComponents` stay visible in a zone at
+ * the top, and the required `displayOrder` list paginates in the remaining
+ * height when it overflows. Pages rotate on a fixed interval with progress
+ * dots at the bottom of the board — the active dot's ring fills over the
+ * interval to show how long until the next page displays. Page boundaries
+ * are computed at build time from the fixed row heights in
+ * `src/lib/screenLayout.ts`. The sign displays exactly what its
+ * `displayOrder` lists: `route-stop` components render the card(s) for one
+ * exact (route, stop) pair so duplicates between nearby stops serving the
+ * same route can be excluded intentionally; routes not listed are never
+ * displayed.
  */
 
 export async function getStaticPaths() {
@@ -45,6 +61,11 @@ if (!Array.isArray(signConfig.displayOrder)) {
     `Screen sign config for "${signId}" is missing its required "displayOrder" array.`,
   );
 }
+
+// Target screen geometry and page-flip timing (defaults applied when the
+// config omits them — see src/lib/screenLayout.ts).
+const dimensions = resolveScreenDimensions(signConfig);
+const intervalMs = resolvePaginationIntervalMs(signConfig);
 
 // ---------------------------------------------------------------------------
 // Fetch data for each stop and group the merged route cards by
@@ -77,17 +98,13 @@ console.warn(
 const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
 
 // ---------------------------------------------------------------------------
-// Build the render list from `displayOrder`: each `route-stop` entry renders
-// only the card(s) for that one exact (route, stop) pair — a route can still
-// appear in multiple directions at its stop — and header entries render
-// between the rows. Routes not listed are never displayed; unknown entries
-// (including leftover route-ID strings from the old shorthand) are skipped
-// with a warning so a bad hand edit can't break the build.
+// Resolve both component lists into render items: each `route-stop` entry
+// renders only the card(s) for that one exact (route, stop) pair — a route
+// can still appear in multiple directions at its stop — and header entries
+// render between the rows. Routes not listed are never displayed; unknown
+// entries (including leftover route-ID strings from the old shorthand) are
+// skipped with a warning so a bad hand edit can't break the build.
 // ---------------------------------------------------------------------------
-type ScreenRenderItem =
-  | { type: "header"; text: string }
-  | { type: "route"; route: StopRoute };
-
 function isHeaderComponent(entry: unknown): entry is ScreenHeaderComponent {
   return (
     typeof entry === "object" &&
@@ -109,99 +126,209 @@ function isRouteStopComponent(
   );
 }
 
-const renderItems: ScreenRenderItem[] = [];
-
-for (const [index, entry] of signConfig.displayOrder.entries()) {
-  if (isRouteStopComponent(entry)) {
-    const pairCards =
-      routesByPair.get(`${entry.routeId}:${entry.stopId}`) ?? [];
-    const cards =
-      entry.directionId === undefined
-        ? pairCards
-        : pairCards.filter((route) => route.directionId === entry.directionId);
-    if (cards.length === 0) {
+function resolveRenderItems(
+  entries: DisplayOrderEntry[],
+  label: string,
+): ScreenRenderItem[] {
+  const items: ScreenRenderItem[] = [];
+  for (const [index, entry] of entries.entries()) {
+    if (isRouteStopComponent(entry)) {
+      const pairCards =
+        routesByPair.get(`${entry.routeId}:${entry.stopId}`) ?? [];
+      const cards =
+        entry.directionId === undefined
+          ? pairCards
+          : pairCards.filter(
+              (route) => route.directionId === entry.directionId,
+            );
+      if (cards.length === 0) {
+        console.warn(
+          `Skipping route-stop ${label} entry ${JSON.stringify(entry)} at index ${index} for screen ${signId}: no matching card.`,
+        );
+      }
+      for (const route of cards) {
+        items.push({ type: "route", route });
+      }
+    } else if (isHeaderComponent(entry)) {
+      items.push({ type: "header", text: entry.text });
+    } else {
       console.warn(
-        `Skipping route-stop displayOrder entry ${JSON.stringify(entry)} at index ${index} for screen ${signId}: no matching card.`,
+        `Skipping unknown ${label} entry ${JSON.stringify(entry)} at index ${index} for screen ${signId}.`,
       );
     }
-    for (const route of cards) {
-      renderItems.push({ type: "route", route });
-    }
-  } else if (isHeaderComponent(entry)) {
-    renderItems.push({ type: "header", text: entry.text });
-  } else {
-    console.warn(
-      `Skipping unknown displayOrder entry ${JSON.stringify(entry)} at index ${index} for screen ${signId}.`,
-    );
   }
+  return items;
 }
+
+const fixedItems = resolveRenderItems(
+  signConfig.fixedComponents ?? [],
+  "fixedComponents",
+);
+const paginatedItems = resolveRenderItems(
+  signConfig.displayOrder,
+  "displayOrder",
+);
+
+// ---------------------------------------------------------------------------
+// Pack the paginated items into pages that fit the height left after the
+// fixed zone and the always-reserved dots bar, using the shared row-height
+// constants. All pages are rendered (inactive ones display:none) so their
+// prediction islands keep updating; the client script rotates them.
+// ---------------------------------------------------------------------------
+const fixedHeight = fixedItems.reduce(
+  (sum, item) => sum + measureScreenRenderItem(item).height,
+  0,
+);
+const availableHeight = paginatedAreaHeight(dimensions, fixedHeight);
+const pages = packIntoPages(
+  paginatedItems,
+  availableHeight,
+  measureScreenRenderItem,
+);
+const pageCount = pages.length;
 ---
 
 <DataInjector data={uniquePredictionStopIds} id="screen-stop-ids" />
+<DataInjector
+  data={{
+    width: dimensions.width,
+    height: dimensions.height,
+    pageCount,
+    intervalMs,
+  }}
+  id="screen-layout"
+/>
 <script>
   import { getData } from "../../lib/getData";
   import watchPredictions from "../../lib/watchPredictions";
 
   const stopIds = getData("screen-stop-ids") as string[];
   watchPredictions(stopIds);
+
+  const layout = getData("screen-layout") as {
+    width: number;
+    height: number;
+    pageCount: number;
+    intervalMs: number;
+  };
+
+  // Fit the fixed-size board to the browser window. Kiosks run at the
+  // board's native resolution (scale 1); smaller preview windows scale
+  // down so the whole board stays visible.
+  const board = document.getElementById("screen-board");
+  const viewport = document.getElementById("screen-viewport");
+  if (board && viewport) {
+    const fitBoard = () => {
+      const scale = Math.min(
+        1,
+        viewport.clientWidth / layout.width,
+        viewport.clientHeight / layout.height,
+      );
+      board.style.transformOrigin = "center center";
+      board.style.transform = `scale(${scale})`;
+    };
+    fitBoard();
+    window.addEventListener("resize", fitBoard);
+  }
+
+  // Rotate pages on a fixed interval when the sign overflows a single page,
+  // with progress dots at the bottom of the board: the active dot's ring
+  // fills over the interval (regenerating the dots restarts the CSS
+  // animation). Inactive pages stay in the DOM (display: none) so their
+  // prediction islands keep updating while hidden.
+  if (layout.pageCount > 1) {
+    const pageEls =
+      document.querySelectorAll<HTMLElement>("[data-screen-page]");
+    const dotsNav = document.querySelector<HTMLElement>("[data-screen-dots]");
+    const RING_RADIUS = 11;
+    const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+    const inactiveDot =
+      '<span class="h-2.5 w-2.5 rounded-full bg-white/40"></span>';
+    const activeDot = `<span class="relative flex h-6 w-6 items-center justify-center">
+      <svg class="absolute inset-0 h-6 w-6 -rotate-90" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="${RING_RADIUS}" fill="none" stroke="white" stroke-width="2" stroke-dasharray="${RING_CIRCUMFERENCE}" style="--screen-ring-circumference: ${RING_CIRCUMFERENCE}; animation: screen-page-progress ${layout.intervalMs}ms linear forwards"></circle>
+      </svg>
+      <span class="h-2.5 w-2.5 rounded-full bg-white"></span>
+    </span>`;
+
+    let current = 0;
+    const show = (index: number): void => {
+      pageEls.forEach((page, i) =>
+        page.classList.toggle("hidden", i !== index),
+      );
+      if (dotsNav) {
+        dotsNav.innerHTML = Array.from(pageEls, (_, i) =>
+          i === index ? activeDot : inactiveDot,
+        ).join("");
+      }
+    };
+
+    show(0);
+    window.setInterval(() => {
+      current = (current + 1) % layout.pageCount;
+      show(current);
+    }, layout.intervalMs);
+  }
 </script>
 
 <Layout screen={true} title={`Metro Screen Display — ${signId}`}>
-  {
-    renderItems.length === 0 ? (
-      <p>No routes configured for this sign.</p>
-    ) : (
-      <div class="">
-        {renderItems.map((item) => {
-          if (item.type === "header") {
-            return (
-              <h2 class="border-b-4 border-gray-900 px-4 pt-8 pb-3 text-center text-5xl font-bold tracking-wide">
-                {item.text}
-              </h2>
-            );
-          }
-
-          const route = item.route;
-          return (
-            <div class="grid grid-cols-12 gap-4 border-b-4 border-gray-900">
-              <div class="col-span-9 flex items-center justify-start py-4 pl-4">
-                <RouteBadge
-                  routeId={route.routeId}
-                  routeType={route.routeType}
-                  name={route.routeShortName}
-                  color={route.routeColor}
-                  textColor={route.routeTextColor}
-                  size="xl"
-                />
-                <div class="ml-5 overflow-hidden">
-                  <div class="mt-7 text-left text-4xl text-nowrap">
-                    {route.headsigns[0].replace(" Station", "")}
-                  </div>
-                  <div class="h-7 text-xl text-nowrap">
-                    {route.headsigns.length > 1 && (
-                      <>
-                        {" "}
-                        {route.headsigns
-                          .slice(1)
-                          .map((h) => h.replace(" Station", ""))
-                          .join(", ")}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div class="col-span-3 flex items-center justify-end py-4 pr-4 text-right text-4xl">
-                <RoutePrediction
-                  routeId={route.routeId}
-                  directionId={route.directionId}
-                  stopId={route.childStopId}
-                  client:load
-                />
-              </div>
-            </div>
-          );
-        })}
+  <div
+    id="screen-viewport"
+    class="flex min-h-dvh items-center justify-center overflow-hidden"
+  >
+    <div
+      id="screen-board"
+      class="flex flex-col overflow-hidden bg-black"
+      style={`width: ${dimensions.width}px; height: ${dimensions.height}px`}
+    >
+      {
+        fixedItems.length > 0 && (
+          <div data-screen-fixed class="flex-none">
+            {fixedItems.map((item) => (
+              <ScreenItem item={item} />
+            ))}
+          </div>
+        )
+      }
+      <div class="min-h-0 flex-1">
+        {
+          pageCount === 0 ? (
+            <p>No routes configured for this sign.</p>
+          ) : (
+            pages.map((page, pageIndex) => (
+              <section
+                data-screen-page={pageIndex}
+                class:list={["h-full", { hidden: pageIndex > 0 }]}
+              >
+                {page.map((item) => (
+                  <ScreenItem item={item} />
+                ))}
+              </section>
+            ))
+          )
+        }
       </div>
-    )
-  }
+      <nav
+        data-screen-dots
+        class="flex flex-none items-center justify-center gap-2"
+        style={`height: ${SCREEN_ROW_HEIGHTS.dotsBar}px`}
+        aria-label="Sign pages"
+      >
+      </nav>
+    </div>
+  </div>
 </Layout>
+
+<style is:global>
+  /* Progress ring around the active pagination dot — animated over one
+     page-flip interval by the page script (which builds the dots markup). */
+  @keyframes screen-page-progress {
+    from {
+      stroke-dashoffset: var(--screen-ring-circumference, 69.1);
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+</style>

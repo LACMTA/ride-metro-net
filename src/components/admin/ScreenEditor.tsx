@@ -1,6 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import RouteBadge from "../RouteBadge";
-import type { DisplayOrderEntry } from "../../data/types";
+import type { DisplayOrderEntry, ScreenDimensions } from "../../data/types";
+import {
+  DEFAULT_PAGINATION_INTERVAL_MS,
+  DEFAULT_SCREEN_DIMENSIONS,
+  measureDisplayOrderEntry,
+  packIntoPages,
+  paginatedAreaHeight,
+  PAGINATION_INTERVAL_MAX_MS,
+  PAGINATION_INTERVAL_MIN_MS,
+  SCREEN_DIMENSIONS_MAX,
+  SCREEN_DIMENSIONS_MIN,
+  SCREEN_ROW_HEIGHTS,
+} from "../../lib/screenLayout";
 import type {
   AdminScreenDetail,
   AdminScreenRouteStopInfo,
@@ -25,8 +37,18 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 
 interface ScreenDraft {
   stopIds: string[];
+  /** The paginated displayOrder list. */
   displayOrder: DisplayOrderEntry[];
+  /** Always-visible components rendered above the paginated list. */
+  fixedComponents: DisplayOrderEntry[];
+  /** Target pixel dimensions (concrete; defaults applied on load). */
+  dimensions: ScreenDimensions;
+  /** Page-flip interval in ms (concrete; default applied on load). */
+  intervalMs: number;
 }
+
+/** Which draft component list a row belongs to. */
+type ListKey = "displayOrder" | "fixedComponents";
 
 /** Display info for a stop ID, accumulated from detail loads and searches. */
 interface StopInfo {
@@ -85,8 +107,11 @@ export default function ScreenEditor() {
     AdminScreenStopLookupResult[] | null
   >(null);
   const [stopSearchError, setStopSearchError] = useState<string | null>(null);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [drag, setDrag] = useState<{ list: ListKey; index: number } | null>(
+    null,
+  );
   const [headerText, setHeaderText] = useState("");
+  const [fixedHeaderText, setFixedHeaderText] = useState("");
 
   // Display-info caches. Written alongside a state update that triggers the
   // next render, so plain refs (no re-render of their own) are fine here.
@@ -107,11 +132,14 @@ export default function ScreenEditor() {
       draft !== null &&
       JSON.stringify(draft) !== JSON.stringify(baseline);
 
-  // Keys ("routeId:stopId") of route-stop entries in the draft displayOrder.
+  // Keys ("routeId:stopId") of route-stop entries in either draft list.
   const draftPairKeys = useMemo(
     () =>
       new Set(
-        (draft?.displayOrder ?? []).flatMap((entry) =>
+        (draft
+          ? [...draft.fixedComponents, ...draft.displayOrder]
+          : []
+        ).flatMap((entry) =>
           typeof entry === "object" &&
           entry !== null &&
           entry.component === "route-stop"
@@ -119,7 +147,7 @@ export default function ScreenEditor() {
             : [],
         ),
       ),
-    [draft?.displayOrder],
+    [draft?.fixedComponents, draft?.displayOrder],
   );
 
   // Serving-pair keys — used to flag draft pairs that no longer serve.
@@ -148,6 +176,28 @@ export default function ScreenEditor() {
       ),
     [servingPairs, draftPairKeys],
   );
+
+  // Rows-per-page / page-count estimate for the draft, using the same
+  // build-time packing math as the sign page. Approximate: each entry
+  // counts as one row (entries without directionId can expand into
+  // multiple route cards at build time).
+  const paginationEstimate = useMemo(() => {
+    if (!draft) return null;
+    const fixedHeight = draft.fixedComponents.reduce(
+      (sum, entry) => sum + measureDisplayOrderEntry(entry).height,
+      0,
+    );
+    const available = paginatedAreaHeight(draft.dimensions, fixedHeight);
+    const pages = packIntoPages(
+      draft.displayOrder,
+      available,
+      measureDisplayOrderEntry,
+    );
+    return {
+      rowsPerPage: Math.floor(available / SCREEN_ROW_HEIGHTS.route),
+      pageCount: pages.length,
+    };
+  }, [draft]);
 
   /** Loads one sign's editor data; drops the response if the user moved on. */
   async function loadSign(nextSignId: string): Promise<void> {
@@ -178,20 +228,30 @@ export default function ScreenEditor() {
       setServingPairs(detail.servingPairs);
       setStalePairs(detail.stalePairs);
 
-      // Display order: the saved list verbatim. displayOrder is an
+      // Draft shape: the saved config with concrete defaults applied.
+      // Optional fields (dimensions, pagination, fixedComponents) are
+      // normalized to concrete values so the inputs always have something
+      // to edit; saving always writes them explicitly. displayOrder is an
       // allowlist — pairs serving the stops but not listed are shown in the
       // available route-stop pairs section below, never auto-added.
-      const copyDisplayOrder = (): DisplayOrderEntry[] =>
-        detail.config.displayOrder.map((entry) => ({ ...entry }));
+      const toDraft = (): ScreenDraft => ({
+        stopIds: [...detail.config.stopIds],
+        displayOrder: detail.config.displayOrder.map((entry) => ({
+          ...entry,
+        })),
+        fixedComponents: detail.config.fixedComponents.map((entry) => ({
+          ...entry,
+        })),
+        dimensions: detail.config.dimensions
+          ? { ...detail.config.dimensions }
+          : { ...DEFAULT_SCREEN_DIMENSIONS },
+        intervalMs:
+          detail.config.pagination?.intervalMs ??
+          DEFAULT_PAGINATION_INTERVAL_MS,
+      });
 
-      setBaseline({
-        stopIds: [...detail.config.stopIds],
-        displayOrder: copyDisplayOrder(),
-      });
-      setDraft({
-        stopIds: [...detail.config.stopIds],
-        displayOrder: copyDisplayOrder(),
-      });
+      setBaseline(toDraft());
+      setDraft(toDraft());
     } catch (e) {
       if (signIdRef.current === nextSignId) {
         setLoadError(e instanceof Error ? e.message : String(e));
@@ -211,7 +271,13 @@ export default function ScreenEditor() {
     if (dirty && !window.confirm("Discard unsaved changes?")) return;
     setIsNew(true);
     setSignId(null);
-    setDraft({ stopIds: [], displayOrder: [] });
+    setDraft({
+      stopIds: [],
+      displayOrder: [],
+      fixedComponents: [],
+      dimensions: { ...DEFAULT_SCREEN_DIMENSIONS },
+      intervalMs: DEFAULT_PAGINATION_INTERVAL_MS,
+    });
     setBaseline(null);
     setServingPairs([]);
     setStalePairs([]);
@@ -368,107 +434,153 @@ export default function ScreenEditor() {
     );
   }
 
-  /** Reorders the draft displayOrder (used by drag and the arrow buttons). */
-  function reorderEntry(from: number, to: number): void {
-    setDraft((prev) => {
+  /** Applies an updater to one of the draft's component lists. */
+  function mutateList(
+    list: ListKey,
+    updater: (entries: DisplayOrderEntry[]) => DisplayOrderEntry[],
+  ): void {
+    setDraft((prev) =>
+      prev ? { ...prev, [list]: updater(prev[list]) } : prev,
+    );
+  }
+
+  /** Reorders one of the draft's component lists (drag + arrow buttons). */
+  function reorderEntry(list: ListKey, from: number, to: number): void {
+    mutateList(list, (entries) => {
       if (
-        !prev ||
         from === to ||
         from < 0 ||
         to < 0 ||
-        from >= prev.displayOrder.length ||
-        to >= prev.displayOrder.length
+        from >= entries.length ||
+        to >= entries.length
       ) {
-        return prev;
+        return entries;
       }
-      const next = [...prev.displayOrder];
+      const next = [...entries];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
-      return { ...prev, displayOrder: next };
+      return next;
     });
   }
 
-  function moveEntry(index: number, delta: -1 | 1): void {
-    reorderEntry(index, index + delta);
+  function moveEntry(list: ListKey, index: number, delta: -1 | 1): void {
+    reorderEntry(list, index, index + delta);
   }
 
-  function removeEntry(index: number): void {
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            displayOrder: prev.displayOrder.filter((_, i) => i !== index),
-          }
-        : prev,
-    );
+  function removeEntry(list: ListKey, index: number): void {
+    mutateList(list, (entries) => entries.filter((_, i) => i !== index));
+  }
+
+  /**
+   * Moves an entry between the fixed and paginated lists — to the end of
+   * the other list.
+   */
+  function moveBetweenLists(from: ListKey, index: number): void {
+    const to: ListKey =
+      from === "displayOrder" ? "fixedComponents" : "displayOrder";
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const entry = prev[from][index];
+      if (!entry) return prev;
+      return {
+        ...prev,
+        [from]: prev[from].filter((_, i) => i !== index),
+        [to]: [...prev[to], entry],
+      };
+    });
   }
 
   /** Appends a route-stop pair component to the draft displayOrder. */
   function addPair(pair: AdminScreenRouteStopInfo): void {
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            displayOrder: [
-              ...prev.displayOrder,
-              {
-                component: "route-stop" as const,
-                routeId: pair.routeId,
-                stopId: pair.stopId,
-              },
-            ],
-          }
-        : prev,
-    );
+    mutateList("displayOrder", (entries) => [
+      ...entries,
+      {
+        component: "route-stop" as const,
+        routeId: pair.routeId,
+        stopId: pair.stopId,
+      },
+    ]);
   }
 
   /** Appends a header component with the given text. */
-  function addHeader(text: string): void {
+  function addHeader(list: ListKey, text: string): void {
     const trimmed = text.trim();
     if (trimmed === "") return;
+    mutateList(list, (entries) => [
+      ...entries,
+      { component: "header" as const, text: trimmed },
+    ]);
+  }
+
+  /** Edits the text of the header component at the given index. */
+  function updateHeaderText(list: ListKey, index: number, text: string): void {
+    mutateList(list, (entries) => {
+      const entry = entries[index];
+      if (!entry || entry.component !== "header") return entries;
+      const next = [...entries];
+      next[index] = { ...entry, text };
+      return next;
+    });
+  }
+
+  /** Sets one side of the draft's screen dimensions from an input string. */
+  function setDimension(side: "width" | "height", raw: string): void {
+    const value = Number(raw);
     setDraft((prev) =>
       prev
         ? {
             ...prev,
-            displayOrder: [
-              ...prev.displayOrder,
-              { component: "header" as const, text: trimmed },
-            ],
+            dimensions: {
+              ...prev.dimensions,
+              [side]: Number.isFinite(value) ? Math.round(value) : 0,
+            },
           }
         : prev,
     );
   }
 
-  /** Edits the text of the header component at the given index. */
-  function updateHeaderText(index: number, text: string): void {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const entry = prev.displayOrder[index];
-      if (!entry || typeof entry === "string") return prev;
-      if (entry.component !== "header") return prev;
-      const next = [...prev.displayOrder];
-      next[index] = { ...entry, text };
-      return { ...prev, displayOrder: next };
-    });
+  /** Sets the draft's page-flip interval, in seconds, from an input. */
+  function setIntervalSeconds(raw: string): void {
+    const seconds = Number(raw);
+    setDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            intervalMs: Number.isFinite(seconds)
+              ? Math.round(seconds * 1000)
+              : 0,
+          }
+        : prev,
+    );
   }
 
-  function handleDragStart(index: number, e: React.DragEvent): void {
+  function handleDragStart(
+    list: ListKey,
+    index: number,
+    e: React.DragEvent,
+  ): void {
     e.dataTransfer.effectAllowed = "move";
     // Firefox doesn't start a drag unless data is set.
     e.dataTransfer.setData("text/plain", String(index));
-    setDragIndex(index);
+    setDrag({ list, index });
   }
 
-  function handleDragOver(index: number, e: React.DragEvent): void {
+  function handleDragOver(
+    list: ListKey,
+    index: number,
+    e: React.DragEvent,
+  ): void {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    if (dragIndex === null || dragIndex === index) return;
-    reorderEntry(dragIndex, index);
-    setDragIndex(index);
+    // Drag reorders within a list; cross-list moves use the explicit
+    // "to fixed / to paginated" buttons on each row.
+    if (!drag || drag.list !== list || drag.index === index) return;
+    reorderEntry(list, drag.index, index);
+    setDrag({ list, index });
   }
 
   function handleDragEnd(): void {
-    setDragIndex(null);
+    setDrag(null);
   }
 
   // --- Save / delete / refresh ---
@@ -495,19 +607,24 @@ export default function ScreenEditor() {
           body: JSON.stringify({
             stopIds: draft.stopIds,
             displayOrder: draft.displayOrder,
+            fixedComponents: draft.fixedComponents,
+            dimensions: draft.dimensions,
+            pagination: { intervalMs: draft.intervalMs },
           }),
         },
       );
-      const copyEntries = (): DisplayOrderEntry[] =>
-        res.displayOrder.map((entry) => ({ ...entry }));
-      setBaseline({
-        stopIds: [...res.stopIds],
-        displayOrder: copyEntries(),
+      const toDraft = (src: AdminScreenSaveResponse): ScreenDraft => ({
+        stopIds: [...src.stopIds],
+        displayOrder: src.displayOrder.map((entry) => ({ ...entry })),
+        fixedComponents: src.fixedComponents.map((entry) => ({ ...entry })),
+        dimensions: src.dimensions
+          ? { ...src.dimensions }
+          : { ...DEFAULT_SCREEN_DIMENSIONS },
+        intervalMs:
+          src.pagination?.intervalMs ?? DEFAULT_PAGINATION_INTERVAL_MS,
       });
-      setDraft({
-        stopIds: [...res.stopIds],
-        displayOrder: copyEntries(),
-      });
+      setBaseline(toDraft(res));
+      setDraft(toDraft(res));
       setSaveState("saved");
       if (isNew) {
         setIsNew(false);
@@ -551,6 +668,190 @@ export default function ScreenEditor() {
     }
   }
 
+  /** Renders one draggable component row, shared by both lists. */
+  function renderEntryRow(
+    list: ListKey,
+    entry: DisplayOrderEntry,
+    index: number,
+    last: boolean,
+  ): ReactElement {
+    const dragging = drag?.list === list && drag.index === index;
+    const moveButton =
+      list === "displayOrder" ? (
+        <button
+          type="button"
+          className="text-secondary-text hover:text-metro-text px-1 text-xs"
+          aria-label="Move to the fixed components"
+          onClick={() => moveBetweenLists("displayOrder", index)}
+        >
+          To fixed
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="text-secondary-text hover:text-metro-text px-1 text-xs"
+          aria-label="Move to the paginated display order"
+          onClick={() => moveBetweenLists("fixedComponents", index)}
+        >
+          To paginated
+        </button>
+      );
+
+    if (entry.component === "route-stop") {
+      const pairKey = `${entry.routeId}:${entry.stopId}`;
+      const pair = pairInfoMap.get(pairKey);
+      const serving = servingPairKeys.has(pairKey);
+      const stopName =
+        pair?.stopName ??
+        stopInfoRef.current.get(entry.stopId)?.stopName ??
+        entry.stopId;
+      return (
+        <li
+          key={`route-stop-${index}`}
+          draggable
+          onDragStart={(e) => handleDragStart(list, index, e)}
+          onDragOver={(e) => handleDragOver(list, index, e)}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleDragEnd();
+          }}
+          onDragEnd={handleDragEnd}
+          className={
+            "flex items-center gap-3 px-3 py-2" +
+            (dragging ? " opacity-50" : "")
+          }
+        >
+          <span
+            className="text-secondary-text cursor-grab select-none"
+            aria-hidden="true"
+          >
+            ⠿
+          </span>
+          {pair && pair.known ? (
+            <RouteBadge
+              routeId={entry.routeId}
+              routeType={pair.routeType}
+              name={pair.label}
+              color={pair.routeColor}
+              textColor={pair.routeTextColor}
+            />
+          ) : (
+            <span className="border-error text-error rounded-sm border px-1.5 py-0.5 font-mono text-xs">
+              {entry.routeId}
+            </span>
+          )}
+          <span className="text-secondary-text text-sm">
+            {pair?.headsigns.join(" / ") || pair?.longName}
+          </span>
+          <span className="text-metro-text text-sm">at {stopName}</span>
+          <span className="text-secondary-text font-mono text-xs">
+            {entry.stopId}
+          </span>
+          {entry.directionId !== undefined && (
+            <span className="border-blue text-blue rounded-sm border px-1.5 py-0.5 text-xs">
+              dir {entry.directionId}
+            </span>
+          )}
+          {pair && !pair.known && (
+            <span className="text-error text-xs font-bold">not in GTFS</span>
+          )}
+          {!serving && (
+            <span className="text-error text-xs">not currently serving</span>
+          )}
+          <span className="flex-1" />
+          {moveButton}
+          <button
+            type="button"
+            className="text-secondary-text hover:text-metro-text px-1 text-sm"
+            aria-label={`Move ${entry.routeId} at ${entry.stopId} up`}
+            disabled={index === 0}
+            onClick={() => moveEntry(list, index, -1)}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="text-secondary-text hover:text-metro-text px-1 text-sm"
+            aria-label={`Move ${entry.routeId} at ${entry.stopId} down`}
+            disabled={last}
+            onClick={() => moveEntry(list, index, 1)}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className="text-error px-1 text-sm"
+            aria-label={`Remove ${entry.routeId} at ${entry.stopId} from ${list === "displayOrder" ? "display order" : "fixed components"}`}
+            onClick={() => removeEntry(list, index)}
+          >
+            ✕
+          </button>
+        </li>
+      );
+    }
+
+    return (
+      <li
+        key={`header-${index}`}
+        draggable
+        onDragStart={(e) => handleDragStart(list, index, e)}
+        onDragOver={(e) => handleDragOver(list, index, e)}
+        onDrop={(e) => {
+          e.preventDefault();
+          handleDragEnd();
+        }}
+        onDragEnd={handleDragEnd}
+        className={
+          "flex items-center gap-3 bg-gray-100 px-3 py-2" +
+          (dragging ? " opacity-50" : "")
+        }
+      >
+        <span
+          className="text-secondary-text cursor-grab select-none"
+          aria-hidden="true"
+        >
+          ⠿
+        </span>
+        <span className="text-secondary-text text-xs font-bold uppercase">
+          Header
+        </span>
+        <input
+          className={INPUT_CLASS + " flex-1"}
+          value={entry.text}
+          aria-label={`Header ${index + 1} text`}
+          onChange={(e) => updateHeaderText(list, index, e.target.value)}
+        />
+        {moveButton}
+        <button
+          type="button"
+          className="text-secondary-text hover:text-metro-text px-1 text-sm"
+          aria-label="Move header up"
+          disabled={index === 0}
+          onClick={() => moveEntry(list, index, -1)}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          className="text-secondary-text hover:text-metro-text px-1 text-sm"
+          aria-label="Move header down"
+          disabled={last}
+          onClick={() => moveEntry(list, index, 1)}
+        >
+          ↓
+        </button>
+        <button
+          type="button"
+          className="text-error px-1 text-sm"
+          aria-label="Remove header"
+          onClick={() => removeEntry(list, index)}
+        >
+          ✕
+        </button>
+      </li>
+    );
+  }
+
   // --- Render ---
 
   if (!signs) {
@@ -570,7 +871,9 @@ export default function ScreenEditor() {
       <h1 className="text-metro-text text-2xl font-bold">Screen signs</h1>
       <p className="text-secondary-text mt-1 text-sm">
         Edits <code>src/data/screenSigns.json</code> — the config behind the
-        arrival-board pages at <code>/screens/&lt;signId&gt;</code>.
+        arrival-board pages at <code>/screens/&lt;signId&gt;</code>. Boards
+        render at the sign's pixel dimensions and paginate their display order
+        when it overflows.
       </p>
 
       {/* Sign selector */}
@@ -623,6 +926,8 @@ export default function ScreenEditor() {
                   {sign.signId} — {sign.stopCount}
                   {sign.stopCount === 1 ? " stop" : " stops"},{" "}
                   {sign.displayOrderCount} display entries
+                  {sign.dimensions &&
+                    `, ${sign.dimensions.width}×${sign.dimensions.height}`}
                 </option>
               ))}
             </select>
@@ -774,178 +1079,157 @@ export default function ScreenEditor() {
             </div>
           </section>
 
+          {/* Dimensions & pagination */}
+          <section>
+            <h2 className="text-metro-text text-lg font-bold">
+              Screen dimensions &amp; pagination
+            </h2>
+            <p className="text-secondary-text mb-3 text-sm">
+              The sign page renders a fixed-size board of exactly these pixel
+              dimensions (default 1920×1080), scaled down to fit smaller browser
+              windows for previewing. When the display order overflows the space
+              left after the fixed components, it splits into pages that rotate
+              on the interval, with progress dots at the bottom of the board.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label
+                className="text-secondary-text text-sm font-bold"
+                htmlFor="screen-width"
+              >
+                Width (px)
+              </label>
+              <input
+                id="screen-width"
+                className={INPUT_CLASS + " w-28"}
+                type="number"
+                min={SCREEN_DIMENSIONS_MIN}
+                max={SCREEN_DIMENSIONS_MAX}
+                value={draft.dimensions.width}
+                onChange={(e) => setDimension("width", e.target.value)}
+              />
+              <label
+                className="text-secondary-text text-sm font-bold"
+                htmlFor="screen-height"
+              >
+                Height (px)
+              </label>
+              <input
+                id="screen-height"
+                className={INPUT_CLASS + " w-28"}
+                type="number"
+                min={SCREEN_DIMENSIONS_MIN}
+                max={SCREEN_DIMENSIONS_MAX}
+                value={draft.dimensions.height}
+                onChange={(e) => setDimension("height", e.target.value)}
+              />
+              <label
+                className="text-secondary-text text-sm font-bold"
+                htmlFor="screen-interval"
+              >
+                Page interval (seconds)
+              </label>
+              <input
+                id="screen-interval"
+                className={INPUT_CLASS + " w-28"}
+                type="number"
+                min={PAGINATION_INTERVAL_MIN_MS / 1000}
+                max={PAGINATION_INTERVAL_MAX_MS / 1000}
+                value={draft.intervalMs / 1000}
+                onChange={(e) => setIntervalSeconds(e.target.value)}
+              />
+            </div>
+            {paginationEstimate && (
+              <p className="text-secondary-text mt-2 text-sm">
+                {draft.displayOrder.length === 0
+                  ? "No paginated components yet."
+                  : paginationEstimate.rowsPerPage > 0
+                    ? `≈ ${paginationEstimate.rowsPerPage} route rows per page → ${paginationEstimate.pageCount} ${paginationEstimate.pageCount === 1 ? "page" : "pages"} at ${draft.dimensions.width}×${draft.dimensions.height}.`
+                    : "No route rows fit — increase the height or trim the fixed components."}{" "}
+                Estimate only — an entry without a direction can expand into
+                multiple rows on the built page.
+              </p>
+            )}
+          </section>
+
+          {/* Fixed components */}
+          <section>
+            <h2 className="text-metro-text text-lg font-bold">
+              Fixed components (always visible)
+            </h2>
+            <p className="text-secondary-text mb-3 text-sm">
+              Rendered in a fixed zone at the top of the board, above the
+              paginated display order — use them for the sign’s title or
+              branding. Same component types as the display order; a route-stop
+              pair may not appear in both lists. Their height reduces the space
+              available for paginated pages.
+            </p>
+            <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
+              {draft.fixedComponents.map((entry, index) =>
+                renderEntryRow(
+                  "fixedComponents",
+                  entry,
+                  index,
+                  index === draft.fixedComponents.length - 1,
+                ),
+              )}
+              {draft.fixedComponents.length === 0 && (
+                <li className="text-secondary-text px-3 py-2 text-sm">
+                  Nothing fixed — every component paginates.
+                </li>
+              )}
+            </ul>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                className={INPUT_CLASS + " min-w-56"}
+                placeholder="Fixed header text (e.g. Union Station)…"
+                value={fixedHeaderText}
+                onChange={(e) => setFixedHeaderText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    addHeader("fixedComponents", fixedHeaderText);
+                    setFixedHeaderText("");
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className={BUTTON_CLASS}
+                disabled={fixedHeaderText.trim() === ""}
+                onClick={() => {
+                  addHeader("fixedComponents", fixedHeaderText);
+                  setFixedHeaderText("");
+                }}
+              >
+                Add fixed header
+              </button>
+            </div>
+          </section>
+
           {/* Display order */}
           <section>
-            <h2 className="text-metro-text text-lg font-bold">Display order</h2>
+            <h2 className="text-metro-text text-lg font-bold">
+              Display order (paginated)
+            </h2>
             <p className="text-secondary-text mb-3 text-sm">
               Exactly what the sign displays, in order — drag rows or use the
               arrows to arrange. Route-stop rows render one exact (route, stop)
               pair — use them to show a route at just one of several nearby
               stops and intentionally exclude duplicates. Entries that no longer
               serve the sign’s stops are kept and flagged; the sign page skips
-              them. Headers render as full-width section headings. Saving writes
-              the full list to <code>displayOrder</code>.
+              them. Headers render as full-width section headings. When this
+              list overflows the screen it splits into rotating pages; saving
+              writes the full list to <code>displayOrder</code>.
             </p>
             <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
-              {draft.displayOrder.map((entry, index) => {
-                const last = index === draft.displayOrder.length - 1;
-                if (entry.component === "route-stop") {
-                  const pairKey = `${entry.routeId}:${entry.stopId}`;
-                  const pair = pairInfoMap.get(pairKey);
-                  const serving = servingPairKeys.has(pairKey);
-                  const stopName =
-                    pair?.stopName ??
-                    stopInfoRef.current.get(entry.stopId)?.stopName ??
-                    entry.stopId;
-                  return (
-                    <li
-                      key={`route-stop-${index}`}
-                      draggable
-                      onDragStart={(e) => handleDragStart(index, e)}
-                      onDragOver={(e) => handleDragOver(index, e)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        handleDragEnd();
-                      }}
-                      onDragEnd={handleDragEnd}
-                      className={
-                        "flex items-center gap-3 px-3 py-2" +
-                        (dragIndex === index ? " opacity-50" : "")
-                      }
-                    >
-                      <span
-                        className="text-secondary-text cursor-grab select-none"
-                        aria-hidden="true"
-                      >
-                        ⠿
-                      </span>
-                      {pair && pair.known ? (
-                        <RouteBadge
-                          routeId={entry.routeId}
-                          routeType={pair.routeType}
-                          name={pair.label}
-                          color={pair.routeColor}
-                          textColor={pair.routeTextColor}
-                        />
-                      ) : (
-                        <span className="border-error text-error rounded-sm border px-1.5 py-0.5 font-mono text-xs">
-                          {entry.routeId}
-                        </span>
-                      )}
-                      <span className="text-secondary-text text-sm">
-                        {pair?.headsigns.join(" / ") || pair?.longName}
-                      </span>
-                      <span className="text-metro-text text-sm">
-                        at {stopName}
-                      </span>
-                      <span className="text-secondary-text font-mono text-xs">
-                        {entry.stopId}
-                      </span>
-                      {entry.directionId !== undefined && (
-                        <span className="border-blue text-blue rounded-sm border px-1.5 py-0.5 text-xs">
-                          dir {entry.directionId}
-                        </span>
-                      )}
-                      {pair && !pair.known && (
-                        <span className="text-error text-xs font-bold">
-                          not in GTFS
-                        </span>
-                      )}
-                      {!serving && (
-                        <span className="text-error text-xs">
-                          not currently serving
-                        </span>
-                      )}
-                      <span className="flex-1" />
-                      <button
-                        type="button"
-                        className="text-secondary-text hover:text-metro-text px-1 text-sm"
-                        aria-label={`Move ${entry.routeId} at ${entry.stopId} up`}
-                        disabled={index === 0}
-                        onClick={() => moveEntry(index, -1)}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="text-secondary-text hover:text-metro-text px-1 text-sm"
-                        aria-label={`Move ${entry.routeId} at ${entry.stopId} down`}
-                        disabled={last}
-                        onClick={() => moveEntry(index, 1)}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="text-error px-1 text-sm"
-                        aria-label={`Remove ${entry.routeId} at ${entry.stopId} from display order`}
-                        onClick={() => removeEntry(index)}
-                      >
-                        ✕
-                      </button>
-                    </li>
-                  );
-                }
-                return (
-                  <li
-                    key={`header-${index}`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(index, e)}
-                    onDragOver={(e) => handleDragOver(index, e)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handleDragEnd();
-                    }}
-                    onDragEnd={handleDragEnd}
-                    className={
-                      "flex items-center gap-3 bg-gray-100 px-3 py-2" +
-                      (dragIndex === index ? " opacity-50" : "")
-                    }
-                  >
-                    <span
-                      className="text-secondary-text cursor-grab select-none"
-                      aria-hidden="true"
-                    >
-                      ⠿
-                    </span>
-                    <span className="text-secondary-text text-xs font-bold uppercase">
-                      Header
-                    </span>
-                    <input
-                      className={INPUT_CLASS + " flex-1"}
-                      value={entry.text}
-                      aria-label={`Header ${index + 1} text`}
-                      onChange={(e) => updateHeaderText(index, e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="text-secondary-text hover:text-metro-text px-1 text-sm"
-                      aria-label="Move header up"
-                      disabled={index === 0}
-                      onClick={() => moveEntry(index, -1)}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="text-secondary-text hover:text-metro-text px-1 text-sm"
-                      aria-label="Move header down"
-                      disabled={last}
-                      onClick={() => moveEntry(index, 1)}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className="text-error px-1 text-sm"
-                      aria-label="Remove header from display order"
-                      onClick={() => removeEntry(index)}
-                    >
-                      ✕
-                    </button>
-                  </li>
-                );
-              })}
+              {draft.displayOrder.map((entry, index) =>
+                renderEntryRow(
+                  "displayOrder",
+                  entry,
+                  index,
+                  index === draft.displayOrder.length - 1,
+                ),
+              )}
+
               {draft.displayOrder.length === 0 && (
                 <li className="text-secondary-text px-3 py-2 text-sm">
                   Nothing on the sign yet — add routes from the list below or
@@ -962,14 +1246,17 @@ export default function ScreenEditor() {
                 value={headerText}
                 onChange={(e) => setHeaderText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") addHeader(headerText);
+                  if (e.key === "Enter") addHeader("displayOrder", headerText);
                 }}
               />
               <button
                 type="button"
                 className={BUTTON_CLASS}
                 disabled={headerText.trim() === ""}
-                onClick={() => addHeader(headerText)}
+                onClick={() => {
+                  addHeader("displayOrder", headerText);
+                  setHeaderText("");
+                }}
               >
                 Add header
               </button>
@@ -983,10 +1270,11 @@ export default function ScreenEditor() {
             </h2>
             <p className="text-secondary-text mb-3 text-sm">
               Route-stop pairs serving the selected stops but not included in
-              the display order — one entry per (route, stop), so you can add
-              the exact pair the sign should show and intentionally exclude
-              duplicates when several nearby stops serve the same route. Adding
-              one appends it to the end of the display order above.
+              the fixed components or display order — one entry per (route,
+              stop), so you can add the exact pair the sign should show and
+              intentionally exclude duplicates when several nearby stops serve
+              the same route. Adding one appends it to the end of the display
+              order above.
             </p>
             <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
               {availablePairs.length === 0 ? (

@@ -53,26 +53,81 @@ export type DisplayOrderComponent =
 export type DisplayOrderEntry = DisplayOrderComponent;
 
 /**
+ * Pixel dimensions of the physical screen a sign targets (e.g. 1920×1080).
+ * The sign page renders a fixed-size board of exactly these dimensions and
+ * paginates any content that would overflow it. See `src/lib/screenLayout.ts`
+ * for the shared row-height constants and page-packing math.
+ */
+export interface ScreenDimensions {
+  /** Target screen width in px (e.g. 1920). */
+  width: number;
+  /** Target screen height in px (e.g. 1080). */
+  height: number;
+}
+
+/**
+ * Pagination timing for a sign. When the paginated `displayOrder` overflows
+ * the space left on the target `dimensions` (after `fixedComponents`), the
+ * sign splits it into pages that rotate automatically on a fixed interval,
+ * with progress dots at the bottom of the board — the active dot's ring
+ * fills over the interval to show how long until the next page displays.
+ */
+export interface ScreenPaginationSettings {
+  /**
+   * How long each page displays before flipping, in milliseconds. Defaults
+   * to `DEFAULT_PAGINATION_INTERVAL_MS` (10s). Must be at least
+   * `PAGINATION_INTERVAL_MIN_MS`.
+   */
+  intervalMs?: number;
+}
+
+/**
  * Configuration for a single arrival-board screen sign.
  * Each key in `ScreenSigns` maps a URL-safe `signId` to its config.
  *
  * A sign is defined by an array of stop IDs plus a required `displayOrder`
- * that declares exactly what the sign shows, in order.
+ * that declares exactly what the sign shows, in order. Optional
+ * `dimensions` size the board for a physical screen, `fixedComponents`
+ * pin content above the paginating list, and `pagination` tunes the flip.
  */
 export interface ScreenSignConfig {
   /** GTFS stop IDs whose routes should be merged on this sign. */
   stopIds: string[];
 
   /**
-   * Required. Exactly what the sign displays, in order: `route-stop`
-   * components (each rendering the card(s) for one exact route + stop pair,
-   * so duplicates between nearby stops serving the same route are excluded
-   * intentionally) and/or header components. Only pairs listed here are
-   * displayed — routes serving the configured stops but not listed are
+   * Required. The paginated list: exactly what the sign displays, in order —
+   * `route-stop` components (each rendering the card(s) for one exact route +
+   * stop pair, so duplicates between nearby stops serving the same route are
+   * excluded intentionally) and/or header components. Only pairs listed here
+   * are displayed — routes serving the configured stops but not listed are
    * omitted. Pairs that no longer serve the sign's stops are kept and
-   * silently skipped at render time.
+   * silently skipped at render time. When the resolved list overflows the
+   * height available on the target `dimensions`, it is split into pages that
+   * rotate automatically.
    */
   displayOrder: DisplayOrderEntry[];
+
+  /**
+   * Optional. Pixel dimensions of the physical screen the sign targets
+   * (e.g. `{ "width": 1920, "height": 1080 }`). The sign page renders a
+   * fixed-size board of exactly these dimensions, scaled down only to fit
+   * smaller browser windows for previewing. Defaults to 1920×1080.
+   */
+  dimensions?: ScreenDimensions;
+
+  /**
+   * Optional. Pagination timing for the `displayOrder` list. Only applies
+   * when the list overflows the available height (more than one page).
+   */
+  pagination?: ScreenPaginationSettings;
+
+  /**
+   * Optional. Components that render in a fixed zone at the top of the
+   * board and never paginate (e.g. a station-name header). Same component
+   * types as `displayOrder`; a `route-stop` pair may not appear in both
+   * lists. Their height reduces the space available for paginated pages.
+   */
+  fixedComponents?: DisplayOrderEntry[];
 }
 
 /**

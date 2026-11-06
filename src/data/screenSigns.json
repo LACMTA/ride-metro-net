@@ -10,11 +10,20 @@
       "683",
       "3234"
     ],
-    "displayOrder": [
+    "dimensions": {
+      "width": 1080,
+      "height": 1920
+    },
+    "pagination": {
+      "intervalMs": 7500
+    },
+    "fixedComponents": [
       {
         "component": "header",
         "text": "Departures"
-      },
+      }
+    ],
+    "displayOrder": [
       {
         "component": "route-stop",
         "routeId": "801",

@@ -45,7 +45,8 @@ export const GET: APIRoute = async ({ params }) => {
  * Creates or replaces this sign's entry in src/data/screenSigns.json with
  * the request body's config (validated against the request shape and the
  * GTFS database). stopIds must be non-empty; displayOrder is required and
- * written as-is (an empty array is allowed).
+ * written as-is (an empty array is allowed). Optional fixedComponents,
+ * dimensions, and pagination are validated and written when present.
  */
 export const POST: APIRoute = async ({ params, request }) => {
   const signId = params.signId ?? "";
@@ -72,13 +73,25 @@ export const POST: APIRoute = async ({ params, request }) => {
   const stopErrors = validateStopIdsAgainstDb(validation.stopIds);
   if (stopErrors.length > 0) return errorResponse(stopErrors, 400);
 
-  const routeErrors = validateDisplayOrderAgainstDb(validation.displayOrder);
+  const routeErrors = validateDisplayOrderAgainstDb(
+    validation.displayOrder,
+    validation.fixedComponents ?? [],
+  );
   if (routeErrors.length > 0) return errorResponse(routeErrors, 400);
 
   const signs = readScreenSignsFile();
   const entry: ScreenSignConfig = {
     stopIds: validation.stopIds,
     displayOrder: validation.displayOrder,
+    ...(validation.fixedComponents !== undefined
+      ? { fixedComponents: validation.fixedComponents }
+      : {}),
+    ...(validation.dimensions !== undefined
+      ? { dimensions: validation.dimensions }
+      : {}),
+    ...(validation.pagination !== undefined
+      ? { pagination: validation.pagination }
+      : {}),
   };
   signs[signId] = entry;
   await writeScreenSignsFile(signs);
@@ -87,6 +100,9 @@ export const POST: APIRoute = async ({ params, request }) => {
     savedSignId: signId,
     stopIds: validation.stopIds,
     displayOrder: validation.displayOrder,
+    fixedComponents: validation.fixedComponents ?? [],
+    dimensions: validation.dimensions ?? null,
+    pagination: validation.pagination ?? null,
   };
   return new Response(JSON.stringify(responseBody), {
     headers: NO_STORE_HEADERS,

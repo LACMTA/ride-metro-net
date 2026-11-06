@@ -6,7 +6,12 @@
  * (`src/components/admin/*`), so these types must stay free of any
  * server-only imports.
  */
-import type { DisplayOrderEntry, LineMapTripConfig } from "../../data/types";
+import type {
+  DisplayOrderEntry,
+  LineMapTripConfig,
+  ScreenDimensions,
+  ScreenPaginationSettings,
+} from "../../data/types";
 
 /** One selectable line in the admin editor's dropdown. */
 export interface AdminLineSummary {
@@ -139,6 +144,8 @@ export interface AdminScreenSummary {
   stopCount: number;
   /** Number of entries in the sign's displayOrder (routes + components). */
   displayOrderCount: number;
+  /** Saved pixel dimensions, or null when the sign uses the default (1920×1080). */
+  dimensions: ScreenDimensions | null;
 }
 
 /** A top-level stop result from the screens editor's stop lookup. */
@@ -201,8 +208,21 @@ export interface AdminScreenRouteStopInfo {
  */
 export interface AdminScreenDetail {
   signId: string;
-  /** The saved config. */
-  config: { stopIds: string[]; displayOrder: DisplayOrderEntry[] };
+  /**
+   * The saved config, normalized: optional fields become concrete values
+   * (empty fixedComponents, default dimensions/interval as null) so the
+   * editor inputs always have something to edit.
+   */
+  config: {
+    stopIds: string[];
+    displayOrder: DisplayOrderEntry[];
+    /** Always-visible components above the paginated list (empty when unset). */
+    fixedComponents: DisplayOrderEntry[];
+    /** Saved dimensions, or null when the sign uses the default (1920×1080). */
+    dimensions: ScreenDimensions | null;
+    /** Saved pagination settings, or null when unset (default interval). */
+    pagination: ScreenPaginationSettings | null;
+  };
   /** Resolved info per configured stop ID, in config order. */
   stops: AdminScreenStop[];
   /**
@@ -227,4 +247,10 @@ export interface AdminScreenSaveResponse {
   stopIds: string[];
   /** The normalized displayOrder written to screenSigns.json. */
   displayOrder: DisplayOrderEntry[];
+  /** The normalized fixedComponents written (empty when not sent). */
+  fixedComponents: DisplayOrderEntry[];
+  /** The normalized dimensions written, or null when not sent. */
+  dimensions: ScreenDimensions | null;
+  /** The normalized pagination settings written, or null when not sent. */
+  pagination: ScreenPaginationSettings | null;
 }

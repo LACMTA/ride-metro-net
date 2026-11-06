@@ -15,9 +15,17 @@ import { getGtfsDb } from "../gtfsConfig";
 import type {
   DisplayOrderComponent,
   DisplayOrderEntry,
+  ScreenDimensions,
+  ScreenPaginationSettings,
   ScreenRouteStopComponent,
   ScreenSigns,
 } from "../../data/types";
+import {
+  PAGINATION_INTERVAL_MAX_MS,
+  PAGINATION_INTERVAL_MIN_MS,
+  SCREEN_DIMENSIONS_MAX,
+  SCREEN_DIMENSIONS_MIN,
+} from "../screenLayout";
 
 /** Absolute path to the screen-signs config file. */
 const SCREEN_SIGNS_PATH = fileURLToPath(
@@ -64,7 +72,13 @@ export async function writeScreenSignsFile(signs: ScreenSigns): Promise<void> {
 }
 
 /** Properties allowed on a sign config entry (typo guard). */
-const ALLOWED_SIGN_KEYS = new Set(["stopIds", "displayOrder"]);
+const ALLOWED_SIGN_KEYS = new Set([
+  "stopIds",
+  "displayOrder",
+  "dimensions",
+  "pagination",
+  "fixedComponents",
+]);
 
 /** Component types allowed in `displayOrder`. Keep in sync with
  * `DisplayOrderComponent` in `src/data/types.ts`, the sign page's render
@@ -79,17 +93,28 @@ const COMPONENT_PROPERTIES: Record<string, Set<string>> = {
 };
 
 export type ScreenConfigValidationResult =
-  | { ok: true; stopIds: string[]; displayOrder: DisplayOrderEntry[] }
+  | {
+      ok: true;
+      stopIds: string[];
+      displayOrder: DisplayOrderEntry[];
+      /** Normalized fixedComponents, present iff the request included them. */
+      fixedComponents?: DisplayOrderEntry[];
+      /** Normalized dimensions, present iff the request included them. */
+      dimensions?: ScreenDimensions;
+      /** Normalized pagination settings, present iff intervalMs was given. */
+      pagination?: ScreenPaginationSettings;
+    }
   | { ok: false; errors: string[] };
 
 /**
- * Validates one `displayOrder` component object against its component's
- * schema. Returns the normalized component, or null (after pushing
- * human-readable errors) when the entry is invalid.
+ * Validates one displayOrder-style component object against its component's
+ * schema. `path` names the entry in error messages (e.g. `displayOrder[3]`
+ * or `fixedComponents[0]`). Returns the normalized component, or null
+ * (after pushing human-readable errors) when the entry is invalid.
  */
 function validateComponentEntry(
   entry: Record<string, unknown>,
-  index: number,
+  path: string,
   errors: string[],
 ): DisplayOrderComponent | null {
   const { component } = entry;
@@ -98,7 +123,7 @@ function validateComponentEntry(
     !KNOWN_DISPLAY_COMPONENTS.has(component)
   ) {
     errors.push(
-      `displayOrder[${index}] has unknown component ${JSON.stringify(component ?? null)} — known components: ${[...KNOWN_DISPLAY_COMPONENTS].join(", ")}.`,
+      `${path} has unknown component ${JSON.stringify(component ?? null)} — known components: ${[...KNOWN_DISPLAY_COMPONENTS].join(", ")}.`,
     );
     return null;
   }
@@ -106,16 +131,14 @@ function validateComponentEntry(
   for (const key of Object.keys(entry)) {
     if (!COMPONENT_PROPERTIES[component].has(key)) {
       errors.push(
-        `displayOrder[${index}] "${component}" objects may not have a "${key}" property.`,
+        `${path} "${component}" objects may not have a "${key}" property.`,
       );
     }
   }
 
   if (component === "header") {
     if (typeof entry.text !== "string" || entry.text.trim() === "") {
-      errors.push(
-        `displayOrder[${index}] header "text" must be a non-empty string.`,
-      );
+      errors.push(`${path} header "text" must be a non-empty string.`);
       return null;
     }
     return { component: "header", text: entry.text.trim() };
@@ -124,20 +147,16 @@ function validateComponentEntry(
   if (component === "route-stop") {
     const { routeId, stopId, directionId } = entry;
     if (typeof routeId !== "string" || routeId.trim() === "") {
-      errors.push(
-        `displayOrder[${index}] route-stop "routeId" must be a non-empty string.`,
-      );
+      errors.push(`${path} route-stop "routeId" must be a non-empty string.`);
       return null;
     }
     if (typeof stopId !== "string" || stopId.trim() === "") {
-      errors.push(
-        `displayOrder[${index}] route-stop "stopId" must be a non-empty string.`,
-      );
+      errors.push(`${path} route-stop "stopId" must be a non-empty string.`);
       return null;
     }
     if (directionId !== undefined && directionId !== 0 && directionId !== 1) {
       errors.push(
-        `displayOrder[${index}] route-stop "directionId" must be 0 or 1 when present.`,
+        `${path} route-stop "directionId" must be 0 or 1 when present.`,
       );
       return null;
     }
@@ -157,6 +176,68 @@ function validateComponentEntry(
 }
 
 /**
+ * Validates an array of displayOrder-style components — used for both
+ * `displayOrder` (the paginated list) and `fixedComponents` (the
+ * always-visible zone). Every entry must be a known component object;
+ * route-stop pairs must reference one of the sign's stopIds and may not be
+ * used twice anywhere on the sign (fixed + paginated combined). Returns
+ * the normalized entries, or null when the raw value isn't an array (an
+ * error is pushed in that case).
+ */
+function validateComponentList(
+  raw: unknown,
+  label: string,
+  stopIdSet: Set<string>,
+  seenRouteStops: Set<string>,
+  errors: string[],
+): DisplayOrderEntry[] | null {
+  if (!Array.isArray(raw)) {
+    errors.push(
+      `"${label}" must be an array of component objects ("route-stop" pairs and/or "header" components).`,
+    );
+    return null;
+  }
+
+  const entries: DisplayOrderEntry[] = [];
+  for (const [index, entry] of raw.entries()) {
+    if (typeof entry === "object" && entry !== null) {
+      const component = validateComponentEntry(
+        entry as Record<string, unknown>,
+        `${label}[${index}]`,
+        errors,
+      );
+      if (component) {
+        if (component.component === "route-stop") {
+          const pairKey = `${component.routeId}:${component.stopId}:${component.directionId ?? "*"}`;
+          if (seenRouteStops.has(pairKey)) {
+            errors.push(
+              `Duplicate ${label} route-stop entry: route "${component.routeId}" at stop "${component.stopId}"` +
+                (component.directionId !== undefined
+                  ? ` (direction ${component.directionId})`
+                  : "") +
+                ". A route-stop pair may only be used once on a sign (fixed or paginated).",
+            );
+            continue;
+          }
+          seenRouteStops.add(pairKey);
+          if (stopIdSet.size > 0 && !stopIdSet.has(component.stopId)) {
+            errors.push(
+              `${label}[${index}] route-stop references stop "${component.stopId}", which is not in this sign's stopIds.`,
+            );
+          }
+        }
+        entries.push(component);
+      }
+    } else {
+      errors.push(
+        `${label}[${index}] must be a component object — a "route-stop" pair or a "header". Bare route-ID strings are no longer supported; name the stop with a route-stop pair instead.`,
+      );
+    }
+  }
+  return entries;
+}
+
+/**
  * Validates and normalizes a save request body. `stopIds` must be a
  * non-empty array of unique non-empty strings. `displayOrder` is required:
  * an array of component objects, each using a known `component` type with
@@ -164,10 +245,13 @@ function validateComponentEntry(
  * text: "..." }` headers and `{ component: "route-stop", routeId, stopId,
  * directionId? }` route-stop pairs. Route-stop `routeId`s are normalized to
  * their stable prefix (suffixed GTFS IDs like "33-13167" are stored as
- * "33"); duplicate route-stop pairs are rejected, and route-stop `stopId`s
- * must reference one of the sign's `stopIds`. Bare route-ID strings are no
- * longer accepted — every route row must name its stop. Unknown properties
- * are rejected (typo guard).
+ * "33"); duplicate route-stop pairs are rejected across the whole sign, and
+ * route-stop `stopId`s must reference one of the sign's `stopIds`. Bare
+ * route-ID strings are no longer accepted — every route row must name its
+ * stop. Optional `fixedComponents` follow the same rules (rendered in a
+ * fixed zone above the paginated list); optional `dimensions` and
+ * `pagination` size the board for its physical screen and tune the
+ * page-flip interval. Unknown properties are rejected (typo guard).
  */
 export function validateScreenConfigBody(
   body: unknown,
@@ -206,57 +290,39 @@ export function validateScreenConfigBody(
       : [],
   );
 
-  const rawDisplayOrder = obj.displayOrder;
-  let displayOrder: DisplayOrderEntry[] | null = null;
-  if (!Array.isArray(rawDisplayOrder)) {
-    errors.push(
-      '"displayOrder" must be an array of component objects ("route-stop" pairs and/or "header" components).',
-    );
-  } else {
-    displayOrder = [];
-    const seenRouteStops = new Set<string>();
-    for (const [index, entry] of rawDisplayOrder.entries()) {
-      if (typeof entry === "object" && entry !== null) {
-        const component = validateComponentEntry(
-          entry as Record<string, unknown>,
-          index,
+  // Route-stop pairs are unique across the fixed and paginated lists.
+  const seenRouteStops = new Set<string>();
+
+  const displayOrder = validateComponentList(
+    obj.displayOrder,
+    "displayOrder",
+    stopIdSet,
+    seenRouteStops,
+    errors,
+  );
+
+  const fixedComponents =
+    obj.fixedComponents === undefined
+      ? undefined
+      : (validateComponentList(
+          obj.fixedComponents,
+          "fixedComponents",
+          stopIdSet,
+          seenRouteStops,
           errors,
-        );
-        if (component) {
-          if (component.component === "route-stop") {
-            const pairKey = `${component.routeId}:${component.stopId}:${component.directionId ?? "*"}`;
-            if (seenRouteStops.has(pairKey)) {
-              errors.push(
-                `Duplicate displayOrder route-stop entry: route "${component.routeId}" at stop "${component.stopId}"` +
-                  (component.directionId !== undefined
-                    ? ` (direction ${component.directionId})`
-                    : "") +
-                  ".",
-              );
-              continue;
-            }
-            seenRouteStops.add(pairKey);
-            if (stopIdSet.size > 0 && !stopIdSet.has(component.stopId)) {
-              errors.push(
-                `displayOrder[${index}] route-stop references stop "${component.stopId}", which is not in this sign's stopIds.`,
-              );
-            }
-          }
-          displayOrder.push(component);
-        }
-      } else {
-        errors.push(
-          `displayOrder[${index}] must be a component object — a "route-stop" pair or a "header". Bare route-ID strings are no longer supported; name the stop with a route-stop pair instead.`,
-        );
-      }
-    }
-  }
+        ) ?? undefined);
+
+  const dimensions = validateDimensions(obj.dimensions, errors);
+  const pagination = validatePagination(obj.pagination, errors);
 
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
     stopIds: rawStopIds as string[],
     displayOrder: displayOrder ?? [],
+    ...(fixedComponents !== undefined ? { fixedComponents } : {}),
+    ...(dimensions !== undefined ? { dimensions } : {}),
+    ...(pagination !== undefined ? { pagination } : {}),
   };
 }
 
@@ -273,6 +339,93 @@ function validateUniqueStrings(arr: unknown[], label: string): string[] {
     seen.add(entry);
   }
   return errors;
+}
+
+/** Validates one `dimensions` side — an integer of pixels within bounds. */
+function validateDimensionSide(
+  value: unknown,
+  label: "width" | "height",
+  errors: string[],
+): number | undefined {
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    errors.push(`"dimensions.${label}" must be an integer number of pixels.`);
+    return undefined;
+  }
+  if (value < SCREEN_DIMENSIONS_MIN || value > SCREEN_DIMENSIONS_MAX) {
+    errors.push(
+      `"dimensions.${label}" must be between ${SCREEN_DIMENSIONS_MIN} and ${SCREEN_DIMENSIONS_MAX} pixels.`,
+    );
+    return undefined;
+  }
+  return value;
+}
+
+/**
+ * Validates the optional `dimensions` object — `{ width, height }`
+ * integers within the shared bounds. Returns the normalized value, or
+ * undefined when absent/invalid (invalid values have already pushed
+ * errors).
+ */
+function validateDimensions(
+  raw: unknown,
+  errors: string[],
+): ScreenDimensions | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    errors.push(
+      '"dimensions" must be an object: { "width": <px>, "height": <px> }.',
+    );
+    return undefined;
+  }
+  const obj = raw as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (key !== "width" && key !== "height") {
+      errors.push(`"dimensions" may not have a "${key}" property.`);
+    }
+  }
+  const width = validateDimensionSide(obj.width, "width", errors);
+  const height = validateDimensionSide(obj.height, "height", errors);
+  if (width === undefined || height === undefined) return undefined;
+  return { width, height };
+}
+
+/**
+ * Validates the optional `pagination` object — `{ intervalMs }` within the
+ * shared bounds. An object without `intervalMs` is treated as unset.
+ */
+function validatePagination(
+  raw: unknown,
+  errors: string[],
+): ScreenPaginationSettings | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    errors.push('"pagination" must be an object: { "intervalMs": <ms> }.');
+    return undefined;
+  }
+  const obj = raw as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (key !== "intervalMs") {
+      errors.push(`"pagination" may not have a "${key}" property.`);
+    }
+  }
+  const intervalMs = obj.intervalMs;
+  if (intervalMs === undefined) return undefined;
+  if (typeof intervalMs !== "number" || !Number.isInteger(intervalMs)) {
+    errors.push(
+      '"pagination.intervalMs" must be an integer number of milliseconds.',
+    );
+    return undefined;
+  }
+  if (
+    intervalMs < PAGINATION_INTERVAL_MIN_MS ||
+    intervalMs > PAGINATION_INTERVAL_MAX_MS
+  ) {
+    errors.push(
+      `"pagination.intervalMs" must be between ${PAGINATION_INTERVAL_MIN_MS} and ${PAGINATION_INTERVAL_MAX_MS} milliseconds.`,
+    );
+    return undefined;
+  }
+  return { intervalMs };
 }
 
 interface StopValidationRow {
@@ -328,18 +481,20 @@ interface RouteValidationRow {
 }
 
 /**
- * Cross-checks the `routeId` of every submitted route-stop component against
- * the GTFS database: each stable route-ID prefix must match a known route
- * (bare prefix or any of its suffixed variants). Header components are
- * skipped — they aren't route IDs. Pairs that no longer serve the sign's
- * stops are allowed — the sign page silently ignores them — but unknown
- * routes are rejected so the config can't rot silently. Returns
- * human-readable errors for a 400 response (empty = valid).
+ * Cross-checks the `routeId` of every submitted route-stop component — in
+ * the paginated `displayOrder` and in `fixedComponents` — against the GTFS
+ * database: each stable route-ID prefix must match a known route (bare
+ * prefix or any of its suffixed variants). Header components are skipped —
+ * they aren't route IDs. Pairs that no longer serve the sign's stops are
+ * allowed — the sign page silently ignores them — but unknown routes are
+ * rejected so the config can't rot silently. Returns human-readable errors
+ * for a 400 response (empty = valid).
  */
 export function validateDisplayOrderAgainstDb(
   displayOrder: DisplayOrderEntry[],
+  fixedComponents: DisplayOrderEntry[] = [],
 ): string[] {
-  const routeIds = displayOrder.flatMap((entry) =>
+  const routeIds = [...displayOrder, ...fixedComponents].flatMap((entry) =>
     entry.component === "route-stop" ? [entry.routeId] : [],
   );
   if (routeIds.length === 0) return [];
