@@ -26,7 +26,11 @@ export default function Alert({
       {showAlertIcon && <AlertIconColumn />}
       <div>
         <p className="font-bold capitalize">
-          {String(alert.effect).toLowerCase().replace("_", " ")}
+          {/* GTFS-RT "OTHER_EFFECT" and "UNKNOWN_EFFECT" are generic;
+              show them simply as "Alert". */}
+          {alert.effect === "OTHER_EFFECT" || alert.effect === "UNKNOWN_EFFECT"
+            ? "Alert"
+            : String(alert.effect).toLowerCase().replace("_", " ")}
         </p>
         <p>{alert.descriptionText}</p>
         <p className="mt-2 flex items-center text-gray-700">
