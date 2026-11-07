@@ -243,8 +243,13 @@ const pageCount = pages.length;
     const RING_RADIUS = 11;
     const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-    const inactiveDot =
-      '<span class="h-2.5 w-2.5 rounded-full bg-white/40"></span>';
+    // Both dot variants must reserve the same 24×24 footprint (the ring's
+    // size), or the centered dots row shifts as the active dot moves
+    // between positions. The ring SVG is absolutely positioned, so only
+    // the wrapper's size affects layout.
+    const inactiveDot = `<span class="relative flex h-6 w-6 items-center justify-center">
+      <span class="h-2.5 w-2.5 rounded-full bg-white/40"></span>
+    </span>`;
     const activeDot = `<span class="relative flex h-6 w-6 items-center justify-center">
       <svg class="absolute inset-0 h-6 w-6 -rotate-90" viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="${RING_RADIUS}" fill="none" stroke="white" stroke-width="2" stroke-dasharray="${RING_CIRCUMFERENCE}" style="--screen-ring-circumference: ${RING_CIRCUMFERENCE}; animation: screen-page-progress ${layout.intervalMs}ms linear forwards"></circle>
