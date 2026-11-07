@@ -21,7 +21,7 @@ export default function SystemWideAlert() {
   return (
     <div className="bg-alert">
       <Column>
-        <Alert alert={systemAlert} fullWidth />
+        <Alert alert={systemAlert} fullWidth showTimeframe={false} />
       </Column>
     </div>
   );
