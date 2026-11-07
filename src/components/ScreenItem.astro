@@ -1,0 +1,63 @@
+---
+import RouteBadge from "./RouteBadge";
+import RoutePrediction from "./ScreenPredictions";
+import { SCREEN_ROW_HEIGHTS, type ScreenRenderItem } from "../lib/screenLayout";
+
+interface Props {
+  /** The render item to draw — a heading or a route row. */
+  item: ScreenRenderItem;
+}
+
+const { item } = Astro.props;
+---
+
+{
+  item.type === "header" ? (
+    <h2
+      class="flex items-center justify-center border-b-4 border-gray-900 px-4 text-center text-5xl font-bold tracking-wide"
+      style={`height: ${SCREEN_ROW_HEIGHTS.header}px`}
+    >
+      {item.text}
+    </h2>
+  ) : (
+    <div
+      class="grid grid-cols-12 items-center gap-4 border-b-4 border-gray-900"
+      style={`height: ${SCREEN_ROW_HEIGHTS.route}px`}
+    >
+      <div class="col-span-9 flex items-center justify-start pl-4">
+        <RouteBadge
+          routeId={item.route.routeId}
+          routeType={item.route.routeType}
+          name={item.route.routeShortName}
+          color={item.route.routeColor}
+          textColor={item.route.routeTextColor}
+          size="xl"
+        />
+        <div class="ml-5 overflow-hidden">
+          <div class="mt-7 text-left text-4xl text-nowrap">
+            {item.route.headsigns[0].replace(" Station", "")}
+          </div>
+          <div class="h-7 text-xl text-nowrap">
+            {item.route.headsigns.length > 1 && (
+              <>
+                {" "}
+                {item.route.headsigns
+                  .slice(1)
+                  .map((h) => h.replace(" Station", ""))
+                  .join(", ")}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div class="col-span-3 flex items-center justify-end pr-4 text-right text-4xl">
+        <RoutePrediction
+          routeId={item.route.routeId}
+          directionId={item.route.directionId}
+          stopId={item.route.childStopId}
+          client:load
+        />
+      </div>
+    </div>
+  )
+}
