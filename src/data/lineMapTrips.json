@@ -1974,12 +1974,12 @@
   "804": {
     "trips": [
       {
-        "tripId": "64334586",
+        "tripId": "64424546",
         "directionId": 0,
         "serviceType": "core"
       },
       {
-        "tripId": "64334594",
+        "tripId": "64424549",
         "directionId": 1,
         "serviceType": "core"
       }
