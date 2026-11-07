@@ -6,9 +6,13 @@ import Column from "./Column";
 export default function SystemWideAlert() {
   const $alerts = useStore(alerts);
 
+  // An alert is system-wide when it has an informed entity with no route or
+  // stop scope. The DB layer stores `agencyId: ""` on every entity (see
+  // `toAlert` in getServiceAlerts), so a scope-less entity is the system-wide
+  // signal — not a populated agencyId.
   const systemAlert = $alerts.find((alert) =>
     alert.informedEntities.some(
-      (entity) => entity.agencyId != null && entity.agencyId !== "",
+      (entity) => entity.routeId == null && entity.stopId == null,
     ),
   );
 
@@ -17,7 +21,7 @@ export default function SystemWideAlert() {
   return (
     <div className="bg-alert">
       <Column>
-        <Alert alert={systemAlert} fullWidth />
+        <Alert alert={systemAlert} fullWidth showTimeframe={false} />
       </Column>
     </div>
   );

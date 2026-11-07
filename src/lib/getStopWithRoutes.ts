@@ -1,5 +1,4 @@
-import { openDb } from "gtfs";
-import { GTFSconfig } from "../integrations/import-gtfs";
+import { getGtfsDb } from "./gtfsConfig";
 import { objectToCamel } from "ts-case-convert";
 import type Database from "better-sqlite3";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "./routeShortNameOverrides";
@@ -13,13 +12,12 @@ export interface StopWithRoutes {
    * Use these IDs when requesting real-time predictions from Swiftly.
    */
   childStopIds: string[];
-  /** Swiftly real-time API agency key, derived from route_type at build time. */
-  swiftlyAgencyId: string;
   routes: StopRoute[];
 }
 
 export interface StopRoute {
   routeId: string;
+  agencyId: string;
   routeShortName: string;
   routeType: number;
   routeColor: string;
@@ -38,7 +36,6 @@ export interface StopRoute {
 interface DatabaseQueryResult {
   stop_name: string;
   stop_id: string;
-  swiftly_agency_id: string;
   routes: string; // JSON string
 }
 
@@ -46,21 +43,8 @@ interface ChildStopRow {
   stop_id: string;
 }
 
-let dbInstance: Database.Database | null = null;
 let preparedQuery: Database.Statement | null = null;
 let preparedChildStopsQuery: Database.Statement | null = null;
-
-function getDb() {
-  if (!dbInstance) {
-    dbInstance = openDb(GTFSconfig);
-
-    dbInstance.pragma("synchronous = OFF");
-    dbInstance.pragma("cache_size = 10000");
-    dbInstance.pragma("temp_store = MEMORY");
-    dbInstance.pragma("journal_mode = OFF"); // Safe for in-memory
-  }
-  return dbInstance;
-}
 
 
 const query = `
@@ -71,44 +55,75 @@ const query = `
       UNION ALL
       SELECT stop_id FROM stops WHERE parent_station = @stopId
     ),
+    -- Materialize the stop_times rows for relevant stops ONCE so that both
+    -- headsign_counts and route_headsigns can derive from it without each
+    -- scanning the full 3.5M-row stop_times table independently.
+    stop_data AS MATERIALIZED (
+      SELECT
+        stop_times.stop_id,
+        stop_times.trip_id,
+        stop_times.stop_sequence,
+        stop_times.stop_headsign
+      FROM stop_times
+      JOIN relevant_stops rs ON rs.stop_id = stop_times.stop_id
+    ),
+    -- Count how many times each processed headsign appears per route/direction
+    -- at the relevant stops, so headsigns can be sorted by frequency.
+    headsign_counts AS (
+      SELECT
+        trips.route_id,
+        trips.direction_id,
+        SUBSTR(stop_data.stop_headsign, INSTR(stop_data.stop_headsign, ' - ') + 3) AS headsign,
+        COUNT(*) AS headsign_count
+      FROM stop_data
+      JOIN trips ON trips.trip_id = stop_data.trip_id
+      GROUP BY trips.route_id, trips.direction_id,
+        SUBSTR(stop_data.stop_headsign, INSTR(stop_data.stop_headsign, ' - ') + 3)
+    ),
     -- Group by direction for every route type — one StopRoute per direction per route.
     route_headsigns AS (
       SELECT
         @stopId AS stop_id,
         routes.route_id,
+        routes.agency_id,
         routes.route_short_name,
         routes.route_long_name,
         routes.route_type,
         routes.route_color,
         routes.route_text_color,
-        CASE WHEN routes.route_type = 3 THEN 'lametro' ELSE 'lametro-rail' END AS swiftly_agency_id,
         trips.direction_id,
-        MIN(stop_times.stop_sequence) AS min_stop_sequence,
+        MIN(stop_data.stop_sequence) AS min_stop_sequence,
         -- 1 if this stop has at least one following stop in any trip for this
         -- route/direction (i.e. not a pure terminus); 0 if always the last stop.
         MAX(CASE
-          WHEN stop_times.stop_sequence < (
+          WHEN stop_data.stop_sequence < (
             SELECT MAX(st2.stop_sequence) FROM stop_times st2
-            WHERE st2.trip_id = stop_times.trip_id
+            WHERE st2.trip_id = stop_data.trip_id
           ) THEN 1 ELSE 0
         END) AS has_stops_after,
-        MIN(rs.stop_id) AS child_stop_id,
-        JSON_GROUP_ARRAY(
-          DISTINCT SUBSTR(stop_times.stop_headsign, INSTR(stop_times.stop_headsign, ' - ') + 3)
+        MIN(stop_data.stop_id) AS child_stop_id,
+        (
+          SELECT JSON_GROUP_ARRAY(headsign)
+          FROM (
+            SELECT headsign
+            FROM headsign_counts hc
+            WHERE hc.route_id = routes.route_id
+              AND hc.direction_id = trips.direction_id
+            ORDER BY hc.headsign_count DESC, hc.headsign ASC
+          )
         ) AS headsigns
-      FROM stop_times
-      JOIN relevant_stops rs ON rs.stop_id = stop_times.stop_id
-      LEFT JOIN trips ON trips.trip_id = stop_times.trip_id
+      FROM stop_data
+      LEFT JOIN trips ON trips.trip_id = stop_data.trip_id
       LEFT JOIN routes ON routes.route_id = trips.route_id
-      GROUP BY routes.route_id, routes.route_short_name, trips.direction_id
+      GROUP BY routes.route_id, routes.agency_id, routes.route_short_name, trips.direction_id
     )
     SELECT
       stops.stop_name AS stop_name,
       stops.stop_id AS stop_id,
-      MIN(route_headsigns.swiftly_agency_id) AS swiftly_agency_id,
       JSON_GROUP_ARRAY(
         JSON_OBJECT(
           'route_id', route_headsigns.route_id,
+          'agency_id', route_headsigns.agency_id,
           'route_short_name', route_headsigns.route_short_name,
           'route_type', route_headsigns.route_type,
           'route_color', COALESCE(route_headsigns.route_color, ''),
@@ -148,7 +163,7 @@ const query = `
 
 function getPreparedQuery() {
   if (!preparedQuery) {
-    const db = getDb();
+    const db = getGtfsDb();
     preparedQuery = db.prepare(query);
   }
   return preparedQuery;
@@ -156,7 +171,7 @@ function getPreparedQuery() {
 
 function getPreparedChildStopsQuery() {
   if (!preparedChildStopsQuery) {
-    const db = getDb();
+    const db = getGtfsDb();
     preparedChildStopsQuery = db.prepare(
       `SELECT DISTINCT stops.stop_id FROM stops INNER JOIN stop_times ON stop_times.stop_id = stops.stop_id WHERE stops.parent_station = @stopId`,
     );
@@ -188,7 +203,6 @@ export default async function (stopId: string) {
     stopName: res.stop_name,
     stopId: res.stop_id,
     childStopIds: childRows.map((r) => r.stop_id),
-    swiftlyAgencyId: res.swiftly_agency_id,
     routes,
   };
 

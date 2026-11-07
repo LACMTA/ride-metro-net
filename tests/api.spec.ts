@@ -10,7 +10,7 @@ test.describe("API endpoints", () => {
   test.describe("GET /api/predictions", () => {
     test("returns predictions for a valid bus stop", async ({ request }) => {
       const res = await request.get("/api/predictions", {
-        params: { stopId: "11010", agency: "lametro" },
+        params: { stopId: "11010" },
       });
 
       expect(res.status()).toBe(200);
@@ -30,7 +30,7 @@ test.describe("API endpoints", () => {
     test("returns predictions for a rail child stop", async ({ request }) => {
       // 80214 is a child stop of Union Station (80214S)
       const res = await request.get("/api/predictions", {
-        params: { stopId: "80214", agency: "lametro-rail" },
+        params: { stopId: "80214" },
       });
 
       expect(res.status()).toBe(200);
@@ -40,7 +40,7 @@ test.describe("API endpoints", () => {
 
     test("supports comma-separated stop IDs", async ({ request }) => {
       const res = await request.get("/api/predictions", {
-        params: { stopId: "80214,80409", agency: "lametro-rail" },
+        params: { stopId: "80214,80409" },
       });
 
       expect(res.status()).toBe(200);
@@ -49,17 +49,7 @@ test.describe("API endpoints", () => {
     });
 
     test("returns 400 when stopId is missing", async ({ request }) => {
-      const res = await request.get("/api/predictions", {
-        params: { agency: "lametro" },
-      });
-
-      expect(res.status()).toBe(400);
-    });
-
-    test("returns 400 when agency is missing", async ({ request }) => {
-      const res = await request.get("/api/predictions", {
-        params: { stopId: "11010" },
-      });
+      const res = await request.get("/api/predictions");
 
       expect(res.status()).toBe(400);
     });

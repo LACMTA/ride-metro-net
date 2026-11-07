@@ -1,12 +1,12 @@
-import type { SwiftlyAlert } from "./fetchSwiftlyAlerts";
+import type { Alert } from "./getServiceAlerts";
 import type { ConciseAlert } from "../pages/api/alerts";
 
 /**
- * Convert a full SwiftlyAlert into the minimal `ConciseAlert` shape,
+ * Convert a full `Alert` into the minimal `ConciseAlert` shape,
  * converting the first active-period datetime strings to POSIX timestamps
  * (seconds) as the GTFS spec requires.
  */
-export function makeConciseAlert(fullAlert: SwiftlyAlert): ConciseAlert {
+export function makeConciseAlert(fullAlert: Alert): ConciseAlert {
   const rawPeriod = fullAlert.activePeriods[0];
   return {
     activePeriod: {

@@ -1,12 +1,15 @@
 import { useStore } from "@nanostores/react";
-import { routePredictions, predictionsRequestStatus } from "../lib/routePredictionsStore";
+import {
+  routePredictions,
+  predictionsRequestStatus,
+} from "../lib/routePredictionsStore";
 import type { StopRoute } from "../lib/getStopWithRoutes";
 import type { Prediction } from "../pages/api/predictions";
 import AlertList from "./AlertList";
 import RouteBadge from "./RouteBadge";
 import type { ReactNode } from "react";
 import ArrowIcon from "./ArrowIcon";
-import { isBuswayRoute } from "../lib/routeShortNameOverrides";
+import { isBuswayRoute, getLineSlug } from "../lib/routeShortNameOverrides";
 import { Card, CardHeader, CardBody } from "./Card";
 import railCardinalDirections from "../data/railCardinalDirections";
 
@@ -33,7 +36,9 @@ function DirectionTable({
 }: {
   routes: StopRoute[];
   $routePredictions: ReturnType<typeof useStore<typeof routePredictions>>;
-  $predictionsRequestStatus: ReturnType<typeof useStore<typeof predictionsRequestStatus>>;
+  $predictionsRequestStatus: ReturnType<
+    typeof useStore<typeof predictionsRequestStatus>
+  >;
 }) {
   const directionId = routes[0].directionId;
   const isRailOrBusway =
@@ -194,6 +199,7 @@ export default function StopRoutePrediction({ routes }: Props) {
             color={route.routeColor}
             textColor={route.routeTextColor}
             className={uniqueRoutes.length > 1 ? "mr-2" : undefined}
+            href={`/lines/${getLineSlug(route.routeId)}/`}
           />
         ))}
       </CardHeader>
