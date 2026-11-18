@@ -12,12 +12,14 @@ interface Props {
   alert: ConciseAlert;
   fullWidth?: boolean;
   showAlertIcon?: boolean;
+  showTimeframe?: boolean;
 }
 
 export default function Alert({
   alert,
   fullWidth = false,
   showAlertIcon = true,
+  showTimeframe = true,
 }: Props) {
   return (
     <div
@@ -26,36 +28,42 @@ export default function Alert({
       {showAlertIcon && <AlertIconColumn />}
       <div>
         <p className="font-bold capitalize">
-          {String(alert.effect).toLowerCase().replace("_", " ")}
+          {/* GTFS-RT "OTHER_EFFECT" and "UNKNOWN_EFFECT" are generic;
+              show them simply as "Alert". */}
+          {alert.effect === "OTHER_EFFECT" || alert.effect === "UNKNOWN_EFFECT"
+            ? "Alert"
+            : String(alert.effect).toLowerCase().replace("_", " ")}
         </p>
         <p>{alert.descriptionText}</p>
-        <p className="mt-2 flex items-center text-gray-700">
-          <CalendarIcon className="mr-1.5 inline h-4" />
-          {/* The alert is active */}
-          {isCurrent(alert) ? (
-            // end is null → ongoing with no scheduled end
-            alert.activePeriod.end === null ? (
-              <>Ongoing</>
+        {showTimeframe && (
+          <p className="mt-2 flex items-center text-gray-700">
+            <CalendarIcon className="mr-1.5 inline h-4" />
+            {/* The alert is active */}
+            {isCurrent(alert) ? (
+              // end is null → ongoing with no scheduled end
+              alert.activePeriod.end === null ? (
+                <>Ongoing</>
+              ) : (
+                <>Ends {formatTimestamp(alert.activePeriod.end)}.</>
+              )
+            ) : getDateInPT(alert.activePeriod.start) ===
+              getDateInPT(alert.activePeriod.end!) ? (
+              // Alert starts and ends on the same day
+              // (end cannot be null here: isCurrent would have returned true)
+              <>
+                {getDateInPT(alert.activePeriod.start)} from{" "}
+                {formatTimeOnly(alert.activePeriod.start)} to{" "}
+                {formatTimeOnly(alert.activePeriod.end!)}.
+              </>
             ) : (
-              <>Ends {formatTimestamp(alert.activePeriod.end)}.</>
-            )
-          ) : getDateInPT(alert.activePeriod.start) ===
-            getDateInPT(alert.activePeriod.end!) ? (
-            // Alert starts and ends on the same day
-            // (end cannot be null here: isCurrent would have returned true)
-            <>
-              {getDateInPT(alert.activePeriod.start)} from{" "}
-              {formatTimeOnly(alert.activePeriod.start)} to{" "}
-              {formatTimeOnly(alert.activePeriod.end!)}.
-            </>
-          ) : (
-            // Alert starts and ends on different days
-            <>
-              {formatTimestamp(alert.activePeriod.start)} to{" "}
-              {formatTimestamp(alert.activePeriod.end!)}.
-            </>
-          )}
-        </p>
+              // Alert starts and ends on different days
+              <>
+                {formatTimestamp(alert.activePeriod.start)} to{" "}
+                {formatTimestamp(alert.activePeriod.end!)}.
+              </>
+            )}
+          </p>
+        )}
       </div>
     </div>
   );

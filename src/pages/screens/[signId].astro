@@ -1,0 +1,155 @@
+---
+export const prerender = true;
+
+import getStopWithRoutes from "../../lib/getStopWithRoutes";
+import type { StopRoute } from "../../lib/getStopWithRoutes";
+import { getAgencySettings } from "../../lib/agencies";
+import { getScreenSignEntries, getScreenSign } from "../../lib/getScreenSigns";
+import DataInjector from "../../components/DataInjector.astro";
+import RoutePrediction from "../../components/ScreenPredictions";
+import Layout from "../../layouts/Layout.astro";
+import RouteBadge from "../../components/RouteBadge";
+
+/**
+ * /screens/[signId].astro
+ *
+ * Config-driven arrival board. Each sign is defined in `src/data/screenSigns.json`
+ * and pre-rendered at build time. Real-time predictions are polled client-side.
+ *
+ * The display behavior matches the query-parameter-based `/screens/` page:
+ * all routes from all configured stop IDs are merged into a single flat list.
+ */
+
+export async function getStaticPaths() {
+  return getScreenSignEntries().map(({ signId }) => ({
+    params: { signId },
+  }));
+}
+
+const { signId } = Astro.params;
+const signConfig = getScreenSign(signId);
+
+if (!signConfig) {
+  throw new Error(`No screen sign config found for signId: ${signId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Fetch data for each stop and merge all routes into a single array.
+// Collect all stop IDs (including child/platform IDs) for predictions polling.
+// ---------------------------------------------------------------------------
+const allRoutes: StopRoute[] = [];
+const notFoundStopIds: string[] = [];
+const allPredictionStopIds: string[] = [];
+
+for (const stopId of signConfig.stopIds) {
+  try {
+    const stop = await getStopWithRoutes(stopId);
+    allRoutes.push(...stop.routes);
+    allPredictionStopIds.push(stop.stopId, ...stop.childStopIds);
+  } catch {
+    notFoundStopIds.push(stopId);
+  }
+}
+
+console.warn(
+  `Stops not found for screen ${signId}: ${notFoundStopIds.join(", ")}`,
+);
+
+const uniquePredictionStopIds = [...new Set(allPredictionStopIds)];
+
+// ---------------------------------------------------------------------------
+// If the sign config specifies a `routeOrder`, sort the merged routes to
+// match that order. Unlisted routes keep their original relative order at the
+// end. JavaScript's Array.sort is stable (ES2019+), so unlisted routes are
+// preserved in insertion order.
+// ---------------------------------------------------------------------------
+if (signConfig.routeOrder?.length) {
+  const orderMap = new Map(
+    signConfig.routeOrder.map((routeId, index) => [routeId, index]),
+  );
+  allRoutes.sort(
+    (a, b) =>
+      (orderMap.get(a.routeId) ?? Infinity) -
+      (orderMap.get(b.routeId) ?? Infinity),
+  );
+}
+---
+
+<DataInjector data={uniquePredictionStopIds} id="screen-stop-ids" />
+<DataInjector data={allRoutes} id="screen-all-routes" />
+<script>
+  import { getData } from "../../lib/getData";
+  import watchPredictions from "../../lib/watchPredictions";
+
+  const stopIds = getData("screen-stop-ids") as string[];
+  const allRoutes = getData("screen-all-routes");
+  console.log("Prebuilt route data:", allRoutes);
+  watchPredictions(stopIds);
+</script>
+
+<Layout screen={true} title={`Metro Screen Display — ${signId}`}>
+  {
+    allRoutes.length === 0 ? (
+      <p>No routes found for the requested stops.</p>
+    ) : (
+      <div class="">
+        {allRoutes.map((route) => {
+          const agencySettings = getAgencySettings(route.agencyId);
+          return (
+            <div class="grid grid-cols-12 gap-4 border-b-4 border-gray-900">
+              <div
+                class="col-span-2 py-4 pl-4"
+                style={
+                  agencySettings?.color
+                    ? `background-color: ${agencySettings.color};`
+                    : undefined
+                }
+              >
+                {agencySettings?.logoFile && (
+                  <img
+                    src={`/agency-logos/${agencySettings.logoFile}`}
+                    alt=""
+                    class="margin-x-auto h-full py-5"
+                  />
+                )}
+              </div>{" "}
+              <div class="col-span-7 flex items-center justify-start py-4">
+                <RouteBadge
+                  routeId={route.routeId}
+                  routeType={route.routeType}
+                  name={route.routeShortName}
+                  color={route.routeColor}
+                  textColor={route.routeTextColor}
+                  size="xl"
+                />
+                <div class="ml-5 overflow-hidden">
+                  <div class="mt-7 text-left text-4xl text-nowrap">
+                    {route.headsigns[0].replace(" Station", "")}
+                  </div>
+                  <div class="h-7 text-xl text-nowrap">
+                    {route.headsigns.length > 1 && (
+                      <>
+                        {" "}
+                        {route.headsigns
+                          .slice(1)
+                          .map((h) => h.replace(" Station", ""))
+                          .join(", ")}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div class="col-span-3 flex items-center justify-end py-4 pr-4 text-right text-4xl">
+                <RoutePrediction
+                  routeId={route.routeId}
+                  directionId={route.directionId}
+                  client:load
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )
+  }
+</Layout>

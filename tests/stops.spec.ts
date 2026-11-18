@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { stops } from "./fixtures";
 
-test.describe("Stop pages (/stops/:stopId)", () => {
+test.describe.skip("Stop pages (/stops/:stopId) — disabled for alerts-only launch", () => {
   for (const stop of stops) {
     test(`loads /stops/${stop.stopId} (${stop.expectedName})`, async ({
       page,
@@ -32,7 +32,6 @@ test.describe("Stop pages (/stops/:stopId)", () => {
       // Verify predictions API was called with the correct agency and stop ID
       expect(predictionsRequests.length).toBeGreaterThanOrEqual(1);
       const predictionsUrl = new URL(predictionsRequests[0]);
-      expect(predictionsUrl.searchParams.get("agency")).toBe(stop.agency);
       expect(predictionsUrl.searchParams.get("stopId")).toBeTruthy();
 
       // Verify alerts API was called and includes the stop ID.

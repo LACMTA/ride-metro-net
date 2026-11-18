@@ -17,6 +17,8 @@ interface Props {
   routes: Route[];
   title: string;
   badgeSize?: BadgeSizes;
+  /** When true (default), badges link to their line page. Set false on line pages to avoid self-links. */
+  linkBadges?: boolean;
 }
 
 /**
@@ -28,7 +30,12 @@ interface Props {
  *   - A deduplicated, numerically-sorted list of RouteBadges
  *   - An <h1> with the supplied title
  */
-export default function PageHeader({ routes, title, badgeSize = "lg" }: Props) {
+export default function PageHeader({
+  routes,
+  title,
+  badgeSize = "lg",
+  linkBadges = true,
+}: Props) {
   const uniqueSortedRoutes = routes
     .filter(
       (route, index, self) =>
@@ -62,6 +69,11 @@ export default function PageHeader({ routes, title, badgeSize = "lg" }: Props) {
                   color={route.routeColor}
                   textColor={route.routeTextColor}
                   size={badgeSize}
+                  href={
+                    linkBadges
+                      ? `/lines/${getLineSlug(route.routeId)}/`
+                      : undefined
+                  }
                 />
               </li>
             ))}
