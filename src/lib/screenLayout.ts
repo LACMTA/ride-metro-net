@@ -70,6 +70,16 @@ export type ScreenRenderItem =
        * which display the card's full headsign list.
        */
       displayHeadsigns?: string[];
+      /**
+       * Optional: the badge display name for a filtered row — the sub-line
+       * its `headsignFilter` isolates (e.g. "48" of "10/48"), computed at
+       * build time with `resolveSplitLineBadgeName`
+       * (`src/lib/splitLines.ts`) when every matched raw headsign carries
+       * the same sub-line prefix. Undefined on unfiltered rows and on
+       * filtered rows that don't isolate a single sub-line — both badge
+       * with the route's full short name.
+       */
+      badgeName?: string;
     };
 
 /**
@@ -87,16 +97,8 @@ export function matchesHeadsignFilter(
 }
 
 /**
- * The sub-line prefix of a raw GTFS headsign — the text before the first
- * " - " (e.g. "48" in "48 - Avalon Station"). Split-line routes carry their
- * sub-line only here. Null when the headsign has no prefix.
+ * How much vertical space an item occupies, and whether it is a heading.
  */
-export function headsignLinePrefix(rawHeadsign: string): string | null {
-  const idx = rawHeadsign.indexOf(" - ");
-  return idx > 0 ? rawHeadsign.slice(0, idx) : null;
-}
-
-/** How much vertical space an item occupies, and whether it is a heading. */
 export interface ScreenItemMeasure {
   height: number;
   isHeader: boolean;

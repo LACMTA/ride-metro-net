@@ -6,6 +6,7 @@ export type { BadgeSizes };
 interface Props {
   routeId: string;
   routeType: number;
+  /** Display text — the route short name, or the resolved sub-line for a split-line row (see `resolveSplitLineBadgeName` in `src/lib/splitLines.ts`). */
   name: string;
   /** GTFS route_color — hex string without the leading '#' (e.g. "0072BC"). Not required for bus routes (routeType === 3). */
   color?: string;

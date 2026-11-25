@@ -8,7 +8,6 @@ import type {
 import {
   DEFAULT_PAGINATION_INTERVAL_MS,
   DEFAULT_SCREEN_DIMENSIONS,
-  headsignLinePrefix,
   matchesHeadsignFilter,
   measureDisplayOrderEntry,
   packIntoPages,
@@ -19,6 +18,10 @@ import {
   SCREEN_DIMENSIONS_MIN,
   SCREEN_ROW_HEIGHTS,
 } from "../../lib/screenLayout";
+import {
+  headsignLinePrefix,
+  resolveSplitLineBadgeName,
+} from "../../lib/splitLines";
 import type {
   AdminScreenDetail,
   AdminScreenRouteStopInfo,
@@ -888,6 +891,29 @@ export default function ScreenEditor() {
                   .map((option) => option.headsign),
               ),
             ];
+      // The row's badge name — mirroring the sign page's build-time logic: a
+      // headsign filter that isolates one sub-line of a split-line route
+      // (e.g. "48" of "10/48") badges the row as just that sub-line when
+      // every matched raw headsign carries the same sub-line prefix.
+      const matchedRawHeadsigns =
+        filterNeedle === ""
+          ? []
+          : pairHeadsignOptions
+              .filter(
+                (option) =>
+                  (entry.directionId === undefined ||
+                    option.directionId === entry.directionId) &&
+                  matchesHeadsignFilter(filterNeedle, option.rawHeadsign),
+              )
+              .map((option) => option.rawHeadsign);
+      const badgeName =
+        pair &&
+        pair.known &&
+        filterNeedle !== "" &&
+        matchedRawHeadsigns.length > 0
+          ? (resolveSplitLineBadgeName(pair.label, matchedRawHeadsigns) ??
+            undefined)
+          : undefined;
 
       return (
         <li
@@ -915,7 +941,7 @@ export default function ScreenEditor() {
               <RouteBadge
                 routeId={entry.routeId}
                 routeType={pair.routeType}
-                name={pair.label}
+                name={badgeName ?? pair.label}
                 color={pair.routeColor}
                 textColor={pair.routeTextColor}
               />

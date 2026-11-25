@@ -69,7 +69,12 @@ export const badgeSizes: Record<BadgeSizes, SizeConfig> = {
 export interface BadgeStyleInput {
   routeId: string;
   routeType: number;
-  /** Display name (route short name, e.g. "720", "A"). */
+  /**
+   * Display name — the route short name (e.g. "720", "A"), or the resolved
+   * sub-line for a display scoped to one half of a split-line route (e.g.
+   * "48" of "10/48"; see `resolveSplitLineBadgeName` in
+   * `src/lib/splitLines.ts`).
+   */
   name: string;
   /** GTFS route_color — hex string without the leading '#' (e.g. "0072BC"). */
   color?: string;

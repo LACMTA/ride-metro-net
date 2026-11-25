@@ -19,6 +19,7 @@ import {
   SCREEN_ROW_HEIGHTS,
   type ScreenRenderItem,
 } from "../../lib/screenLayout";
+import { resolveSplitLineBadgeName } from "../../lib/splitLines";
 import {
   getPairRawHeadsigns,
   pairHeadsignsKey,
@@ -138,9 +139,9 @@ function isRouteStopComponent(
 // Split-line support: route-stop entries with a `headsignFilter` render only
 // the arrivals — and headsign text — whose raw GTFS stop_headsign contains
 // the filter, so split-line routes (two lines under one route ID, e.g.
-// "10/48") can be split into one row per sub-line. The same substring
-// concept as the line map's `stopHeadsignFilter`. Only pairs that actually
-// use a filter are queried.
+// "10/48") can be split into one row per sub-line, each badging as just its
+// sub-line. The same substring concept as the line map's
+// `stopHeadsignFilter`. Only pairs that actually use a filter are queried.
 // ---------------------------------------------------------------------------
 const filteredPairs: { routeId: string; stopId: string }[] = [];
 const seenFilteredPairs = new Set<string>();
@@ -190,17 +191,15 @@ function resolveRenderItems(
           continue;
         }
         // Split-line rows show only the processed texts of the raw headsigns
-        // matching the filter for this card's direction.
+        // matching the filter for this card's direction — and badge as just
+        // the sub-line when every matched headsign carries the same prefix.
+        const matchedRows = pairRows.filter(
+          (row) =>
+            row.directionId === route.directionId &&
+            matchesHeadsignFilter(headsignFilter, row.rawHeadsign),
+        );
         const displayHeadsigns = [
-          ...new Set(
-            pairRows
-              .filter(
-                (row) =>
-                  row.directionId === route.directionId &&
-                  matchesHeadsignFilter(headsignFilter, row.rawHeadsign),
-              )
-              .map((row) => row.headsign),
-          ),
+          ...new Set(matchedRows.map((row) => row.headsign)),
         ];
         if (displayHeadsigns.length === 0) {
           console.warn(
@@ -208,11 +207,16 @@ function resolveRenderItems(
           );
           continue;
         }
+        const badgeName = resolveSplitLineBadgeName(
+          route.routeShortName,
+          matchedRows.map((row) => row.rawHeadsign),
+        );
         items.push({
           type: "route",
           route,
           headsignFilter,
           displayHeadsigns,
+          ...(badgeName && { badgeName }),
         });
       }
     } else if (isHeaderComponent(entry)) {
