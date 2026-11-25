@@ -55,91 +55,103 @@
       },
       {
         "component": "route-stop",
-        "routeId": "487",
-        "stopId": "3300",
-        "directionId": 0,
-        "headsignFilter": "487"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "487",
-        "stopId": "3301",
-        "directionId": 1,
-        "headsignFilter": "487"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "487",
-        "stopId": "3300",
-        "directionId": 0,
-        "headsignFilter": "489"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "487",
-        "stopId": "3301",
-        "directionId": 1,
-        "headsignFilter": "489"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "40",
-        "stopId": "30000"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "40",
-        "stopId": "652"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "40",
-        "stopId": "683"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "33",
-        "stopId": "30000"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "33",
-        "stopId": "652"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "70",
-        "stopId": "3103"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "70",
-        "stopId": "683"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "74",
-        "stopId": "3103"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "74",
-        "stopId": "683"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "78",
-        "stopId": "3103"
-      },
-      {
-        "component": "route-stop",
-        "routeId": "78",
-        "stopId": "683"
-      },
-      {
-        "component": "route-stop",
         "routeId": "28",
-        "stopId": "683"
+        "stopId": "683",
+        "directionId": 1
+      },
+      {
+        "component": "route-stop",
+        "routeId": "33",
+        "stopId": "30000",
+        "directionId": 1
+      },
+      {
+        "component": "route-stop",
+        "routeId": "33",
+        "stopId": "652",
+        "directionId": 0
+      },
+      {
+        "component": "route-stop",
+        "routeId": "40",
+        "stopId": "30000",
+        "directionId": 1
+      },
+      {
+        "component": "route-stop",
+        "routeId": "40",
+        "stopId": "652",
+        "directionId": 0
+      },
+      {
+        "component": "route-stop",
+        "routeId": "40",
+        "stopId": "683",
+        "directionId": 1
+      },
+      {
+        "component": "route-stop",
+        "routeId": "70",
+        "stopId": "3103",
+        "directionId": 0
+      },
+      {
+        "component": "route-stop",
+        "routeId": "70",
+        "stopId": "683",
+        "directionId": 1
+      },
+      {
+        "component": "route-stop",
+        "routeId": "74",
+        "stopId": "3103",
+        "directionId": 0
+      },
+      {
+        "component": "route-stop",
+        "routeId": "74",
+        "stopId": "683",
+        "directionId": 1
+      },
+      {
+        "component": "route-stop",
+        "routeId": "78",
+        "stopId": "3103",
+        "directionId": 0
+      },
+      {
+        "component": "route-stop",
+        "routeId": "78",
+        "stopId": "683",
+        "directionId": 1
+      },
+      {
+        "component": "route-stop",
+        "routeId": "487",
+        "stopId": "3300",
+        "directionId": 0,
+        "headsignFilter": "487"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "487",
+        "stopId": "3301",
+        "directionId": 1,
+        "headsignFilter": "487"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "487",
+        "stopId": "3300",
+        "directionId": 0,
+        "headsignFilter": "489"
+      },
+      {
+        "component": "route-stop",
+        "routeId": "487",
+        "stopId": "3301",
+        "directionId": 1,
+        "headsignFilter": "489"
       }
     ],
     "fixedComponents": [

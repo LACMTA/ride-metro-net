@@ -18,13 +18,28 @@ const includeAnalytics = import.meta.env.PROD && !screen;
     <meta name="viewport" content="width=device-width" />
     {includeAnalytics && <AnalyticsHead />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link
-      rel="preload"
-      href="/fonts/atkinson-hyperlegible-regular.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
+    {
+      /* Screen signs render in DIN Pro (`src/styles/din.css`) and every other
+         page in Atkinson Hyperlegible — preload whichever face the page will
+         actually render first. */
+      screen ? (
+        <link
+          rel="preload"
+          href="/fonts/DINPro.otf"
+          as="font"
+          type="font/otf"
+          crossorigin
+        />
+      ) : (
+        <link
+          rel="preload"
+          href="/fonts/atkinson-hyperlegible-regular.woff2"
+          as="font"
+          type="font/woff2"
+          crossorigin
+        />
+      )
+    }
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>

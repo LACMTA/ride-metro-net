@@ -1,0 +1,24 @@
+/* DIN Pro — used only by the physical-screen sign pages
+   (`/screens/[signId]`), which import this file so the @font-face rules ship
+   only with those pages; every other page keeps the site-wide Atkinson
+   Hyperlegible (`fonts.css`). Only the faces the sign board actually renders
+   are declared: the board uses regular text and `font-bold` rows/badges — no
+   italics or intermediate weights. Other DIN Pro faces (Medium, Black,
+   condensed variants, italics) are available in `public/fonts` and can be
+   declared here on demand. */
+
+@font-face {
+  font-family: "DIN Pro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/DINPro.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "DIN Pro";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/DINPro-Bold.otf") format("opentype");
+}

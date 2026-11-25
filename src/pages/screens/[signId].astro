@@ -28,6 +28,7 @@ import {
 import DataInjector from "../../components/DataInjector.astro";
 import ScreenItem from "../../components/ScreenItem.astro";
 import Layout from "../../layouts/Layout.astro";
+import "../../styles/din.css";
 
 /**
  * /screens/[signId].astro
@@ -396,6 +397,26 @@ const pageCount = pages.length;
 </Layout>
 
 <style is:global>
+  /* Sign boards render in DIN Pro instead of the site-wide Atkinson
+     Hyperlegible — the faces are declared in `src/styles/din.css`, imported
+     by this page only. Scoped to the board so everything else (including all
+     other pages) keeps the default font. */
+  #screen-board {
+    font-family: "DIN Pro", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Optical badge centering: DIN Pro's inflated hhea metrics (ascent 1.041em
+     / descent 0.237em, cap height 0.712em) push the baseline down inside the
+     flex-centered badge, so letters sit ~1.7px below the circle's optical
+     center at the xl badge's 36px font. padding-bottom lifts the centered
+     line box by half its value, and it's em-based so it scales with badge
+     size — the border-box badge height keeps the circle geometry identical.
+     Scoped to signs: the rest of the site keeps Atkinson, which centers fine.
+     Tune: each 0.01em ≈ ±0.18px of lift at 36px. */
+  #screen-board .screen-route-badge {
+    padding-bottom: 0.092em; /* (ascent − descent − cap) of DIN Pro */
+  }
+
   /* Progress ring around the active pagination dot — animated over one
      page-flip interval by the page script (which builds the dots markup). */
   @keyframes screen-page-progress {
