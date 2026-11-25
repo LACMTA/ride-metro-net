@@ -22,6 +22,10 @@ import {
   headsignLinePrefix,
   resolveSplitLineBadgeName,
 } from "../../lib/splitLines";
+import {
+  pairCoverageCellLabel,
+  uncoveredPairCells,
+} from "../../lib/admin/pairCoverage";
 import type {
   AdminScreenDetail,
   AdminScreenRouteStopInfo,
@@ -153,28 +157,22 @@ export default function ScreenEditor() {
       draft !== null &&
       JSON.stringify(draft) !== JSON.stringify(baseline);
 
-  // Keys ("routeId:stopId") of route-stop entries in either draft list that
-  // are fully UNSCOPED — no headsign filter and no direction. An unscoped
-  // entry renders everything the pair serves, fully consuming the pair — it
-  // disappears from the available list. Entries scoped by a headsign filter
-  // or a direction only cover part of the pair, so the pair stays available
-  // for complementary rows (the other split-line or the other direction).
-  const draftUnscopedPairKeys = useMemo(
-    () =>
-      new Set(
-        (draft
-          ? [...draft.fixedComponents, ...draft.displayOrder]
-          : []
-        ).flatMap((entry) =>
-          entry.component === "route-stop" &&
-          !entry.headsignFilter &&
-          entry.directionId === undefined
-            ? [`${entry.routeId}:${entry.stopId}`]
-            : [],
-        ),
-      ),
-    [draft?.fixedComponents, draft?.displayOrder],
-  );
+  // Draft route-stop entries grouped per pair — the configured rows the
+  // coverage math checks against. Route IDs are normalized to their stable
+  // prefix, exactly like the duplicate detection the server applies on save.
+  const draftPairEntries = useMemo(() => {
+    const byPair = new Map<string, ScreenRouteStopComponent[]>();
+    for (const entry of draft
+      ? [...draft.fixedComponents, ...draft.displayOrder]
+      : []) {
+      if (entry.component !== "route-stop") continue;
+      const key = `${entry.routeId.trim().split("-")[0]}:${entry.stopId.trim()}`;
+      const entries = byPair.get(key);
+      if (entries) entries.push(entry);
+      else byPair.set(key, [entry]);
+    }
+    return byPair;
+  }, [draft?.fixedComponents, draft?.displayOrder]);
 
   // Route-stop identities that appear more than once across both draft
   // lists — the exact combinations the server rejects as duplicates on
@@ -214,15 +212,34 @@ export default function ScreenEditor() {
     return map;
   }, [servingPairs, stalePairs]);
 
-  // Route-stop pairs serving the draft stops but not already shown unscoped
-  // in the display order.
-  const availablePairs = useMemo(
-    () =>
-      servingPairs.filter(
-        (pair) => !draftUnscopedPairKeys.has(`${pair.routeId}:${pair.stopId}`),
-      ),
-    [servingPairs, draftUnscopedPairKeys],
-  );
+  // Route-stop pairs serving the draft stops that the draft rows don't fully
+  // cover yet — a pair stays listed while at least one of its served
+  // directions or raw headsigns is rendered by no configured row, and
+  // disappears once every cell is covered (an unscoped row covers everything;
+  // rows scoped by a direction or a headsign filter cover only their own
+  // slice). The uncovered cells per pair are kept so partially covered rows
+  // can show what's still missing.
+  const { availablePairs, uncoveredCellsByPairKey } = useMemo(() => {
+    const available: AdminScreenRouteStopInfo[] = [];
+    const uncoveredByPairKey = new Map<
+      string,
+      ReturnType<typeof uncoveredPairCells>
+    >();
+    for (const pair of servingPairs) {
+      const key = `${pair.routeId}:${pair.stopId}`;
+      const uncovered = uncoveredPairCells(
+        pair,
+        draftPairEntries.get(key) ?? [],
+      );
+      if (uncovered.length === 0) continue;
+      available.push(pair);
+      uncoveredByPairKey.set(key, uncovered);
+    }
+    return {
+      availablePairs: available,
+      uncoveredCellsByPairKey: uncoveredByPairKey,
+    };
+  }, [servingPairs, draftPairEntries]);
 
   // Rows-per-page / page-count estimate for the draft, using the same
   // build-time packing math as the sign page. Approximate: each entry
@@ -1551,16 +1568,17 @@ export default function ScreenEditor() {
               Available route-stop pairs
             </h2>
             <p className="text-secondary-text mb-3 text-sm">
-              Route-stop pairs serving the selected stops but not already shown
-              unscoped — one entry per (route, stop), so you can add the exact
-              pair the sign should show and intentionally exclude duplicates
-              when several nearby stops serve the same route. Each row lists the
-              raw headsigns the pair runs under (e.g.{" "}
+              Route-stop pairs serving the selected stops that the display order
+              doesn't fully cover yet — one entry per (route, stop), so you can
+              add the exact pair the sign should show and intentionally exclude
+              duplicates when several nearby stops serve the same route. Each
+              row lists the raw headsigns the pair runs under (e.g.{" "}
               <code>48 - Avalon Station</code>) — the text a headsign filter
-              matches against. Adding one appends it to the end of the display
-              order above; a pair already shown only scoped by a headsign filter
-              or a direction stays here so its other lines and directions can be
-              added too.
+              matches against. A pair disappears once some configured row covers
+              every direction and headsign it serves; rows scoped by a direction
+              or a headsign filter cover only their own slice, so a partially
+              covered pair stays listed with the headsigns still missing. Adding
+              one appends it to the end of the display order above.
             </p>
             <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
               {availablePairs.length === 0 ? (
@@ -1568,40 +1586,54 @@ export default function ScreenEditor() {
                   No additional route-stop pairs serve the selected stops.
                 </li>
               ) : (
-                availablePairs.map((pair) => (
-                  <li
-                    key={`${pair.routeId}:${pair.stopId}`}
-                    className="flex items-center gap-3 px-3 py-2"
-                  >
-                    <RouteBadge
-                      routeId={pair.routeId}
-                      routeType={pair.routeType}
-                      name={pair.label}
-                      color={pair.routeColor}
-                      textColor={pair.routeTextColor}
-                    />
-                    <span className="text-secondary-text min-w-0 flex-1 text-sm">
-                      {pair.headsignOptions.length > 0
-                        ? pair.headsignOptions
-                            .map((option) => option.rawHeadsign)
-                            .join(" / ")
-                        : pair.headsigns.join(" / ") || pair.longName}
-                    </span>
-                    <span className="text-metro-text text-sm whitespace-nowrap">
-                      {pair.stopName}
-                    </span>
-                    <span className="text-secondary-text font-mono text-xs whitespace-nowrap">
-                      {pair.stopId}
-                    </span>
-                    <button
-                      type="button"
-                      className="text-link shrink-0 cursor-pointer text-sm"
-                      onClick={() => addPair(pair)}
+                availablePairs.map((pair) => {
+                  const pairKey = `${pair.routeId}:${pair.stopId}`;
+                  const uncovered = draftPairEntries.has(pairKey)
+                    ? uncoveredCellsByPairKey.get(pairKey)
+                    : undefined;
+                  return (
+                    <li
+                      key={pairKey}
+                      className="flex items-center gap-3 px-3 py-2"
                     >
-                      Add
-                    </button>
-                  </li>
-                ))
+                      <RouteBadge
+                        routeId={pair.routeId}
+                        routeType={pair.routeType}
+                        name={pair.label}
+                        color={pair.routeColor}
+                        textColor={pair.routeTextColor}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-secondary-text block text-sm">
+                          {pair.headsignOptions.length > 0
+                            ? pair.headsignOptions
+                                .map((option) => option.rawHeadsign)
+                                .join(" / ")
+                            : pair.headsigns.join(" / ") || pair.longName}
+                        </span>
+                        {uncovered && (
+                          <span className="text-secondary-text block text-xs">
+                            Not yet shown:{" "}
+                            {uncovered.map(pairCoverageCellLabel).join(" / ")}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-metro-text text-sm whitespace-nowrap">
+                        {pair.stopName}
+                      </span>
+                      <span className="text-secondary-text font-mono text-xs whitespace-nowrap">
+                        {pair.stopId}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-link shrink-0 cursor-pointer text-sm"
+                        onClick={() => addPair(pair)}
+                      >
+                        Add
+                      </button>
+                    </li>
+                  );
+                })
               )}
             </ul>
           </section>
