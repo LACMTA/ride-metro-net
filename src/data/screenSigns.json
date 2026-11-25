@@ -108,11 +108,6 @@
       },
       {
         "component": "route-stop",
-        "routeId": "33",
-        "stopId": "683"
-      },
-      {
-        "component": "route-stop",
         "routeId": "70",
         "stopId": "3103"
       },
