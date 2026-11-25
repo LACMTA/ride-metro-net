@@ -46,11 +46,17 @@ export default function RoutePrediction({
   }
 
   const filter = headsignFilter?.trim() ?? "";
+  // Each destination's predictions are time-sorted by the API, but a row can
+  // match several destinations (a direction with multiple headsigns, a
+  // split-line filter matching several raw headsigns, …), and flat-mapping
+  // concatenates their per-destination arrays without a global order —
+  // sort the merged list by absolute arrival time so countdowns ascend.
   const predictions = routePred.destinations
     .filter((d) => d.directionId === String(directionId))
     .filter((d) => stopId === undefined || d.stopId === stopId)
     .filter((d) => matchesHeadsignFilter(filter, d.rawHeadsign))
-    .flatMap((d) => d.predictions);
+    .flatMap((d) => d.predictions)
+    .sort((a, b) => a.time - b.time);
 
   if (predictions.length === 0) {
     return <p>No predictions available</p>;
