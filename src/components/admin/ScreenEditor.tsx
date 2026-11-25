@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import RouteBadge from "../RouteBadge";
-import type { DisplayOrderEntry, ScreenDimensions } from "../../data/types";
+import type {
+  DisplayOrderEntry,
+  ScreenDimensions,
+  ScreenRouteStopComponent,
+} from "../../data/types";
 import {
   DEFAULT_PAGINATION_INTERVAL_MS,
   DEFAULT_SCREEN_DIMENSIONS,
@@ -25,7 +29,7 @@ import type {
 
 const SELECT_CLASS = "border-divider-line rounded border px-2 py-1";
 const INPUT_CLASS = SELECT_CLASS;
-const BUTTON_CLASS = SELECT_CLASS;
+const BUTTON_CLASS = SELECT_CLASS + " cursor-pointer disabled:cursor-default";
 
 /** URL-safe kebab-case slug pattern — matches the server's validation. */
 const SIGN_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -58,6 +62,18 @@ interface StopInfo {
   isParentStation: boolean;
   /** False when the stop no longer exists in the GTFS database. */
   found: boolean;
+}
+
+/**
+ * The identity key of a route-stop entry — (route, stop, direction, trimmed
+ * headsignFilter), with the route ID normalized to its stable prefix,
+ * exactly mirroring the duplicate detection the server applies on save
+ * (`src/lib/admin/screenSignsFile.ts`). The same pair may appear multiple
+ * times only with different keys (different headsign filters or
+ * directions) — one entry per split-line sub-line.
+ */
+function routeStopIdentityKey(entry: ScreenRouteStopComponent): string {
+  return `${entry.routeId.trim().split("-")[0]}:${entry.stopId.trim()}:${entry.directionId ?? "*"}:${entry.headsignFilter?.trim() ?? "*"}`;
 }
 
 /** fetch + JSON helper that surfaces API validation errors as messages. */
@@ -156,6 +172,27 @@ export default function ScreenEditor() {
       ),
     [draft?.fixedComponents, draft?.displayOrder],
   );
+
+  // Route-stop identities that appear more than once across both draft
+  // lists — the exact combinations the server rejects as duplicates on
+  // save. Duplicating a row to split a split-line route only becomes valid
+  // once each copy's headsign filter diverges, so affected rows are
+  // flagged inline.
+  const draftDuplicateIdentityKeys = useMemo(() => {
+    const entries = draft
+      ? [...draft.fixedComponents, ...draft.displayOrder]
+      : [];
+    const counts = new Map<string, number>();
+    for (const entry of entries) {
+      if (entry.component !== "route-stop") continue;
+      const key = routeStopIdentityKey(entry);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const duplicatedKeys = [...counts]
+      .filter(([, count]) => count > 1)
+      .map(([key]) => key);
+    return new Set(duplicatedKeys);
+  }, [draft?.fixedComponents, draft?.displayOrder]);
 
   // Serving-pair keys — used to flag draft pairs that no longer serve.
   const servingPairKeys = useMemo(
@@ -479,6 +516,24 @@ export default function ScreenEditor() {
   }
 
   /**
+   * Inserts a copy of a route-stop entry directly below the original,
+   * keeping its direction and headsign filter — the starting point for
+   * splitting a split-line route into one row per sub-line: give each copy
+   * a different headsign filter (e.g. "10" and "48"). The copy is flagged
+   * inline until its filter diverges; the server rejects exact duplicates
+   * on save.
+   */
+  function duplicateEntry(list: ListKey, index: number): void {
+    mutateList(list, (entries) => {
+      const entry = entries[index];
+      if (!entry || entry.component !== "route-stop") return entries;
+      const next = [...entries];
+      next.splice(index + 1, 0, { ...entry });
+      return next;
+    });
+  }
+
+  /**
    * Moves an entry between the fixed and paginated lists — to the end of
    * the other list.
    */
@@ -738,7 +793,7 @@ export default function ScreenEditor() {
       list === "displayOrder" ? (
         <button
           type="button"
-          className="text-secondary-text hover:text-metro-text shrink-0 px-1 text-xs"
+          className="text-secondary-text hover:text-metro-text shrink-0 cursor-pointer px-1 text-xs"
           aria-label="Move to the fixed components"
           onClick={() => moveBetweenLists("displayOrder", index)}
         >
@@ -747,7 +802,7 @@ export default function ScreenEditor() {
       ) : (
         <button
           type="button"
-          className="text-secondary-text hover:text-metro-text shrink-0 px-1 text-xs"
+          className="text-secondary-text hover:text-metro-text shrink-0 cursor-pointer px-1 text-xs"
           aria-label="Move to the paginated display order"
           onClick={() => moveBetweenLists("fixedComponents", index)}
         >
@@ -763,6 +818,12 @@ export default function ScreenEditor() {
         pair?.stopName ??
         stopInfoRef.current.get(entry.stopId)?.stopName ??
         entry.stopId;
+      // Whether this row's identity is duplicated elsewhere on the sign —
+      // the server rejects exact duplicates on save, so such rows are
+      // flagged inline until their headsign filters diverge.
+      const duplicateIdentity = draftDuplicateIdentityKeys.has(
+        routeStopIdentityKey(entry),
+      );
 
       // The raw headsigns this pair runs under — what a headsignFilter
       // matches against. Split-line sub-lines are only distinguishable
@@ -883,11 +944,24 @@ export default function ScreenEditor() {
                   not currently serving
                 </span>
               )}
+              {duplicateIdentity && (
+                <span className="text-error text-xs font-bold">
+                  duplicate — give each copy a different headsign filter
+                </span>
+              )}
             </div>
             {moveButton}
             <button
               type="button"
-              className="text-secondary-text hover:text-metro-text shrink-0 px-1 text-sm"
+              className="text-secondary-text hover:text-metro-text shrink-0 cursor-pointer px-1 text-xs"
+              aria-label={`Duplicate ${entry.routeId} at ${entry.stopId} — inserts a copy below to scope to another split-line sub-line`}
+              onClick={() => duplicateEntry(list, index)}
+            >
+              Duplicate
+            </button>
+            <button
+              type="button"
+              className="text-secondary-text hover:text-metro-text shrink-0 cursor-pointer px-1 text-sm disabled:cursor-default"
               aria-label={`Move ${entry.routeId} at ${entry.stopId} up`}
               disabled={index === 0}
               onClick={() => moveEntry(list, index, -1)}
@@ -896,7 +970,7 @@ export default function ScreenEditor() {
             </button>
             <button
               type="button"
-              className="text-secondary-text hover:text-metro-text shrink-0 px-1 text-sm"
+              className="text-secondary-text hover:text-metro-text shrink-0 cursor-pointer px-1 text-sm disabled:cursor-default"
               aria-label={`Move ${entry.routeId} at ${entry.stopId} down`}
               disabled={last}
               onClick={() => moveEntry(list, index, 1)}
@@ -905,7 +979,7 @@ export default function ScreenEditor() {
             </button>
             <button
               type="button"
-              className="text-error shrink-0 px-1 text-sm"
+              className="text-error shrink-0 cursor-pointer px-1 text-sm"
               aria-label={`Remove ${entry.routeId} at ${entry.stopId} from ${list === "displayOrder" ? "display order" : "fixed components"}`}
               onClick={() => removeEntry(list, index)}
             >
@@ -999,7 +1073,7 @@ export default function ScreenEditor() {
         {moveButton}
         <button
           type="button"
-          className="text-secondary-text hover:text-metro-text px-1 text-sm"
+          className="text-secondary-text hover:text-metro-text cursor-pointer px-1 text-sm disabled:cursor-default"
           aria-label="Move header up"
           disabled={index === 0}
           onClick={() => moveEntry(list, index, -1)}
@@ -1008,7 +1082,7 @@ export default function ScreenEditor() {
         </button>
         <button
           type="button"
-          className="text-secondary-text hover:text-metro-text px-1 text-sm"
+          className="text-secondary-text hover:text-metro-text cursor-pointer px-1 text-sm disabled:cursor-default"
           aria-label="Move header down"
           disabled={last}
           onClick={() => moveEntry(list, index, 1)}
@@ -1017,7 +1091,7 @@ export default function ScreenEditor() {
         </button>
         <button
           type="button"
-          className="text-error px-1 text-sm"
+          className="text-error cursor-pointer px-1 text-sm"
           aria-label="Remove header"
           onClick={() => removeEntry(list, index)}
         >
@@ -1117,7 +1191,7 @@ export default function ScreenEditor() {
               <>
                 <button
                   type="button"
-                  className="border-error text-error hover:bg-xlight-red rounded border px-2 py-1"
+                  className="border-error text-error hover:bg-xlight-red cursor-pointer rounded border px-2 py-1"
                   onClick={deleteSign}
                 >
                   Delete…
@@ -1180,7 +1254,7 @@ export default function ScreenEditor() {
                     <span className="flex-1" />
                     <button
                       type="button"
-                      className="text-error px-1 text-sm"
+                      className="text-error cursor-pointer px-1 text-sm"
                       aria-label={`Remove stop ${stopId}`}
                       onClick={() => removeStop(stopId)}
                     >
@@ -1222,7 +1296,7 @@ export default function ScreenEditor() {
                       <li key={stop.stopId}>
                         <button
                           type="button"
-                          className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-100 disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent"
+                          className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left hover:bg-gray-100 disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent"
                           disabled={added}
                           onClick={() => addStop(stop)}
                         >
@@ -1394,7 +1468,8 @@ export default function ScreenEditor() {
               rail direction at a station), and its headsign filter limits it to
               arrivals whose raw headsign contains that text — add the same pair
               twice with different filters (e.g. &quot;10&quot; and
-              &quot;48&quot;) to split a split-line route into one row per line.
+              &quot;48&quot;) to split a split-line route into one row per line;
+              a row&apos;s Duplicate button inserts such a copy in one click.
               Entries that no longer serve the sign&apos;s stops are kept and
               flagged; the sign page skips them. Headers render as full-width
               section headings. When this list overflows the screen it splits
@@ -1494,7 +1569,7 @@ export default function ScreenEditor() {
                     </span>
                     <button
                       type="button"
-                      className="text-link shrink-0 text-sm"
+                      className="text-link shrink-0 cursor-pointer text-sm"
                       onClick={() => addPair(pair)}
                     >
                       Add
