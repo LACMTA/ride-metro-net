@@ -43,8 +43,13 @@ interface ChildStopRow {
   stop_id: string;
 }
 
+interface StopNameRow {
+  stop_name: string;
+}
+
 let preparedQuery: Database.Statement | null = null;
 let preparedChildStopsQuery: Database.Statement | null = null;
+let preparedStopNameQuery: Database.Statement | null = null;
 
 const query = `
     WITH
@@ -100,6 +105,19 @@ const query = `
             WHERE st2.trip_id = stop_data.trip_id
           ) THEN 1 ELSE 0
         END) AS has_stops_after,
+        -- 1 if any trip of this route/direction continues from this stop to a
+        -- downstream stop that allows pickup (a rider boarding here can be
+        -- carried somewhere); 0 when every trip either ends here or continues
+        -- only to non-passenger layover stops (pickup_type = 1). The bus
+        -- filter below uses this to drop "boarding terminus" directions.
+        MAX(CASE
+          WHEN EXISTS (
+            SELECT 1 FROM stop_times s3
+            WHERE s3.trip_id = stop_data.trip_id
+              AND s3.stop_sequence > stop_data.stop_sequence
+              AND COALESCE(s3.pickup_type, 0) != 1
+          ) THEN 1 ELSE 0
+        END) AS has_pickup_after,
         MIN(stop_data.stop_id) AS child_stop_id,
         (
           SELECT JSON_GROUP_ARRAY(headsign)
@@ -157,6 +175,19 @@ const query = `
         route_headsigns.route_type != 3
         AND route_headsigns.has_stops_after = 0
       )
+      -- For bus routes, exclude a direction that is a "boarding terminus" at
+      -- this stop: every trip either ends here or continues only to
+      -- layover-only stops (pickup_type = 1), so riders boarding here cannot
+      -- be carried anywhere — its predictions are arrivals of trips ending
+      -- here, not departures. Unlike the origin rule above, this also covers
+      -- terminus stops where the return direction departs from a different
+      -- stop (e.g. route 28 terminates at Vignes/Cesar Chavez but departs
+      -- from the opposite corner), which the same-stop origin rule cannot
+      -- see.
+      AND NOT (
+        route_headsigns.route_type = 3
+        AND route_headsigns.has_pickup_after = 0
+      )
     GROUP BY stops.stop_id, stops.stop_name;
         `;
 
@@ -178,29 +209,59 @@ function getPreparedChildStopsQuery() {
   return preparedChildStopsQuery;
 }
 
+function getPreparedStopNameQuery(): Database.Statement {
+  if (!preparedStopNameQuery) {
+    preparedStopNameQuery = getGtfsDb().prepare(
+      `SELECT stop_name FROM stops WHERE stop_id = @stopId`,
+    );
+  }
+  return preparedStopNameQuery;
+}
+
 export default async function (stopId: string) {
   const mainQuery = getPreparedQuery();
-  const res = mainQuery.get({ stopId }) as DatabaseQueryResult;
+  const res = mainQuery.get({ stopId }) as DatabaseQueryResult | undefined;
 
   const childRows = getPreparedChildStopsQuery().all({
     stopId,
   }) as ChildStopRow[];
 
-  const routes = (objectToCamel(JSON.parse(res.routes)) as StopRoute[]).map(
-    (route) => {
-      // Normalize routeId to the stable prefix (e.g. "901-13196" → "901")
-      route.routeId = route.routeId.split("-")[0];
-      if (!route.routeShortName) {
-        route.routeShortName =
-          ROUTE_SHORT_NAME_OVERRIDES[route.routeId] ?? route.routeShortName;
-      }
-      return route;
-    },
-  );
+  // The direction filters can exclude every route a stop serves — e.g. a
+  // curbside bus terminus whose only directions are arrival-side (routes
+  // 28/33 at Vignes/Cesar Chavez), or a layover-only stop. The main query
+  // returns no rows then, so resolve the stop's name separately and return an
+  // empty route list rather than crashing callers — the stop page renders its
+  // usual shell with no route cards, and the screens/admin callers already
+  // treat stops without pairs as empty.
+  let stopName: string;
+  let routeRows: StopRoute[];
+  if (res) {
+    stopName = res.stop_name;
+    routeRows = objectToCamel(JSON.parse(res.routes)) as StopRoute[];
+  } else {
+    const stopRow = getPreparedStopNameQuery().get({ stopId }) as
+      | StopNameRow
+      | undefined;
+    if (!stopRow) {
+      throw new Error(`No stop found for stopId: ${stopId}`);
+    }
+    stopName = stopRow.stop_name;
+    routeRows = [];
+  }
+
+  const routes = routeRows.map((route) => {
+    // Normalize routeId to the stable prefix (e.g. "901-13196" → "901")
+    route.routeId = route.routeId.split("-")[0];
+    if (!route.routeShortName) {
+      route.routeShortName =
+        ROUTE_SHORT_NAME_OVERRIDES[route.routeId] ?? route.routeShortName;
+    }
+    return route;
+  });
 
   const stop: StopWithRoutes = {
-    stopName: res.stop_name,
-    stopId: res.stop_id,
+    stopName,
+    stopId: res?.stop_id ?? stopId,
     childStopIds: childRows.map((r) => r.stop_id),
     routes,
   };
