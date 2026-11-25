@@ -3,6 +3,7 @@ import {
   routePredictions,
   predictionsRequestStatus,
 } from "../lib/routePredictionsStore";
+import { matchesHeadsignFilter } from "../lib/screenLayout";
 
 interface Props {
   routeId: string;
@@ -13,12 +14,21 @@ interface Props {
    * are shown; otherwise predictions across all polled stops are merged.
    */
   stopId?: string;
+  /**
+   * Optional: only show arrivals whose raw GTFS stop_headsign contains this
+   * substring (case-insensitive). Split-line routes run two lines under one
+   * GTFS route ID, distinguishable only by the raw headsign's prefix
+   * ("48 - Avalon Station" vs "10 - Downtown LA - 7th - Hill") — sign rows
+   * use this to show each sub-line's arrivals separately.
+   */
+  headsignFilter?: string;
 }
 
 export default function RoutePrediction({
   routeId,
   directionId,
   stopId,
+  headsignFilter,
 }: Props) {
   const $routePredictions = useStore(routePredictions);
   const $predictionsRequestStatus = useStore(predictionsRequestStatus);
@@ -35,9 +45,11 @@ export default function RoutePrediction({
     return <>No predictions available</>;
   }
 
+  const filter = headsignFilter?.trim() ?? "";
   const predictions = routePred.destinations
     .filter((d) => d.directionId === String(directionId))
     .filter((d) => stopId === undefined || d.stopId === stopId)
+    .filter((d) => matchesHeadsignFilter(filter, d.rawHeadsign))
     .flatMap((d) => d.predictions);
 
   if (predictions.length === 0) {

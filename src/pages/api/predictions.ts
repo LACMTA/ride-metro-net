@@ -22,7 +22,20 @@ const DEFAULT_PREDICTIONS_LIMIT = 3;
 export type RoutePredictions = {
   destinations: {
     directionId: string;
+    /**
+     * Display text: the raw headsign with its "Line - " prefix stripped
+     * (e.g. "Avalon Station"). Identical between split-line sub-lines that
+     * share a destination — filter by `rawHeadsign` instead.
+     */
     headsign: string;
+    /**
+     * The full GTFS `stop_headsign` (e.g. "48 - Avalon Station").
+     * Destinations are grouped by this, so split-line sub-lines that share
+     * display text ("48 - Melrose - Vine" vs "10 - Melrose - Vine") stay
+     * separate — clients filter sign rows' headsign filters against it.
+     * Empty when the trip's stop_times row has no headsign.
+     */
+    rawHeadsign: string;
     /**
      * The GTFS stop ID these predictions are recorded against. Destinations
      * are never merged across stops, so multi-stop requests can attribute
@@ -70,8 +83,9 @@ interface PredictionRow {
  * @param {number} [limit] - Maximum number of predictions to return per route per direction per stop.
  *   The soonest arrivals across all headsigns in a direction at one stop are kept. Defaults to 3.
  * @returns {RoutePredictions[]} Aggregated array of predictions across all requested stops.
- *   Destinations are grouped per direction + headsign per stop (never merged
- *   across stops), so each arrival is attributable to its exact stop.
+ *   Destinations are grouped per direction + raw headsign per stop (never merged
+ *   across stops), so each arrival is attributable to its exact stop — and
+ *   split-line sub-lines sharing display text stay distinguishable.
  */
 export async function GET(context: import("astro").APIContext) {
   const stopIdParam = context.url.searchParams.get("stopId");
@@ -156,9 +170,11 @@ export async function GET(context: import("astro").APIContext) {
   // Group flat rows into RoutePredictions shape, keyed by route_id.
   // Predictions across all requested stop IDs are merged into a single entry
   // per route so the client sees one unified predictions list per line, but
-  // destinations are grouped per direction + headsign per stop (never
+  // destinations are grouped per direction + raw headsign per stop (never
   // merged across stops) so each arrival stays attributable to its exact
-  // stop.
+  // stop — and split-line sub-lines that share processed display text
+  // (e.g. "48 - Melrose - Vine" vs "10 - Melrose - Vine") stay separate,
+  // letting sign rows filter arrivals by the raw headsign.
   const byRoute = new Map<string, RoutePredictions>();
 
   for (const row of rows) {
@@ -170,7 +186,9 @@ export async function GET(context: import("astro").APIContext) {
     if (arrivalTs === null) continue;
 
     // Strip "Route Name - " prefix from headsign
-    // e.g. "Metro A Line - Pomona Station" → "Pomona Station"
+    // e.g. "Metro A Line - Pomona Station" → "Pomona Station".
+    // The raw headsign is kept too: split-line sub-lines are only
+    // distinguishable by its prefix ("48 - Avalon Station").
     const rawHeadsign = row.raw_headsign ?? "";
     const dashIdx = rawHeadsign.indexOf(" - ");
     const headsign =
@@ -195,13 +213,14 @@ export async function GET(context: import("astro").APIContext) {
     let dest = routePred.destinations.find(
       (d) =>
         d.directionId === directionId &&
-        d.headsign === headsign &&
+        d.rawHeadsign === rawHeadsign &&
         d.stopId === row.stop_id,
     );
     if (!dest) {
       dest = {
         directionId,
         headsign,
+        rawHeadsign,
         stopId: row.stop_id,
         predictions: [],
       };
@@ -231,6 +250,7 @@ export async function GET(context: import("astro").APIContext) {
       {
         directionId: string;
         headsign: string;
+        rawHeadsign: string;
         stopId: string;
         predictions: Prediction[];
       }[]

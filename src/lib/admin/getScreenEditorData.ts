@@ -11,6 +11,7 @@ import { getGtfsDb } from "../gtfsConfig";
 import { buildForWebRouteCondition } from "../stopEligibility";
 import getStopWithRoutes, { type StopRoute } from "../getStopWithRoutes";
 import { ROUTE_SHORT_NAME_OVERRIDES } from "../routeShortNameOverrides";
+import { getPairRawHeadsigns, pairHeadsignsKey } from "../getPairHeadsigns";
 import { readScreenSignsFile } from "./screenSignsFile";
 import type {
   AdminScreenDetail,
@@ -259,6 +260,21 @@ export async function getServingPairs(
   const stopRows = getStopRows(stopIds);
   const routeRows = getRouteRows([...allRouteIds]);
 
+  // Collect the pair list in advance so their raw headsigns can be fetched
+  // in one batch — the vocabulary a route-stop entry's headsignFilter matches
+  // against, and the only place split-line sub-lines are distinguishable.
+  const pairList: { routeId: string; stopId: string }[] = [];
+  const seenPairListKeys = new Set<string>();
+  for (const { stopId, byRoute } of perStop) {
+    for (const routeId of byRoute.keys()) {
+      const key = pairHeadsignsKey(routeId, stopId);
+      if (seenPairListKeys.has(key)) continue;
+      seenPairListKeys.add(key);
+      pairList.push({ routeId, stopId });
+    }
+  }
+  const headsignsByPair = getPairRawHeadsigns(pairList);
+
   const pairs: AdminScreenRouteStopInfo[] = [];
   const seenPairs = new Set<string>();
   for (const { stopId, byRoute } of perStop) {
@@ -276,6 +292,10 @@ export async function getServingPairs(
         stopId,
         stopName: stopRows.get(stopId)?.stop_name ?? "",
         headsigns: [...new Set(cards.flatMap((card) => card.headsigns))],
+        headsignOptions: headsignsByPair.get(key) ?? [],
+        directionIds: [...new Set(cards.map((card) => card.directionId))].sort(
+          (a, b) => a - b,
+        ),
         label:
           first.routeShortName ||
           row?.route_short_name ||
@@ -340,6 +360,8 @@ export async function getScreenDetail(
       stopId: pair.stopId,
       stopName: stopRows.get(pair.stopId)?.stop_name ?? "",
       headsigns: [],
+      headsignOptions: [],
+      directionIds: [],
       label:
         row?.route_short_name ||
         ROUTE_SHORT_NAME_OVERRIDES[pair.routeId] ||

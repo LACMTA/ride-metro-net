@@ -12,6 +12,7 @@ import type {
   ScreenDimensions,
   ScreenPaginationSettings,
 } from "../../data/types";
+import type { PairHeadsignRow } from "../getPairHeadsigns";
 
 /** One selectable line in the admin editor's dropdown. */
 export interface AdminLineSummary {
@@ -186,6 +187,22 @@ export interface AdminScreenRouteStopInfo {
    * Empty for stale pairs whose service has gone away.
    */
   headsigns: string[];
+  /**
+   * The raw headsigns this pair runs under, per direction, frequency-ordered
+   * — the vocabulary a route-stop entry's `headsignFilter` matches against.
+   * Split-line routes (two lines under one GTFS route ID, e.g. "10/48")
+   * are only distinguishable here: the raw headsign carries the sub-line
+   * prefix ("48 - Avalon Station"). Empty for stale pairs whose service
+   * has gone away. (Type-only import — erased from the client bundle.)
+   */
+  headsignOptions: PairHeadsignRow[];
+  /**
+   * The GTFS directions this pair serves at the stop — one entry per served
+   * direction, derived from the same per-direction cards the sign page
+   * renders (bus pairs list only their service direction; rail pairs can
+   * list both). Empty for stale pairs whose service has gone away.
+   */
+  directionIds: (0 | 1)[];
   /** Resolved display short name ("B" for rail, "33" for bus). */
   label: string;
   /** GTFS route_long_name ("" when unknown). */

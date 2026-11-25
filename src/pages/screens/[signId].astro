@@ -11,6 +11,7 @@ import type {
 import { getScreenSignEntries, getScreenSign } from "../../lib/getScreenSigns";
 import {
   measureScreenRenderItem,
+  matchesHeadsignFilter,
   packIntoPages,
   paginatedAreaHeight,
   resolvePaginationIntervalMs,
@@ -18,6 +19,11 @@ import {
   SCREEN_ROW_HEIGHTS,
   type ScreenRenderItem,
 } from "../../lib/screenLayout";
+import {
+  getPairRawHeadsigns,
+  pairHeadsignsKey,
+  type PairHeadsigns,
+} from "../../lib/getPairHeadsigns";
 import DataInjector from "../../components/DataInjector.astro";
 import ScreenItem from "../../components/ScreenItem.astro";
 import Layout from "../../layouts/Layout.astro";
@@ -122,9 +128,35 @@ function isRouteStopComponent(
     entry !== null &&
     (entry as ScreenRouteStopComponent).component === "route-stop" &&
     typeof (entry as ScreenRouteStopComponent).routeId === "string" &&
-    typeof (entry as ScreenRouteStopComponent).stopId === "string"
+    typeof (entry as ScreenRouteStopComponent).stopId === "string" &&
+    ((entry as ScreenRouteStopComponent).headsignFilter === undefined ||
+      typeof (entry as ScreenRouteStopComponent).headsignFilter === "string")
   );
 }
+
+// ---------------------------------------------------------------------------
+// Split-line support: route-stop entries with a `headsignFilter` render only
+// the arrivals — and headsign text — whose raw GTFS stop_headsign contains
+// the filter, so split-line routes (two lines under one route ID, e.g.
+// "10/48") can be split into one row per sub-line. The same substring
+// concept as the line map's `stopHeadsignFilter`. Only pairs that actually
+// use a filter are queried.
+// ---------------------------------------------------------------------------
+const filteredPairs: { routeId: string; stopId: string }[] = [];
+const seenFilteredPairs = new Set<string>();
+for (const entry of [
+  ...(signConfig.fixedComponents ?? []),
+  ...signConfig.displayOrder,
+]) {
+  if (!isRouteStopComponent(entry) || entry.headsignFilter === undefined) {
+    continue;
+  }
+  const key = pairHeadsignsKey(entry.routeId, entry.stopId);
+  if (seenFilteredPairs.has(key)) continue;
+  seenFilteredPairs.add(key);
+  filteredPairs.push({ routeId: entry.routeId, stopId: entry.stopId });
+}
+const pairHeadsigns: PairHeadsigns = getPairRawHeadsigns(filteredPairs);
 
 function resolveRenderItems(
   entries: DisplayOrderEntry[],
@@ -146,8 +178,42 @@ function resolveRenderItems(
           `Skipping route-stop ${label} entry ${JSON.stringify(entry)} at index ${index} for screen ${signId}: no matching card.`,
         );
       }
+      const headsignFilter = entry.headsignFilter?.trim() ?? "";
+      const pairRows = headsignFilter
+        ? (pairHeadsigns.get(pairHeadsignsKey(entry.routeId, entry.stopId)) ??
+          [])
+        : [];
       for (const route of cards) {
-        items.push({ type: "route", route });
+        // Unfiltered rows render the card as-is, with its full headsign list.
+        if (headsignFilter === "") {
+          items.push({ type: "route", route });
+          continue;
+        }
+        // Split-line rows show only the processed texts of the raw headsigns
+        // matching the filter for this card's direction.
+        const displayHeadsigns = [
+          ...new Set(
+            pairRows
+              .filter(
+                (row) =>
+                  row.directionId === route.directionId &&
+                  matchesHeadsignFilter(headsignFilter, row.rawHeadsign),
+              )
+              .map((row) => row.headsign),
+          ),
+        ];
+        if (displayHeadsigns.length === 0) {
+          console.warn(
+            `Skipping route-stop ${label} entry ${JSON.stringify(entry)} at index ${index} for screen ${signId}: headsignFilter "${headsignFilter}" matches no headsigns for route ${entry.routeId} at stop ${entry.stopId} (direction ${route.directionId}).`,
+          );
+          continue;
+        }
+        items.push({
+          type: "route",
+          route,
+          headsignFilter,
+          displayHeadsigns,
+        });
       }
     } else if (isHeaderComponent(entry)) {
       items.push({ type: "header", text: entry.text });

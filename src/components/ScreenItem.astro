@@ -35,13 +35,16 @@ const { item } = Astro.props;
         />
         <div class="ml-5 overflow-hidden">
           <div class="mt-7 text-left text-4xl text-nowrap">
-            {item.route.headsigns[0].replace(" Station", "")}
+            {(item.displayHeadsigns ?? item.route.headsigns)[0]?.replace(
+              " Station",
+              "",
+            )}
           </div>
           <div class="h-7 text-xl text-nowrap">
-            {item.route.headsigns.length > 1 && (
+            {(item.displayHeadsigns ?? item.route.headsigns).length > 1 && (
               <>
                 {" "}
-                {item.route.headsigns
+                {(item.displayHeadsigns ?? item.route.headsigns)
                   .slice(1)
                   .map((h) => h.replace(" Station", ""))
                   .join(", ")}
@@ -55,6 +58,7 @@ const { item } = Astro.props;
           routeId={item.route.routeId}
           directionId={item.route.directionId}
           stopId={item.route.childStopId}
+          headsignFilter={item.headsignFilter}
           client:load
         />
       </div>

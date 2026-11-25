@@ -54,7 +54,47 @@ export const PAGINATION_INTERVAL_MAX_MS = 600_000;
 /** One resolved render item on a sign — a section heading or a route card. */
 export type ScreenRenderItem =
   | { type: "header"; text: string }
-  | { type: "route"; route: StopRoute };
+  | {
+      type: "route";
+      route: StopRoute;
+      /**
+       * Optional: only arrivals whose raw GTFS stop_headsign contains this
+       * substring are shown on this row (split-line rows). Forwarded to the
+       * prediction island.
+       */
+      headsignFilter?: string;
+      /**
+       * Headsign display texts for a filtered row — the processed texts of
+       * the raw headsigns matching `headsignFilter` for this card's
+       * direction, computed at build time. Undefined on unfiltered rows,
+       * which display the card's full headsign list.
+       */
+      displayHeadsigns?: string[];
+    };
+
+/**
+ * Whether a raw GTFS `stop_headsign` matches a sign entry's
+ * `headsignFilter` — a case-insensitive substring match, mirroring the SQL
+ * `LIKE '%...%'` semantics of the line map's `stopHeadsignFilter`. An empty
+ * filter matches everything.
+ */
+export function matchesHeadsignFilter(
+  filter: string,
+  rawHeadsign: string,
+): boolean {
+  const needle = filter.trim().toLowerCase();
+  return needle === "" || rawHeadsign.toLowerCase().includes(needle);
+}
+
+/**
+ * The sub-line prefix of a raw GTFS headsign — the text before the first
+ * " - " (e.g. "48" in "48 - Avalon Station"). Split-line routes carry their
+ * sub-line only here. Null when the headsign has no prefix.
+ */
+export function headsignLinePrefix(rawHeadsign: string): string | null {
+  const idx = rawHeadsign.indexOf(" - ");
+  return idx > 0 ? rawHeadsign.slice(0, idx) : null;
+}
 
 /** How much vertical space an item occupies, and whether it is a heading. */
 export interface ScreenItemMeasure {

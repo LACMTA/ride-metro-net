@@ -33,6 +33,17 @@ export interface ScreenRouteStopComponent {
    * directions at a station).
    */
   directionId?: 0 | 1;
+  /**
+   * Optional: only show arrivals whose raw GTFS `stop_headsign` contains this
+   * substring (case-insensitive), and limit the row's displayed headsign text
+   * to matching headsigns. Split-line routes (e.g. "10/48") run two lines
+   * under one GTFS route ID, distinguishable only by the raw headsign's
+   * prefix ("48 - Avalon Station" vs "10 - Downtown LA - 7th - Hill") — the
+   * same concept as `LineMapTripConfig.stopHeadsignFilter`. Add the same
+   * (route, stop) pair twice with different filters to give each sub-line
+   * its own row. Omit to show every headsign the pair serves.
+   */
+  headsignFilter?: string;
 }
 
 /**

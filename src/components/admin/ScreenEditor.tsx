@@ -4,6 +4,8 @@ import type { DisplayOrderEntry, ScreenDimensions } from "../../data/types";
 import {
   DEFAULT_PAGINATION_INTERVAL_MS,
   DEFAULT_SCREEN_DIMENSIONS,
+  headsignLinePrefix,
+  matchesHeadsignFilter,
   measureDisplayOrderEntry,
   packIntoPages,
   paginatedAreaHeight,
@@ -132,17 +134,22 @@ export default function ScreenEditor() {
       draft !== null &&
       JSON.stringify(draft) !== JSON.stringify(baseline);
 
-  // Keys ("routeId:stopId") of route-stop entries in either draft list.
-  const draftPairKeys = useMemo(
+  // Keys ("routeId:stopId") of route-stop entries in either draft list that
+  // are fully UNSCOPED — no headsign filter and no direction. An unscoped
+  // entry renders everything the pair serves, fully consuming the pair — it
+  // disappears from the available list. Entries scoped by a headsign filter
+  // or a direction only cover part of the pair, so the pair stays available
+  // for complementary rows (the other split-line or the other direction).
+  const draftUnscopedPairKeys = useMemo(
     () =>
       new Set(
         (draft
           ? [...draft.fixedComponents, ...draft.displayOrder]
           : []
         ).flatMap((entry) =>
-          typeof entry === "object" &&
-          entry !== null &&
-          entry.component === "route-stop"
+          entry.component === "route-stop" &&
+          !entry.headsignFilter &&
+          entry.directionId === undefined
             ? [`${entry.routeId}:${entry.stopId}`]
             : [],
         ),
@@ -167,14 +174,14 @@ export default function ScreenEditor() {
     return map;
   }, [servingPairs, stalePairs]);
 
-  // Route-stop pairs serving the draft stops but not already in the display
-  // order.
+  // Route-stop pairs serving the draft stops but not already shown unscoped
+  // in the display order.
   const availablePairs = useMemo(
     () =>
       servingPairs.filter(
-        (pair) => !draftPairKeys.has(`${pair.routeId}:${pair.stopId}`),
+        (pair) => !draftUnscopedPairKeys.has(`${pair.routeId}:${pair.stopId}`),
       ),
-    [servingPairs, draftPairKeys],
+    [servingPairs, draftUnscopedPairKeys],
   );
 
   // Rows-per-page / page-count estimate for the draft, using the same
@@ -523,6 +530,57 @@ export default function ScreenEditor() {
     });
   }
 
+  /**
+   * Sets a route-stop entry's headsign filter — a substring of the pair's
+   * raw GTFS stop_headsigns that limits the row to matching arrivals
+   * (splitting split-line routes into one row per sub-line). An empty
+   * value removes the filter. The raw value is kept as typed (never
+   * trimmed mid-edit, so spaces survive); the server trims on save.
+   */
+  function updateEntryHeadsignFilter(
+    list: ListKey,
+    index: number,
+    value: string,
+  ): void {
+    mutateList(list, (entries) => {
+      const entry = entries[index];
+      if (!entry || entry.component !== "route-stop") return entries;
+      const next = [...entries];
+      if (value.trim() === "") {
+        const { headsignFilter: _removed, ...rest } = entry;
+        next[index] = rest;
+      } else {
+        next[index] = { ...entry, headsignFilter: value };
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Sets a route-stop entry's direction — limiting the row to the card(s)
+   * for one GTFS direction (e.g. just one rail direction at a station). An
+   * empty value removes the limit so the row renders every direction the
+   * pair serves.
+   */
+  function updateEntryDirectionId(
+    list: ListKey,
+    index: number,
+    value: string,
+  ): void {
+    mutateList(list, (entries) => {
+      const entry = entries[index];
+      if (!entry || entry.component !== "route-stop") return entries;
+      const next = [...entries];
+      if (value === "") {
+        const { directionId: _removed, ...rest } = entry;
+        next[index] = rest;
+      } else {
+        next[index] = { ...entry, directionId: value === "1" ? 1 : 0 };
+      }
+      return next;
+    });
+  }
+
   /** Sets one side of the draft's screen dimensions from an input string. */
   function setDimension(side: "width" | "height", raw: string): void {
     const value = Number(raw);
@@ -680,7 +738,7 @@ export default function ScreenEditor() {
       list === "displayOrder" ? (
         <button
           type="button"
-          className="text-secondary-text hover:text-metro-text px-1 text-xs"
+          className="text-secondary-text hover:text-metro-text shrink-0 px-1 text-xs"
           aria-label="Move to the fixed components"
           onClick={() => moveBetweenLists("displayOrder", index)}
         >
@@ -689,7 +747,7 @@ export default function ScreenEditor() {
       ) : (
         <button
           type="button"
-          className="text-secondary-text hover:text-metro-text px-1 text-xs"
+          className="text-secondary-text hover:text-metro-text shrink-0 px-1 text-xs"
           aria-label="Move to the paginated display order"
           onClick={() => moveBetweenLists("fixedComponents", index)}
         >
@@ -705,6 +763,71 @@ export default function ScreenEditor() {
         pair?.stopName ??
         stopInfoRef.current.get(entry.stopId)?.stopName ??
         entry.stopId;
+
+      // The raw headsigns this pair runs under — what a headsignFilter
+      // matches against. Split-line sub-lines are only distinguishable
+      // here ("48 - Avalon Station" vs "10 - Downtown LA - 7th - Hill").
+      const pairHeadsignOptions = pair?.headsignOptions ?? [];
+      // Distinct sub-line prefixes (the text before " - ") — the suggested
+      // filter values for splitting. Several distinct prefixes means a
+      // split-line route.
+      const prefixGroups: { prefix: string; headsigns: string[] }[] = [];
+      for (const option of pairHeadsignOptions) {
+        const prefix = headsignLinePrefix(option.rawHeadsign);
+        if (prefix === null) continue;
+        const group = prefixGroups.find((g) => g.prefix === prefix);
+        if (group) {
+          if (!group.headsigns.includes(option.headsign)) {
+            group.headsigns.push(option.headsign);
+          }
+        } else {
+          prefixGroups.push({ prefix, headsigns: [option.headsign] });
+        }
+      }
+      const isSplitLine = prefixGroups.length >= 2;
+      const filterListId = `headsign-filter-options-${entry.routeId}-${entry.stopId}`;
+
+      // The directions this pair serves (from the same per-direction cards
+      // the sign page renders). Unknown pairs — stale rows whose route no
+      // longer serves the stop — fall back to both values so a saved
+      // direction stays editable; a saved direction the pair no longer
+      // serves is kept as an option too.
+      const servedDirections = pair?.directionIds ?? [];
+      const directionOptions = [
+        ...new Set<number>([
+          ...(servedDirections.length > 0 ? servedDirections : [0, 1]),
+          ...(entry.directionId !== undefined ? [entry.directionId] : []),
+        ]),
+      ].sort((a, b) => a - b);
+      // Most-frequent destination per direction, as a readable hint for the
+      // otherwise cryptic dir 0 / dir 1 values.
+      const directionLabels = new Map<number, string>();
+      for (const option of pairHeadsignOptions) {
+        if (!directionLabels.has(option.directionId)) {
+          directionLabels.set(option.directionId, option.headsign);
+        }
+      }
+
+      // What the row will display: scoped by a direction or headsign
+      // filter, only the matching processed texts — mirroring the sign
+      // page's build-time card filtering.
+      const filterNeedle = entry.headsignFilter?.trim() ?? "";
+      const rowHeadsigns =
+        filterNeedle === "" && entry.directionId === undefined
+          ? (pair?.headsigns ?? [])
+          : [
+              ...new Set(
+                pairHeadsignOptions
+                  .filter(
+                    (option) =>
+                      (entry.directionId === undefined ||
+                        option.directionId === entry.directionId) &&
+                      matchesHeadsignFilter(filterNeedle, option.rawHeadsign),
+                  )
+                  .map((option) => option.headsign),
+              ),
+            ];
+
       return (
         <li
           key={`route-stop-${index}`}
@@ -717,75 +840,127 @@ export default function ScreenEditor() {
           }}
           onDragEnd={handleDragEnd}
           className={
-            "flex items-center gap-3 px-3 py-2" +
-            (dragging ? " opacity-50" : "")
+            "flex flex-col gap-1 px-3 py-2" + (dragging ? " opacity-50" : "")
           }
         >
-          <span
-            className="text-secondary-text cursor-grab select-none"
-            aria-hidden="true"
-          >
-            ⠿
-          </span>
-          {pair && pair.known ? (
-            <RouteBadge
-              routeId={entry.routeId}
-              routeType={pair.routeType}
-              name={pair.label}
-              color={pair.routeColor}
-              textColor={pair.routeTextColor}
+          <div className="flex items-center gap-3">
+            <span
+              className="text-secondary-text cursor-grab select-none"
+              aria-hidden="true"
+            >
+              ⠿
+            </span>
+            {pair && pair.known ? (
+              <RouteBadge
+                routeId={entry.routeId}
+                routeType={pair.routeType}
+                name={pair.label}
+                color={pair.routeColor}
+                textColor={pair.routeTextColor}
+              />
+            ) : (
+              <span className="border-error text-error rounded-sm border px-1.5 py-0.5 font-mono text-xs">
+                {entry.routeId}
+              </span>
+            )}
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5">
+              <span className="text-secondary-text text-sm">
+                {rowHeadsigns.join(" / ") || pair?.longName}
+              </span>
+              <span className="text-metro-text text-sm whitespace-nowrap">
+                at {stopName}
+              </span>
+              <span className="text-secondary-text font-mono text-xs whitespace-nowrap">
+                {entry.stopId}
+              </span>
+              {pair && !pair.known && (
+                <span className="text-error text-xs font-bold">
+                  not in GTFS
+                </span>
+              )}
+              {!serving && (
+                <span className="text-error text-xs">
+                  not currently serving
+                </span>
+              )}
+            </div>
+            {moveButton}
+            <button
+              type="button"
+              className="text-secondary-text hover:text-metro-text shrink-0 px-1 text-sm"
+              aria-label={`Move ${entry.routeId} at ${entry.stopId} up`}
+              disabled={index === 0}
+              onClick={() => moveEntry(list, index, -1)}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="text-secondary-text hover:text-metro-text shrink-0 px-1 text-sm"
+              aria-label={`Move ${entry.routeId} at ${entry.stopId} down`}
+              disabled={last}
+              onClick={() => moveEntry(list, index, 1)}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              className="text-error shrink-0 px-1 text-sm"
+              aria-label={`Remove ${entry.routeId} at ${entry.stopId} from ${list === "displayOrder" ? "display order" : "fixed components"}`}
+              onClick={() => removeEntry(list, index)}
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pl-7">
+            <select
+              className={SELECT_CLASS + " w-40"}
+              value={
+                entry.directionId === undefined ? "" : String(entry.directionId)
+              }
+              aria-label={`Direction for route ${entry.routeId} at stop ${entry.stopId} — limits the row to one GTFS direction`}
+              onChange={(e) =>
+                updateEntryDirectionId(list, index, e.target.value)
+              }
+            >
+              <option value="">All directions</option>
+              {directionOptions.map((direction) => (
+                <option key={direction} value={String(direction)}>
+                  dir {direction}
+                  {directionLabels.get(direction) !== undefined
+                    ? ` — ${directionLabels.get(direction)}`
+                    : ""}
+                </option>
+              ))}
+            </select>
+            <input
+              className={INPUT_CLASS + " w-40"}
+              list={isSplitLine ? filterListId : undefined}
+              value={entry.headsignFilter ?? ""}
+              placeholder="all headsigns"
+              aria-label={`Headsign filter for route ${entry.routeId} at stop ${entry.stopId} — only arrivals whose raw headsign contains this text`}
+              onChange={(e) =>
+                updateEntryHeadsignFilter(list, index, e.target.value)
+              }
             />
-          ) : (
-            <span className="border-error text-error rounded-sm border px-1.5 py-0.5 font-mono text-xs">
-              {entry.routeId}
-            </span>
+          </div>
+          {isSplitLine && (
+            <>
+              <p className="text-secondary-text pl-7 text-xs">
+                Runs under:{" "}
+                {pairHeadsignOptions
+                  .map((option) => option.rawHeadsign)
+                  .join(" / ")}
+              </p>
+              <datalist id={filterListId}>
+                {prefixGroups.map((group) => (
+                  <option key={group.prefix} value={group.prefix}>
+                    {group.headsigns.join(" / ")}
+                  </option>
+                ))}
+              </datalist>
+            </>
           )}
-          <span className="text-secondary-text text-sm">
-            {pair?.headsigns.join(" / ") || pair?.longName}
-          </span>
-          <span className="text-metro-text text-sm">at {stopName}</span>
-          <span className="text-secondary-text font-mono text-xs">
-            {entry.stopId}
-          </span>
-          {entry.directionId !== undefined && (
-            <span className="border-blue text-blue rounded-sm border px-1.5 py-0.5 text-xs">
-              dir {entry.directionId}
-            </span>
-          )}
-          {pair && !pair.known && (
-            <span className="text-error text-xs font-bold">not in GTFS</span>
-          )}
-          {!serving && (
-            <span className="text-error text-xs">not currently serving</span>
-          )}
-          <span className="flex-1" />
-          {moveButton}
-          <button
-            type="button"
-            className="text-secondary-text hover:text-metro-text px-1 text-sm"
-            aria-label={`Move ${entry.routeId} at ${entry.stopId} up`}
-            disabled={index === 0}
-            onClick={() => moveEntry(list, index, -1)}
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            className="text-secondary-text hover:text-metro-text px-1 text-sm"
-            aria-label={`Move ${entry.routeId} at ${entry.stopId} down`}
-            disabled={last}
-            onClick={() => moveEntry(list, index, 1)}
-          >
-            ↓
-          </button>
-          <button
-            type="button"
-            className="text-error px-1 text-sm"
-            aria-label={`Remove ${entry.routeId} at ${entry.stopId} from ${list === "displayOrder" ? "display order" : "fixed components"}`}
-            onClick={() => removeEntry(list, index)}
-          >
-            ✕
-          </button>
         </li>
       );
     }
@@ -1214,11 +1389,17 @@ export default function ScreenEditor() {
               Exactly what the sign displays, in order — drag rows or use the
               arrows to arrange. Route-stop rows render one exact (route, stop)
               pair — use them to show a route at just one of several nearby
-              stops and intentionally exclude duplicates. Entries that no longer
-              serve the sign’s stops are kept and flagged; the sign page skips
-              them. Headers render as full-width section headings. When this
-              list overflows the screen it splits into rotating pages; saving
-              writes the full list to <code>displayOrder</code>.
+              stops and intentionally exclude duplicates. Each row&apos;s
+              direction selector limits it to one GTFS direction (e.g. just one
+              rail direction at a station), and its headsign filter limits it to
+              arrivals whose raw headsign contains that text — add the same pair
+              twice with different filters (e.g. &quot;10&quot; and
+              &quot;48&quot;) to split a split-line route into one row per line.
+              Entries that no longer serve the sign&apos;s stops are kept and
+              flagged; the sign page skips them. Headers render as full-width
+              section headings. When this list overflows the screen it splits
+              into rotating pages; saving writes the full list to{" "}
+              <code>displayOrder</code>.
             </p>
             <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
               {draft.displayOrder.map((entry, index) =>
@@ -1269,12 +1450,16 @@ export default function ScreenEditor() {
               Available route-stop pairs
             </h2>
             <p className="text-secondary-text mb-3 text-sm">
-              Route-stop pairs serving the selected stops but not included in
-              the fixed components or display order — one entry per (route,
-              stop), so you can add the exact pair the sign should show and
-              intentionally exclude duplicates when several nearby stops serve
-              the same route. Adding one appends it to the end of the display
-              order above.
+              Route-stop pairs serving the selected stops but not already shown
+              unscoped — one entry per (route, stop), so you can add the exact
+              pair the sign should show and intentionally exclude duplicates
+              when several nearby stops serve the same route. Each row lists the
+              raw headsigns the pair runs under (e.g.{" "}
+              <code>48 - Avalon Station</code>) — the text a headsign filter
+              matches against. Adding one appends it to the end of the display
+              order above; a pair already shown only scoped by a headsign filter
+              or a direction stays here so its other lines and directions can be
+              added too.
             </p>
             <ul className="border-border-light divide-border-light divide-y rounded-md border bg-white">
               {availablePairs.length === 0 ? (
@@ -1294,19 +1479,22 @@ export default function ScreenEditor() {
                       color={pair.routeColor}
                       textColor={pair.routeTextColor}
                     />
-                    <span className="text-secondary-text text-sm">
-                      {pair.headsigns.join(" / ") || pair.longName}
+                    <span className="text-secondary-text min-w-0 flex-1 text-sm">
+                      {pair.headsignOptions.length > 0
+                        ? pair.headsignOptions
+                            .map((option) => option.rawHeadsign)
+                            .join(" / ")
+                        : pair.headsigns.join(" / ") || pair.longName}
                     </span>
-                    <span className="text-metro-text text-sm">
+                    <span className="text-metro-text text-sm whitespace-nowrap">
                       {pair.stopName}
                     </span>
-                    <span className="text-secondary-text font-mono text-xs">
+                    <span className="text-secondary-text font-mono text-xs whitespace-nowrap">
                       {pair.stopId}
                     </span>
-                    <span className="flex-1" />
                     <button
                       type="button"
-                      className="text-link text-sm"
+                      className="text-link shrink-0 text-sm"
                       onClick={() => addPair(pair)}
                     >
                       Add

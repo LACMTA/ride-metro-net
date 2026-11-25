@@ -89,7 +89,13 @@ const KNOWN_DISPLAY_COMPONENTS = new Set(["header", "route-stop"]);
 /** Properties allowed on each component type (typo guard). */
 const COMPONENT_PROPERTIES: Record<string, Set<string>> = {
   header: new Set(["component", "text"]),
-  "route-stop": new Set(["component", "routeId", "stopId", "directionId"]),
+  "route-stop": new Set([
+    "component",
+    "routeId",
+    "stopId",
+    "directionId",
+    "headsignFilter",
+  ]),
 };
 
 export type ScreenConfigValidationResult =
@@ -145,7 +151,7 @@ function validateComponentEntry(
   }
 
   if (component === "route-stop") {
-    const { routeId, stopId, directionId } = entry;
+    const { routeId, stopId, directionId, headsignFilter } = entry;
     if (typeof routeId !== "string" || routeId.trim() === "") {
       errors.push(`${path} route-stop "routeId" must be a non-empty string.`);
       return null;
@@ -160,6 +166,17 @@ function validateComponentEntry(
       );
       return null;
     }
+    // Same validation as the line map's stopHeadsignFilter: a non-empty
+    // substring of the raw GTFS stop_headsign when present.
+    if (
+      headsignFilter !== undefined &&
+      (typeof headsignFilter !== "string" || headsignFilter.trim() === "")
+    ) {
+      errors.push(
+        `${path} route-stop "headsignFilter" must be a non-empty string.`,
+      );
+      return null;
+    }
     const normalized: ScreenRouteStopComponent = {
       component: "route-stop",
       // Normalize suffixed GTFS route IDs to the stable prefix.
@@ -168,6 +185,9 @@ function validateComponentEntry(
       ...(directionId === undefined
         ? {}
         : { directionId: directionId as 0 | 1 }),
+      ...(typeof headsignFilter === "string"
+        ? { headsignFilter: headsignFilter.trim() }
+        : {}),
     };
     return normalized;
   }
@@ -180,7 +200,11 @@ function validateComponentEntry(
  * `displayOrder` (the paginated list) and `fixedComponents` (the
  * always-visible zone). Every entry must be a known component object;
  * route-stop pairs must reference one of the sign's stopIds and may not be
- * used twice anywhere on the sign (fixed + paginated combined). Returns
+ * used twice anywhere on the sign with the same identity (fixed +
+ * paginated combined) — the same (route, stop, direction, headsignFilter)
+ * combination may only appear once, but the same pair MAY appear multiple
+ * times with different headsign filters, which is how split-line routes
+ * (two lines under one GTFS route ID) get one row per sub-line. Returns
  * the normalized entries, or null when the raw value isn't an array (an
  * error is pushed in that case).
  */
@@ -208,14 +232,17 @@ function validateComponentList(
       );
       if (component) {
         if (component.component === "route-stop") {
-          const pairKey = `${component.routeId}:${component.stopId}:${component.directionId ?? "*"}`;
+          const pairKey = `${component.routeId}:${component.stopId}:${component.directionId ?? "*"}:${component.headsignFilter ?? "*"}`;
           if (seenRouteStops.has(pairKey)) {
             errors.push(
               `Duplicate ${label} route-stop entry: route "${component.routeId}" at stop "${component.stopId}"` +
                 (component.directionId !== undefined
                   ? ` (direction ${component.directionId})`
                   : "") +
-                ". A route-stop pair may only be used once on a sign (fixed or paginated).",
+                (component.headsignFilter !== undefined
+                  ? ` (headsign filter "${component.headsignFilter}")`
+                  : "") +
+                ". The same pair may appear more than once only with different headsign filters (or directions) — use one entry per split-line sub-line, otherwise use it once (fixed or paginated).",
             );
             continue;
           }
@@ -243,15 +270,19 @@ function validateComponentList(
  * an array of component objects, each using a known `component` type with
  * exactly that component's allowed properties — `{ component: "header",
  * text: "..." }` headers and `{ component: "route-stop", routeId, stopId,
- * directionId? }` route-stop pairs. Route-stop `routeId`s are normalized to
- * their stable prefix (suffixed GTFS IDs like "33-13167" are stored as
- * "33"); duplicate route-stop pairs are rejected across the whole sign, and
- * route-stop `stopId`s must reference one of the sign's `stopIds`. Bare
- * route-ID strings are no longer accepted — every route row must name its
- * stop. Optional `fixedComponents` follow the same rules (rendered in a
- * fixed zone above the paginated list); optional `dimensions` and
- * `pagination` size the board for its physical screen and tune the
- * page-flip interval. Unknown properties are rejected (typo guard).
+ * directionId?, headsignFilter? }` route-stop pairs. Route-stop `routeId`s
+ * are normalized to their stable prefix (suffixed GTFS IDs like "33-13167"
+ * are stored as "33"); duplicate route-stop identities are rejected across
+ * the whole sign — the same (route, stop, direction, headsignFilter) may
+ * only appear once, but the same pair may appear multiple times with
+ * different headsign filters, splitting split-line routes into one row
+ * per sub-line — and route-stop `stopId`s must reference one of the sign's
+ * `stopIds`. Bare route-ID strings are no longer accepted — every route
+ * row must name its stop. Optional `fixedComponents` follow the same rules
+ * (rendered in a fixed zone above the paginated list); optional
+ * `dimensions` and `pagination` size the board for its physical screen and
+ * tune the page-flip interval. Unknown properties are rejected (typo
+ * guard).
  */
 export function validateScreenConfigBody(
   body: unknown,
