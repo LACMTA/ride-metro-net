@@ -62,5 +62,5 @@ export default function RoutePrediction({
     return <p>No predictions available</p>;
   }
 
-  return <>{predictions.map((pred) => pred.min).join(", ")} mins</>;
+  return <>{predictions.map((pred) => pred.min).join(", ")} min</>;
 }
